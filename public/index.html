@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Liora — Estudo Inteligente</title>
+  <meta name="description" content="Liora — Planos de estudo e sessões com IA." />
+  <link rel="icon" href="/favicon.ico" />
+
+  <!-- Fonte -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/style.css?v=1" />
+</head>
+
+<body>
+  <div id="app">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo">Li</div>
+        <div class="brand-text">
+          <h1>Liora</h1>
+          <p>Estudo Inteligente</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-theme" class="btn-icon" title="Alternar tema" aria-label="Alternar tema">🌗</button>
+
+        <button id="btn-login" class="btn-secondary">Entrar</button>
+        <button id="btn-logout" class="btn-secondary hidden">Sair</button>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- HOME -->
+      <section id="screen-home" class="screen active">
+        <div class="hero">
+          <h2>Como deseja estudar hoje?</h2>
+
+          <div class="grid-2">
+            <button class="card-btn" data-nav="tema">
+              <div class="card-title">Tema</div>
+              <div class="card-desc">Gere plano e sessões por assunto</div>
+            </button>
+
+            <button class="card-btn" data-nav="pdf">
+              <div class="card-title">PDF</div>
+              <div class="card-desc">Gere plano com base no conteúdo do PDF</div>
+            </button>
+
+            <button class="card-btn" data-nav="simulados">
+              <div class="card-title">Simulados</div>
+              <div class="card-desc">Questões por banca e dificuldade</div>
+              <span class="pill">em breve</span>
+            </button>
+
+            <button class="card-btn" data-nav="dashboard">
+              <div class="card-title">Meu desempenho</div>
+              <div class="card-desc">Acompanhe sua evolução por banca</div>
+              <span class="pill">em breve</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TEMA -->
+      <section id="screen-tema" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Plano por Tema</h3>
+        </div>
+
+        <div class="panel">
+          <label class="label">Tema</label>
+          <input id="inp-tema" class="input" placeholder="Ex.: IA Generativa, Direito Constitucional..." />
+
+          <label class="label">Nível</label>
+          <select id="sel-nivel" class="input">
+            <option value="iniciante">Iniciante</option>
+            <option value="intermediario">Intermediário</option>
+            <option value="avancado">Avançado</option>
+          </select>
+
+          <button id="btn-gerar-tema" class="btn-primary">
+            Gerar plano
+          </button>
+
+          <div id="tema-status" class="muted small"></div>
+        </div>
+
+        <div id="tema-result" class="two-cols hidden">
+          <aside class="aside">
+            <div class="aside-title">Sessões</div>
+            <div id="lista-sessoes" class="list"></div>
+
+            <div class="aside-actions">
+              <button id="btn-limpar-plano" class="btn-secondary">
+                Limpar plano
+              </button>
+            </div>
+          </aside>
+
+          <section class="content">
+            <div id="sessao-view" class="sessao"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- PDF -->
+      <section id="screen-pdf" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Plano por PDF</h3>
+        </div>
+
+        <div class="panel">
+          <div class="muted">
+            Esqueleto pronto ✅<br>
+            Vamos fechar PDF depois que o Tema estiver perfeito.
+          </div>
+
+          <input type="file" accept="application/pdf" class="input" disabled />
+          <button class="btn-primary" disabled>Gerar plano</button>
+        </div>
+      </section>
+
+      <!-- SIMULADOS -->
+      <section id="screen-simulados" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Simulados</h3>
+        </div>
+
+        <div class="panel">
+          <div class="muted">
+            Em breve ✅<br>
+            Vamos implementar depois de fechar Tema + PDF.
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section id="screen-dashboard" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Meu desempenho</h3>
+        </div>
+
+        <div class="panel">
+          <div class="muted">
+            Em breve ✅<br>
+            Aqui entra evolução por banca + recomendações.
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- LOADING -->
+    <div id="ui-loading" class="overlay hidden" aria-hidden="true">
+      <div class="overlay-card">
+        <div class="spinner"></div>
+        <div id="ui-loading-text" class="overlay-text">Processando…</div>
+      </div>
+    </div>
+
+    <!-- ERROR -->
+    <div id="ui-error" class="overlay hidden" aria-hidden="true">
+      <div class="overlay-card">
+        <div class="overlay-title">Algo deu ruim 😅</div>
+        <div id="ui-error-text" class="overlay-text">Erro</div>
+        <div class="overlay-actions">
+          <button id="ui-error-close" class="btn-primary">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- APP (1 único script) -->
+  <script type="module" src="/scripts/app.js?v=1"></script>
+</body>
+</html>
