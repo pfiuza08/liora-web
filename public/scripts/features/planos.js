@@ -218,6 +218,7 @@ export const planos = {
 
   // -----------------------------
   // 🧱 Render Sessão Premium
+  // ✅ Conteúdo ANTES de checkpoint
   // -----------------------------
   renderSessao(s) {
     const view = document.getElementById("sessao-view");
@@ -388,11 +389,7 @@ export const planos = {
       <h4>${this._escapeHtml(titulo)}</h4>
       <p class="muted"><b>Objetivo:</b> ${this._escapeHtml(objetivo)}</p>
 
-      ${checklistHtml}
-      ${errosHtml}
-      ${flashcardsHtml}
-      ${checkpointHtml}
-
+      <!-- ✅ CONTEÚDO PRIMEIRO -->
       <div class="box">
         <b>Introdução</b>
         <p>${this._escapeHtml(introducao)}</p>
@@ -417,6 +414,14 @@ export const planos = {
         <b>Resumo rápido</b>
         ${listOrDash(resumo)}
       </div>
+
+      <!-- ✅ SUPORTE DE ESTUDO -->
+      ${checklistHtml}
+      ${errosHtml}
+      ${flashcardsHtml}
+
+      <!-- ✅ AVALIAÇÃO POR ÚLTIMO -->
+      ${checkpointHtml}
     `;
 
     // toolbar
@@ -431,7 +436,7 @@ export const planos = {
       });
     });
 
-    // checkpoint: show/hide explicação/gabarito (texto correto)
+    // show/hide explicação/gabarito (texto certo)
     view.querySelectorAll("[data-show]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = btn.getAttribute("data-show");
@@ -442,12 +447,11 @@ export const planos = {
         const open = el.style.display !== "none";
         el.style.display = open ? "none" : "block";
 
-        if (open) btn.textContent = `Mostrar ${label}`;
-        else btn.textContent = `Ocultar ${label}`;
+        btn.textContent = open ? `Mostrar ${label}` : `Ocultar ${label}`;
       });
     });
 
-    // checkpoint: answer selection feedback (MCQ)
+    // MCQ: feedback
     view.querySelectorAll(".cq-opt").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = Number(btn.getAttribute("data-q"));
@@ -456,8 +460,10 @@ export const planos = {
         const q = checkpoint[qi];
         const correta = Number.isFinite(q?.correta) ? q.correta : -1;
 
-        // visual: desmarca outras
-        view.querySelectorAll(`.cq-opt[data-q="${qi}"]`).forEach((b) => b.classList.remove("selected", "right", "wrong"));
+        view
+          .querySelectorAll(`.cq-opt[data-q="${qi}"]`)
+          .forEach((b) => b.classList.remove("selected", "right", "wrong"));
+
         btn.classList.add("selected");
 
         const fb = document.getElementById(`cq-fb-${qi}`);
@@ -473,7 +479,7 @@ export const planos = {
       });
     });
 
-    // curta: comparar com gabarito (feedback humano)
+    // Curta: comparar com gabarito
     view.querySelectorAll("[data-check]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = btn.getAttribute("data-check");
@@ -489,12 +495,8 @@ export const planos = {
           return;
         }
 
-        // mostra gabarito
         exp.style.display = "block";
-
-        // feedback simples e útil
-        fb.textContent =
-          "✅ Ótimo. Compare sua resposta com o gabarito e ajuste 1 ponto se necessário.";
+        fb.textContent = "✅ Ótimo. Compare sua resposta com o gabarito e ajuste 1 ponto se necessário.";
       });
     });
   },
