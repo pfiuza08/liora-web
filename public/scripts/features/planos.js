@@ -68,13 +68,15 @@ export const planos = {
         throw new Error("Resposta inválida: sem sessões.");
       }
 
-      // normalização leve (garante estrutura)
       data = this._normalizePlano(data, { tema, nivel });
 
       store.set("planoTema", data);
 
       // reset de progresso quando gera plano novo
       this._resetStateForNewPlan(data);
+
+      // limpa cache/uso de aprofundar do plano (não apaga contagem diária)
+      this.ctx.store.set("planoTemaAprofCache", {});
 
       this.render(data);
 
@@ -92,6 +94,7 @@ export const planos = {
     const { store } = this.ctx;
     store.remove("planoTema");
     store.remove("planoTemaState");
+    store.remove("planoTemaAprofCache");
 
     this._plano = null;
     this._sessoes = [];
@@ -218,7 +221,8 @@ export const planos = {
 
   // -----------------------------
   // 🧱 Render Sessão Premium
-  // ✅ Conteúdo ANTES de checkpoint
+  // ✅ Conteúdo ANTES de avaliação
+  // ✅ Conceitos com botão Aprofundar
   // -----------------------------
   renderSessao(s) {
     const view = document.getElementById("sessao-view");
@@ -342,7 +346,7 @@ export const planos = {
                    `;
                  }
 
-                 // ✅ curta (com campo de resposta)
+                 // curta (com campo de resposta)
                  return `
                    <div class="cq" data-cq="${qi}">
                      <div class="cq-q"><span class="cq-tag">Curta</span> ${pergunta}</div>
@@ -373,6 +377,41 @@ export const planos = {
          </div>`
       : "";
 
+    // ✅ Conceitos com botão Aprofundar (inline)
+    const conceitosHtml = conceitos.length
+      ? `<ul class="conceitos-list">
+          ${conceitos
+            .map((item, ci) => {
+              const sid = s?.id || `S${this._idxAtual + 1}`;
+              const key = this._aprofundarKey(sid, ci);
+              const cached = this._getAprofCache()?.[key] || null;
+
+              const hint = cached ? "✅ já aprofundado" : "🔎 aprofundar";
+              const btnLabel = cached ? "Ver aprofundamento" : "Aprofundar";
+
+              return `
+                <li class="conceito-item">
+                  <div class="conceito-row">
+                    <span class="conceito-text">${this._escapeHtml(item)}</span>
+                    <button type="button"
+                            class="btn-secondary btn-aprofundar"
+                            data-aprof-sid="${this._escapeHtml(sid)}"
+                            data-aprof-ci="${ci}"
+                            title="${hint}">
+                      ${btnLabel}
+                    </button>
+                  </div>
+
+                  <div class="aprofundar-slot" id="aprof-slot-${sid}-${ci}">
+                    ${cached ? this._renderAprof(cached) : ""}
+                  </div>
+                </li>
+              `;
+            })
+            .join("")}
+        </ul>`
+      : `<p class="muted">—</p>`;
+
     view.innerHTML = `
       <div class="sessao-toolbar">
         <div class="sessao-progress">
@@ -396,8 +435,8 @@ export const planos = {
       </div>
 
       <div class="box">
-        <b>Conceitos</b>
-        ${listOrDash(conceitos)}
+        <b>Conceitos (com aprofundamento)</b>
+        ${conceitosHtml}
       </div>
 
       <div class="box">
@@ -415,7 +454,7 @@ export const planos = {
         ${listOrDash(resumo)}
       </div>
 
-      <!-- ✅ SUPORTE DE ESTUDO -->
+      <!-- ✅ SUPORTE -->
       ${checklistHtml}
       ${errosHtml}
       ${flashcardsHtml}
@@ -436,7 +475,7 @@ export const planos = {
       });
     });
 
-    // show/hide explicação/gabarito (texto certo)
+    // show/hide explicação/gabarito
     view.querySelectorAll("[data-show]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = btn.getAttribute("data-show");
@@ -499,6 +538,217 @@ export const planos = {
         fb.textContent = "✅ Ótimo. Compare sua resposta com o gabarito e ajuste 1 ponto se necessário.";
       });
     });
+
+    // ✅ Aprofundar: bind nos botões
+    view.querySelectorAll(".btn-aprofundar").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const sid = btn.getAttribute("data-aprof-sid");
+        const ci = Number(btn.getAttribute("data-aprof-ci"));
+
+        if (!sid || !Number.isFinite(ci)) return;
+        await this._aprofundarConceito(s, sid, ci);
+      });
+    });
+  },
+
+  // -----------------------------
+  // 🔎 Aprofundar (Premium + limite Free)
+  // -----------------------------
+  async _aprofundarConceito(sessao, sid, ci) {
+    const { store, ui } = this.ctx;
+
+    const conceitoTxt =
+      Array.isArray(sessao?.conteudo?.conceitos) ? sessao.conteudo.conceitos[ci] : null;
+
+    if (!conceitoTxt) {
+      ui.error("Conceito inválido para aprofundar.");
+      return;
+    }
+
+    // ✅ Cache
+    const key = this._aprofundarKey(sid, ci);
+    const cache = this._getAprofCache();
+    if (cache?.[key]) {
+      this._toggleAprofSlot(sid, ci);
+      return;
+    }
+
+    // ✅ Limite Free
+    const user = store.get("user") || null;
+    const isPremium = !!user?.premium;
+
+    if (!isPremium) {
+      const can = this._canUseAprofFree();
+      if (!can.ok) {
+        ui.error(
+          `Você já usou seus ${can.limit}/dia de Aprofundar no plano Free. Desbloqueie ilimitado no Premium.`
+        );
+        return;
+      }
+    }
+
+    const slot = document.getElementById(`aprof-slot-${sid}-${ci}`);
+    if (!slot) return;
+
+    try {
+      // UI local (sem travar tudo)
+      slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
+
+      // infos do plano atual
+      const metaTema = this._plano?.meta?.tema || "";
+      const metaNivel = this._plano?.meta?.nivel || "iniciante";
+
+      const res = await fetch("/api/aprofundar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tema: metaTema,
+          nivel: metaNivel,
+          sessaoId: sid,
+          sessaoTitulo: sessao?.titulo || "",
+          conceito: conceitoTxt
+        })
+      });
+
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.error("Aprofundar não-JSON:", text);
+        throw new Error("Resposta inválida do servidor (não JSON).");
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+      }
+
+      // validação mínima
+      if (!data?.topico || !data?.explicacaoLonga) {
+        throw new Error("Aprofundamento inválido (faltando campos).");
+      }
+
+      // salva no cache
+      const nextCache = { ...(cache || {}) };
+      nextCache[key] = data;
+      store.set("planoTemaAprofCache", nextCache);
+
+      // conta uso no Free
+      const userNow = store.get("user") || null;
+      if (!userNow?.premium) this._incAprofFreeUse();
+
+      // renderiza
+      slot.innerHTML = this._renderAprof(data);
+
+      // atualiza label do botão (ver aprofundamento)
+      const btn = document.querySelector(
+        `.btn-aprofundar[data-aprof-sid="${CSS.escape(sid)}"][data-aprof-ci="${ci}"]`
+      );
+      if (btn) btn.textContent = "Ver aprofundamento";
+    } catch (e) {
+      console.error(e);
+      slot.innerHTML = "";
+      ui.error(e?.message || "Falha ao gerar aprofundamento.");
+    }
+  },
+
+  _renderAprof(data) {
+    const topico = this._escapeHtml(data?.topico || "Aprofundamento");
+    const explicacao = this._escapeHtml(data?.explicacaoLonga || "");
+    const pegadinha = this._escapeHtml(data?.pegadinha || "");
+    const exemplo = Array.isArray(data?.exemploResolvido) ? data.exemploResolvido : [];
+    const mini = Array.isArray(data?.miniCheck) ? data.miniCheck : [];
+
+    const exemploHtml = exemplo.length
+      ? `<div class="aprof-box">
+          <b>Exemplo resolvido</b>
+          <ol>${exemplo.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ol>
+        </div>`
+      : "";
+
+    const pegadinhaHtml = pegadinha
+      ? `<div class="aprof-box">
+          <b>Pegadinha comum</b>
+          <p>${pegadinha}</p>
+        </div>`
+      : "";
+
+    const miniHtml = mini.length
+      ? `<div class="aprof-box">
+          <b>Mini-check</b>
+          <ul>${mini.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>
+        </div>`
+      : "";
+
+    return `
+      <div class="aprof-panel">
+        <div class="aprof-title">🔎 Zoom: ${topico}</div>
+        <div class="aprof-box">
+          <b>Explicação aprofundada</b>
+          <p>${explicacao}</p>
+        </div>
+        ${exemploHtml}
+        ${pegadinhaHtml}
+        ${miniHtml}
+      </div>
+    `;
+  },
+
+  _toggleAprofSlot(sid, ci) {
+    const slot = document.getElementById(`aprof-slot-${sid}-${ci}`);
+    if (!slot) return;
+    const open = slot.style.display !== "none";
+    slot.style.display = open ? "none" : "block";
+  },
+
+  _aprofundarKey(sessaoId, conceitoIndex) {
+    return `${String(sessaoId)}::C${String(conceitoIndex)}`;
+  },
+
+  _getAprofCache() {
+    return this.ctx?.store?.get("planoTemaAprofCache") || {};
+  },
+
+  // -----------------------------
+  // 🔒 Free limit (3 por dia)
+  // -----------------------------
+  _todayKey() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  },
+
+  _getAprofUsage() {
+    return this.ctx?.store?.get("aprofUsage") || { date: this._todayKey(), used: 0, limit: 3 };
+  },
+
+  _canUseAprofFree() {
+    const st = this._getAprofUsage();
+    const today = this._todayKey();
+    const limit = Number.isFinite(st?.limit) ? st.limit : 3;
+
+    // reset diário
+    if (st?.date !== today) {
+      const reset = { date: today, used: 0, limit };
+      this.ctx.store.set("aprofUsage", reset);
+      return { ok: true, used: 0, limit };
+    }
+
+    const used = Number.isFinite(st?.used) ? st.used : 0;
+    return { ok: used < limit, used, limit };
+  },
+
+  _incAprofFreeUse() {
+    const st = this._getAprofUsage();
+    const today = this._todayKey();
+    const limit = Number.isFinite(st?.limit) ? st.limit : 3;
+
+    const used = st?.date === today ? (Number.isFinite(st.used) ? st.used : 0) : 0;
+
+    const next = { date: today, used: used + 1, limit };
+    this.ctx.store.set("aprofUsage", next);
   },
 
   // -----------------------------
