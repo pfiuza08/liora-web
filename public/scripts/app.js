@@ -4,6 +4,7 @@ import { gates } from "./gates.js";
 import { ui } from "./ui.js";
 
 import { planos } from "./features/planos.js";
+import { pdf } from "./features/pdf.js";
 import { simulados } from "./features/simulados.js";
 import { dashboard } from "./features/dashboard.js";
 
@@ -83,8 +84,10 @@ function boot() {
   setupNav();
 
   planos.init({ router, store, gates, ui });
+  pdf.init({ router, store, gates, ui });
   simulados.init({ router, store, gates, ui });
   dashboard.init({ router, store, gates, ui });
+
 
   // rota inicial
   router.go("home");
