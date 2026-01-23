@@ -323,3 +323,45 @@ body {
   margin-bottom: 10px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ==============================
+   Tema — Sessão Toolbar (A)
+============================== */
+.sessao-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border-radius:12px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  margin-bottom: 12px;
+}
+
+.light .sessao-toolbar{
+  background: rgba(0,0,0,.04);
+  border: 1px solid rgba(0,0,0,.08);
+}
+
+.sessao-progress{
+  font-size: 13px;
+  opacity: .9;
+}
+
+.sessao-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap: wrap;
+}
+
+.session-item{
+  text-align:left;
+}
+
+.session-item.active{
+  outline: 2px solid rgba(196,75,4,.55);
+  background: rgba(196,75,4,.12);
+}
+
+
