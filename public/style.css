@@ -760,4 +760,57 @@ body {
   color: rgba(0,0,0,.85);
 }
 
+/* ==============================
+   Mini CSS — botões do checkpoint (dark-friendly)
+============================== */
+
+.cq-show{
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.92);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cq-show:hover{
+  border-color: rgba(196,75,4,.55);
+  background: rgba(196,75,4,.12);
+}
+
+.light .cq-show{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.02);
+  color: rgba(0,0,0,.85);
+}
+
+.cq-check{
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(196,75,4,.45);
+  background: rgba(196,75,4,.16);
+  color: rgba(255,255,255,.92);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cq-check:hover{
+  border-color: rgba(196,75,4,.70);
+  background: rgba(196,75,4,.22);
+}
+
+.light .cq-check{
+  color: rgba(0,0,0,.85);
+}
+
+/* feedback com contraste */
+.cq-feedback{
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  margin-top: 10px;
+}
 
