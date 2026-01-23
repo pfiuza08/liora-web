@@ -813,4 +813,70 @@ body {
   background: rgba(255,255,255,.03);
   margin-top: 10px;
 }
+/* ==============================
+   Aprofundar (Zoom do conceito)
+============================== */
+
+.conceitos-list{
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.conceito-item{
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+}
+
+.light .conceito-item{
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(0,0,0,.02);
+}
+
+.conceito-row{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conceito-text{
+  flex: 1;
+  line-height: 1.35;
+}
+
+.btn-aprofundar{
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.aprof-panel{
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(196,75,4,.35);
+  background: rgba(196,75,4,.10);
+}
+
+.aprof-title{
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.aprof-box{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.12);
+}
+
+.light .aprof-box{
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(255,255,255,.65);
+}
 
