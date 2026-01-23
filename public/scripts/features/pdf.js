@@ -26,6 +26,7 @@ export const pdf = {
 
     const inp = document.getElementById("inp-pdf");
     const nivel = document.getElementById("sel-nivel-pdf")?.value || "iniciante";
+    const finalidade = document.getElementById("sel-finalidade-pdf")?.value || "estudo";
     const status = document.getElementById("pdf-status");
 
     const file = inp?.files?.[0] || null;
@@ -56,9 +57,11 @@ export const pdf = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nivel,
+          finalidade,
           nomeArquivo: file.name,
           pages
         })
+
       });
 
       const raw = await res.text();
@@ -82,7 +85,8 @@ export const pdf = {
       data = this._normalizePlano(data, {
         tema: `PDF: ${file.name}`,
         nivel
-      });
+      });  
+
 
       store.set("planoPdf", data);
       store.set("planoPdfState", { currentId: data?.sessoes?.[0]?.id || null, doneIds: [] });
