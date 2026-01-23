@@ -16,32 +16,78 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: "config_error", message: "OPENAI_API_KEY não configurada no servidor." });
     }
 
-    const system = `
-Você é a IA educacional da Liora.
-Gere um plano de estudos por TEMA, retornando SESSÕES completas.
-Retorne APENAS JSON válido, sem markdown e sem texto extra.
-Formato obrigatório:
-{
-  "meta": { "tema": "string", "nivel": "iniciante|intermediario|avancado" },
-  "sessoes": [
-    {
-      "id": "S1",
-      "titulo": "string",
-      "objetivo": "string",
-      "conteudo": {
-        "introducao": "string",
-        "conceitos": ["string"],
-        "exemplos": ["string"],
-        "aplicacoes": ["string"],
-        "resumoRapido": ["string"]
+   const system = `
+      Você é a IA educacional da Liora.
+      
+      Tarefa:
+      Gerar um plano de estudos por TEMA, retornando SESSÕES completas, com blocos premium de estudo ativo.
+      
+      Regras obrigatórias:
+      - Retorne APENAS JSON válido (sem markdown, sem texto extra).
+      - Não inclua crases, blocos de código ou comentários.
+      - O JSON deve seguir EXATAMENTE este formato:
+      
+      {
+        "meta": {
+          "tema": "string",
+          "nivel": "iniciante|intermediario|avancado"
+        },
+        "sessoes": [
+          {
+            "id": "S1",
+            "titulo": "string",
+            "objetivo": "string",
+      
+            "tempoEstimadoMin": 10,
+      
+            "checklist": ["string"],
+            "errosComuns": ["string"],
+      
+            "flashcards": [
+              { "frente": "string", "verso": "string" }
+            ],
+      
+            "checkpoint": [
+              {
+                "tipo": "mcq",
+                "pergunta": "string",
+                "opcoes": ["string", "string", "string", "string"],
+                "correta": 0,
+                "explicacao": "string"
+              },
+              {
+                "tipo": "curta",
+                "pergunta": "string",
+                "gabarito": "string"
+              }
+            ],
+      
+            "conteudo": {
+              "introducao": "string",
+              "conceitos": ["string"],
+              "exemplos": ["string"],
+              "aplicacoes": ["string"],
+              "resumoRapido": ["string"]
+            }
+          }
+        ]
       }
-    }
-  ]
-}
-Restrições:
-- 6 a 10 sessões
-- cada lista: 3 a 6 itens
-`.trim();
+          
+          Restrições de quantidade:
+          - Gere entre 6 e 10 sessões.
+          - tempoEstimadoMin: inteiro entre 10 e 35.
+          - checklist: 3 a 6 itens.
+          - errosComuns: 3 a 5 itens.
+          - flashcards: 3 a 6 cards por sessão.
+          - checkpoint: EXATAMENTE 3 itens por sessão:
+            - 2 perguntas tipo "mcq"
+            - 1 pergunta tipo "curta"
+          - mcq:
+            - opcoes: exatamente 4 opções
+            - correta: índice 0..3
+            - explicacao: 1 a 3 frases
+          - Conteúdo em português, didático, direto, sem enrolação.
+          `;
 
     const user = `TEMA: ${tema}\nNÍVEL: ${nivel || "iniciante"}\nGere o plano completo e sessões completas.`;
 
