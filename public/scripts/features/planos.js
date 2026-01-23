@@ -44,14 +44,12 @@ export const planos = {
       ui.loading(true, "Gerando plano e sessões…");
       if (status) status.textContent = "Chamando IA…";
 
-      // ✅ endpoint correto (sem .js)
       const res = await fetch("/api/gerarPlano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tema, nivel })
       });
 
-      // ✅ lê como texto (evita crash quando vem erro não-JSON)
       const text = await res.text();
       let data = null;
 
@@ -75,7 +73,7 @@ export const planos = {
 
       store.set("planoTema", data);
 
-      // ✅ reset de progresso quando gera plano novo
+      // reset de progresso quando gera plano novo
       this._resetStateForNewPlan(data);
 
       this.render(data);
@@ -83,10 +81,10 @@ export const planos = {
       if (status) status.textContent = "Plano gerado!";
     } catch (e) {
       console.error(e);
-      ui.error(e?.message || "Falha ao gerar plano por tema.");
+      this.ctx.ui.error(e?.message || "Falha ao gerar plano por tema.");
       if (status) status.textContent = "";
     } finally {
-      ui.loading(false);
+      this.ctx.ui.loading(false);
     }
   },
 
@@ -121,22 +119,19 @@ export const planos = {
 
     if (!result || !lista || !view) return;
 
-    // guarda estado runtime
     this._plano = data;
     this._sessoes = Array.isArray(data?.sessoes) ? data.sessoes : [];
 
     result.classList.remove("hidden");
     lista.innerHTML = "";
 
-    // ✅ pega progresso salvo (continuar de onde parou)
+    // continuar de onde parou
     const st = this._getState();
     const lastId = st?.currentId || null;
     const idxLast = lastId ? this._sessoes.findIndex((s) => s?.id === lastId) : -1;
-
-    // se não achar, abre a primeira
     this._idxAtual = idxLast >= 0 ? idxLast : 0;
 
-    // render da lista
+    // render lista
     this._sessoes.forEach((s, i) => {
       const btn = document.createElement("button");
       btn.className = "session-item";
@@ -147,14 +142,10 @@ export const planos = {
       const prefix = done ? "✅ " : "";
       btn.textContent = prefix + (s.titulo || `Sessão ${i + 1}`);
 
-      btn.addEventListener("click", () => {
-        this._setCurrentIndex(i);
-      });
-
+      btn.addEventListener("click", () => this._setCurrentIndex(i));
       lista.appendChild(btn);
     });
 
-    // abre a sessão correta
     this._setCurrentIndex(this._idxAtual, { silentSave: true });
 
     console.log("Plano renderizado:", this._sessoes.length, "sessões");
@@ -168,21 +159,17 @@ export const planos = {
     const n = this._sessoes.length;
     if (!n) return;
 
-    // clamp
     const idx = Math.max(0, Math.min(n - 1, Number(i || 0)));
     this._idxAtual = idx;
 
-    // ativa botão na lista
     lista?.querySelectorAll(".session-item").forEach((x) => x.classList.remove("active"));
 
     const btn = lista?.querySelector(`.session-item[data-index="${idx}"]`);
     btn?.classList.add("active");
 
-    // render sessão
     const sessao = this._sessoes[idx];
     this.renderSessao(sessao);
 
-    // salva progresso atual
     if (!opts.silentSave) {
       this._saveState({ currentId: sessao?.id });
     }
@@ -208,10 +195,7 @@ export const planos = {
 
     this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
 
-    // re-render lista (para atualizar ✅)
     this._refreshListChecks();
-
-    // re-render sessão (para atualizar botão)
     this.renderSessao(sessao);
   },
 
@@ -233,7 +217,7 @@ export const planos = {
   },
 
   // -----------------------------
-  // 🧱 Render Sessão (com toolbar)
+  // 🧱 Render Sessão Premium
   // -----------------------------
   renderSessao(s) {
     const view = document.getElementById("sessao-view");
@@ -242,9 +226,14 @@ export const planos = {
     const titulo = s?.titulo || "Sessão";
     const objetivo = s?.objetivo || "-";
 
+    const tempo = Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : null;
+    const checklist = Array.isArray(s?.checklist) ? s.checklist : [];
+    const erros = Array.isArray(s?.errosComuns) ? s.errosComuns : [];
+    const flashcards = Array.isArray(s?.flashcards) ? s.flashcards : [];
+    const checkpoint = Array.isArray(s?.checkpoint) ? s.checkpoint : [];
+
     const c = s?.conteudo || {};
     const introducao = c?.introducao || "—";
-
     const conceitos = Array.isArray(c?.conceitos) ? c.conceitos : [];
     const exemplos = Array.isArray(c?.exemplos) ? c.exemplos : [];
     const aplicacoes = Array.isArray(c?.aplicacoes) ? c.aplicacoes : [];
@@ -264,10 +253,103 @@ export const planos = {
     const prevDisabled = this._idxAtual <= 0 ? "disabled" : "";
     const nextDisabled = this._idxAtual >= n - 1 ? "disabled" : "";
 
+    const tempoChip = tempo ? `<span class="chip">⏱ ${tempo} min</span>` : "";
+
+    const checklistHtml = checklist.length
+      ? `<div class="box">
+           <b>Checklist do que dominar</b>
+           <ul>${checklist.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>
+         </div>`
+      : "";
+
+    const errosHtml = erros.length
+      ? `<div class="box">
+           <b>Erros comuns</b>
+           <ul>${erros.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>
+         </div>`
+      : "";
+
+    const flashcardsHtml = flashcards.length
+      ? `<div class="box">
+           <b>Flashcards</b>
+           <div class="flashcards">
+             ${flashcards
+               .map(
+                 (fc, i) => `
+                <button class="flashcard" type="button" data-flashcard="${i}">
+                  <div class="flashcard-inner">
+                    <div class="flashcard-face flashcard-front">
+                      <div class="flashcard-label">Frente</div>
+                      <div class="flashcard-text">${this._escapeHtml(fc?.frente || "")}</div>
+                      <div class="flashcard-hint">Clique para virar</div>
+                    </div>
+                    <div class="flashcard-face flashcard-back">
+                      <div class="flashcard-label">Verso</div>
+                      <div class="flashcard-text">${this._escapeHtml(fc?.verso || "")}</div>
+                      <div class="flashcard-hint">Clique para voltar</div>
+                    </div>
+                  </div>
+                </button>
+             `
+               )
+               .join("")}
+           </div>
+         </div>`
+      : "";
+
+    const checkpointHtml = checkpoint.length
+      ? `<div class="box">
+           <b>Checkpoint rápido</b>
+           <div class="checkpoint">
+             ${checkpoint
+               .map((q, qi) => {
+                 const tipo = q?.tipo || "mcq";
+                 const pergunta = this._escapeHtml(q?.pergunta || "");
+                 if (tipo === "mcq") {
+                   const opcoes = Array.isArray(q?.opcoes) ? q.opcoes : [];
+                   return `
+                     <div class="cq" data-cq="${qi}">
+                       <div class="cq-q"><span class="cq-tag">MCQ</span> ${pergunta}</div>
+                       <div class="cq-opts">
+                         ${opcoes
+                           .map(
+                             (op, oi) => `
+                             <button type="button" class="cq-opt" data-q="${qi}" data-oi="${oi}">
+                               ${this._escapeHtml(op)}
+                             </button>
+                           `
+                           )
+                           .join("")}
+                       </div>
+                       <div class="cq-feedback" id="cq-fb-${qi}"></div>
+                       <button type="button" class="cq-show" data-show="${qi}">Mostrar explicação</button>
+                       <div class="cq-exp" id="cq-exp-${qi}" style="display:none;">
+                         ${this._escapeHtml(q?.explicacao || "")}
+                       </div>
+                     </div>
+                   `;
+                 }
+
+                 // curta
+                 return `
+                   <div class="cq" data-cq="${qi}">
+                     <div class="cq-q"><span class="cq-tag">Curta</span> ${pergunta}</div>
+                     <button type="button" class="cq-show" data-show="${qi}">Mostrar gabarito</button>
+                     <div class="cq-exp" id="cq-exp-${qi}" style="display:none;">
+                       ${this._escapeHtml(q?.gabarito || "")}
+                     </div>
+                   </div>
+                 `;
+               })
+               .join("")}
+           </div>
+         </div>`
+      : "";
+
     view.innerHTML = `
       <div class="sessao-toolbar">
         <div class="sessao-progress">
-          Sessão <b>${pos}</b> / ${n}
+          Sessão <b>${pos}</b> / ${n} ${tempoChip}
         </div>
 
         <div class="sessao-actions">
@@ -279,6 +361,11 @@ export const planos = {
 
       <h4>${this._escapeHtml(titulo)}</h4>
       <p class="muted"><b>Objetivo:</b> ${this._escapeHtml(objetivo)}</p>
+
+      ${checklistHtml}
+      ${errosHtml}
+      ${flashcardsHtml}
+      ${checkpointHtml}
 
       <div class="box">
         <b>Introdução</b>
@@ -306,14 +393,55 @@ export const planos = {
       </div>
     `;
 
-    // bind toolbar buttons
-    const bPrev = document.getElementById("btn-prev-sessao");
-    const bNext = document.getElementById("btn-next-sessao");
-    const bDone = document.getElementById("btn-done-sessao");
+    // toolbar
+    document.getElementById("btn-prev-sessao")?.addEventListener("click", () => this._goPrev());
+    document.getElementById("btn-next-sessao")?.addEventListener("click", () => this._goNext());
+    document.getElementById("btn-done-sessao")?.addEventListener("click", () => this._toggleDoneCurrent());
 
-    bPrev?.addEventListener("click", () => this._goPrev());
-    bNext?.addEventListener("click", () => this._goNext());
-    bDone?.addEventListener("click", () => this._toggleDoneCurrent());
+    // flashcards: flip
+    view.querySelectorAll("[data-flashcard]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        btn.classList.toggle("flipped");
+      });
+    });
+
+    // checkpoint: reveal exp/gabarito
+    view.querySelectorAll("[data-show]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qi = btn.getAttribute("data-show");
+        const el = document.getElementById(`cq-exp-${qi}`);
+        if (!el) return;
+        const open = el.style.display !== "none";
+        el.style.display = open ? "none" : "block";
+        btn.textContent = open ? "Mostrar explicação" : "Ocultar";
+      });
+    });
+
+    // checkpoint: answer selection feedback
+    view.querySelectorAll(".cq-opt").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qi = Number(btn.getAttribute("data-q"));
+        const oi = Number(btn.getAttribute("data-oi"));
+
+        const q = checkpoint[qi];
+        const correta = Number.isFinite(q?.correta) ? q.correta : -1;
+
+        // visual: desmarca outras
+        view.querySelectorAll(`.cq-opt[data-q="${qi}"]`).forEach((b) => b.classList.remove("selected", "right", "wrong"));
+        btn.classList.add("selected");
+
+        const fb = document.getElementById(`cq-fb-${qi}`);
+        if (!fb) return;
+
+        if (oi === correta) {
+          btn.classList.add("right");
+          fb.textContent = "✅ Correto!";
+        } else {
+          btn.classList.add("wrong");
+          fb.textContent = `❌ Quase. A correta é a opção ${correta + 1}.`;
+        }
+      });
+    });
   },
 
   // -----------------------------
@@ -357,10 +485,36 @@ export const planos = {
       .map((s, i) => {
         const conteudo = s?.conteudo || {};
 
+        const checklist = Array.isArray(s?.checklist) ? s.checklist : [];
+        const errosComuns = Array.isArray(s?.errosComuns) ? s.errosComuns : [];
+        const flashcards = Array.isArray(s?.flashcards) ? s.flashcards : [];
+        const checkpoint = Array.isArray(s?.checkpoint) ? s.checkpoint : [];
+
         return {
           id: s?.id || `S${i + 1}`,
           titulo: s?.titulo || `Sessão ${i + 1}`,
           objetivo: s?.objetivo || "",
+
+          tempoEstimadoMin: Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : 20,
+          checklist,
+          errosComuns,
+
+          flashcards: flashcards
+            .map((fc) => ({
+              frente: fc?.frente || "",
+              verso: fc?.verso || ""
+            }))
+            .filter((fc) => fc.frente || fc.verso),
+
+          checkpoint: checkpoint.map((q) => ({
+            tipo: q?.tipo || "mcq",
+            pergunta: q?.pergunta || "",
+            opcoes: Array.isArray(q?.opcoes) ? q.opcoes : [],
+            correta: Number.isFinite(q?.correta) ? q.correta : 0,
+            explicacao: q?.explicacao || "",
+            gabarito: q?.gabarito || ""
+          })),
+
           conteudo: {
             introducao: conteudo?.introducao || "",
             conceitos: Array.isArray(conteudo?.conceitos) ? conteudo.conceitos : [],
@@ -389,27 +543,23 @@ export const planos = {
   },
 
   // -----------------------------
-  // ⌨️ Atalhos de teclado (A+)
+  // ⌨️ Atalhos de teclado
   // ← anterior | → próxima | C concluir
   // -----------------------------
   _bindKeyboard() {
     if (this._keyboardBound) return;
     this._keyboardBound = true;
-
     window.addEventListener("keydown", (ev) => this._onKeydown(ev));
   },
 
   _onKeydown(ev) {
-    // não atrapalha digitação em inputs/selects/textareas
     const tag = (ev.target?.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select") return;
 
-    // só funciona quando estiver na tela de "Tema"
     const screenTema = document.getElementById("screen-tema");
     const isTemaActive = !!screenTema?.classList.contains("active");
     if (!isTemaActive) return;
 
-    // precisa ter sessões carregadas
     if (!this._sessoes?.length) return;
 
     if (ev.key === "ArrowLeft") {
