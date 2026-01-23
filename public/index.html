@@ -114,23 +114,45 @@
         </div>
       </section>
 
+     
       <!-- PDF -->
       <section id="screen-pdf" class="screen">
         <div class="screen-head">
           <button class="btn-link" data-nav="home">← Voltar</button>
           <h3>Plano por PDF</h3>
         </div>
-
+      
         <div class="panel">
-          <div class="muted">
-            Esqueleto pronto ✅<br>
-            Vamos fechar PDF depois que o Tema estiver perfeito.
-          </div>
-
-          <input type="file" accept="application/pdf" class="input" disabled />
-          <button class="btn-primary" disabled>Gerar plano</button>
+          <label class="label">Selecione um PDF</label>
+          <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
+      
+          <label class="label">Nível</label>
+          <select id="sel-nivel-pdf" class="input">
+            <option value="iniciante">Iniciante</option>
+            <option value="intermediario">Intermediário</option>
+            <option value="avancado">Avançado</option>
+          </select>
+      
+          <button id="btn-gerar-pdf" class="btn-primary">Gerar plano</button>
+          <div id="pdf-status" class="muted small"></div>
+        </div>
+      
+        <div id="pdf-result" class="two-cols hidden">
+          <aside class="aside">
+            <div class="aside-title">Sessões</div>
+            <div id="pdf-lista-sessoes" class="list"></div>
+      
+            <div class="aside-actions">
+              <button id="btn-limpar-pdf" class="btn-secondary">Limpar plano</button>
+            </div>
+          </aside>
+      
+          <section class="content">
+            <div id="pdf-sessao-view" class="sessao"></div>
+          </section>
         </div>
       </section>
+
 
       <!-- SIMULADOS -->
       <section id="screen-simulados" class="screen">
