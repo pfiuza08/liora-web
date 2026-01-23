@@ -13,81 +13,97 @@ module.exports = async function handler(req, res) {
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: "config_error", message: "OPENAI_API_KEY não configurada no servidor." });
+      return res.status(500).json({
+        error: "config_error",
+        message: "OPENAI_API_KEY não configurada no servidor."
+      });
     }
 
-   const system = `
-      Você é a IA educacional da Liora.
-      
-      Tarefa:
-      Gerar um plano de estudos por TEMA, retornando SESSÕES completas, com blocos premium de estudo ativo.
-      
-      Regras obrigatórias:
-      - Retorne APENAS JSON válido (sem markdown, sem texto extra).
-      - Não inclua crases, blocos de código ou comentários.
-      - O JSON deve seguir EXATAMENTE este formato:
-      
-      {
-        "meta": {
-          "tema": "string",
-          "nivel": "iniciante|intermediario|avancado"
+    // ✅ Prompt PREMIUM + anti-vago + consistência
+    const system = `
+Você é a IA educacional da Liora.
+
+Tarefa:
+Gerar um plano de estudos por TEMA, retornando SESSÕES completas, com blocos premium de estudo ativo.
+
+Regras obrigatórias:
+- Retorne APENAS JSON válido (sem markdown, sem texto extra).
+- Não inclua crases, blocos de código ou comentários.
+- O JSON deve seguir EXATAMENTE este formato:
+
+{
+  "meta": {
+    "tema": "string",
+    "nivel": "iniciante|intermediario|avancado"
+  },
+  "sessoes": [
+    {
+      "id": "S1",
+      "titulo": "string",
+      "objetivo": "string",
+
+      "tempoEstimadoMin": 10,
+
+      "checklist": ["string"],
+      "errosComuns": ["string"],
+
+      "flashcards": [
+        { "frente": "string", "verso": "string" }
+      ],
+
+      "checkpoint": [
+        {
+          "tipo": "mcq",
+          "pergunta": "string",
+          "opcoes": ["string", "string", "string", "string"],
+          "correta": 0,
+          "explicacao": "string"
         },
-        "sessoes": [
-          {
-            "id": "S1",
-            "titulo": "string",
-            "objetivo": "string",
-      
-            "tempoEstimadoMin": 10,
-      
-            "checklist": ["string"],
-            "errosComuns": ["string"],
-      
-            "flashcards": [
-              { "frente": "string", "verso": "string" }
-            ],
-      
-            "checkpoint": [
-              {
-                "tipo": "mcq",
-                "pergunta": "string",
-                "opcoes": ["string", "string", "string", "string"],
-                "correta": 0,
-                "explicacao": "string"
-              },
-              {
-                "tipo": "curta",
-                "pergunta": "string",
-                "gabarito": "string"
-              }
-            ],
-      
-            "conteudo": {
-              "introducao": "string",
-              "conceitos": ["string"],
-              "exemplos": ["string"],
-              "aplicacoes": ["string"],
-              "resumoRapido": ["string"]
-            }
-          }
-        ]
+        {
+          "tipo": "curta",
+          "pergunta": "string",
+          "gabarito": "string"
+        }
+      ],
+
+      "conteudo": {
+        "introducao": "string",
+        "conceitos": ["string"],
+        "exemplos": ["string"],
+        "aplicacoes": ["string"],
+        "resumoRapido": ["string"]
       }
-          
-          Restrições de quantidade:
-          - Gere entre 6 e 10 sessões.
-          - tempoEstimadoMin: inteiro entre 10 e 35.
-          - checklist: 3 a 6 itens.
-          - errosComuns: 3 a 5 itens.
-          - flashcards: 3 a 6 cards por sessão.
-          - checkpoint: EXATAMENTE 3 itens por sessão:
-            - 2 perguntas tipo "mcq"
-            - 1 pergunta tipo "curta"
-          - mcq:
-            - opcoes: exatamente 4 opções
-            - correta: índice 0..3
-            - explicacao: 1 a 3 frases
-          - Conteúdo em português, didático, direto, sem enrolação.
-          `;
+    }
+  ]
+}
+
+Restrições de quantidade:
+- Gere entre 6 e 10 sessões.
+- tempoEstimadoMin: inteiro entre 10 e 35.
+- checklist: 3 a 6 itens.
+- errosComuns: 3 a 5 itens.
+- flashcards: 3 a 6 cards por sessão.
+- checkpoint: EXATAMENTE 3 itens por sessão:
+  - 2 perguntas tipo "mcq"
+  - 1 pergunta tipo "curta"
+- mcq:
+  - opcoes: exatamente 4 opções
+  - correta: índice 0..3
+  - explicacao: 1 a 3 frases
+
+Qualidade obrigatória (anti-vago):
+- Introdução: 2 a 4 frases, com contexto concreto e propósito.
+- Conceitos: cada item deve ter definição curta + detalhe prático (sem “é importante”).
+- Exemplos: específicos (com cenário real, número, regra, caso ou mini-situação).
+- Aplicações: usos reais do tema (prova, trabalho, decisão, implementação).
+- Resumo rápido: frases curtas e acionáveis (como "Se aparecer X, faça Y").
+- Evite frases genéricas como “é fundamental”, “é importante”, “de forma geral”.
+- Flashcards: frente = pergunta/termo; verso = resposta objetiva (1–2 frases).
+- Checkpoint MCQ: opções plausíveis e mutuamente exclusivas (sem pegadinha boba).
+- Distribua a alternativa correta entre 0..3 (não pode ser sempre 0).
+
+Conteúdo em português, didático, direto, sem enrolação.
+`.trim();
 
     const user = `TEMA: ${tema}\nNÍVEL: ${nivel || "iniciante"}\nGere o plano completo e sessões completas.`;
 
@@ -109,7 +125,7 @@ module.exports = async function handler(req, res) {
 
     const rawText = await r.text();
 
-    // ✅ Se OpenAI não respondeu nada, a gente já explica
+    // ✅ Se OpenAI não respondeu nada
     if (!rawText || !rawText.trim()) {
       return res.status(500).json({
         error: "openai_empty_response",
@@ -168,50 +184,76 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Normaliza IDs
     // ✅ Normaliza sessões (mantém campos premium)
-      data.sessoes = data.sessoes.map((s, i) => ({
-        id: s?.id || `S${i + 1}`,
-        titulo: s?.titulo || `Sessão ${i + 1}`,
-        objetivo: s?.objetivo || "",
-      
-        // Premium (opcionais)
-        tempoEstimadoMin: Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : 20,
-        checklist: Array.isArray(s?.checklist) ? s.checklist : [],
-        errosComuns: Array.isArray(s?.errosComuns) ? s.errosComuns : [],
-      
-        flashcards: Array.isArray(s?.flashcards)
-          ? s.flashcards.map(fc => ({
+    data.sessoes = data.sessoes.map((s, i) => ({
+      id: s?.id || `S${i + 1}`,
+      titulo: s?.titulo || `Sessão ${i + 1}`,
+      objetivo: s?.objetivo || "",
+
+      // Premium
+      tempoEstimadoMin: Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : 20,
+      checklist: Array.isArray(s?.checklist) ? s.checklist : [],
+      errosComuns: Array.isArray(s?.errosComuns) ? s.errosComuns : [],
+
+      flashcards: Array.isArray(s?.flashcards)
+        ? s.flashcards
+            .map((fc) => ({
               frente: fc?.frente || "",
               verso: fc?.verso || ""
-            })).filter(fc => fc.frente || fc.verso)
-          : [],
-      
-        checkpoint: Array.isArray(s?.checkpoint)
-          ? s.checkpoint.map(q => ({
-              tipo: q?.tipo || "mcq",
-              pergunta: q?.pergunta || "",
-              opcoes: Array.isArray(q?.opcoes) ? q.opcoes : [],
-              correta: Number.isFinite(q?.correta) ? q.correta : 0,
-              explicacao: q?.explicacao || "",
-              gabarito: q?.gabarito || ""
             }))
-          : [],
-      
-        // Conteúdo padrão
-        conteudo: {
-          introducao: s?.conteudo?.introducao || "",
-          conceitos: Array.isArray(s?.conteudo?.conceitos) ? s.conteudo.conceitos : [],
-          exemplos: Array.isArray(s?.conteudo?.exemplos) ? s.conteudo.exemplos : [],
-          aplicacoes: Array.isArray(s?.conteudo?.aplicacoes) ? s.conteudo.aplicacoes : [],
-          resumoRapido: Array.isArray(s?.conteudo?.resumoRapido) ? s.conteudo.resumoRapido : []
+            .filter((fc) => fc.frente || fc.verso)
+        : [],
+
+      checkpoint: Array.isArray(s?.checkpoint)
+        ? s.checkpoint.map((q) => ({
+            tipo: q?.tipo || "mcq",
+            pergunta: q?.pergunta || "",
+            opcoes: Array.isArray(q?.opcoes) ? q.opcoes : [],
+            correta: Number.isFinite(q?.correta) ? q.correta : 0,
+            explicacao: q?.explicacao || "",
+            gabarito: q?.gabarito || ""
+          }))
+        : [],
+
+      // Conteúdo padrão
+      conteudo: {
+        introducao: s?.conteudo?.introducao || "",
+        conceitos: Array.isArray(s?.conteudo?.conceitos) ? s.conteudo.conceitos : [],
+        exemplos: Array.isArray(s?.conteudo?.exemplos) ? s.conteudo.exemplos : [],
+        aplicacoes: Array.isArray(s?.conteudo?.aplicacoes) ? s.conteudo.aplicacoes : [],
+        resumoRapido: Array.isArray(s?.conteudo?.resumoRapido) ? s.conteudo.resumoRapido : []
+      }
+    }));
+
+    // ✅ FIX: evita "todas corretas = A" mantendo a resposta correta
+    data.sessoes = data.sessoes.map((s) => {
+      const cp = Array.isArray(s.checkpoint) ? s.checkpoint : [];
+
+      const fixed = cp.map((q) => {
+        if (q?.tipo !== "mcq") return q;
+
+        const op = Array.isArray(q?.opcoes) ? [...q.opcoes] : [];
+        if (op.length !== 4) return q;
+
+        let correta = Number.isFinite(q?.correta) ? q.correta : 0;
+
+        // Se veio sempre A (0), desloca a correta para outra posição
+        if (correta === 0) {
+          const r = 1 + Math.floor(Math.random() * 3); // 1..3
+          [op[0], op[r]] = [op[r], op[0]];
+          correta = r;
         }
-      }));
 
+        return { ...q, opcoes: op, correta };
+      });
 
+      return { ...s, checkpoint: fixed };
+    });
+
+    // meta
     data.meta = data.meta || { tema, nivel };
     data.meta.tema = data.meta.tema || tema;
-    data.meta.nivel = data.meta.nivel || nivel;
+    data.meta.nivel = data.meta.nivel || nivel || "iniciante";
 
     return res.status(200).json(data);
 
@@ -242,7 +284,6 @@ function safeJsonParse(raw) {
   const last = raw.lastIndexOf("}");
   if (first >= 0 && last > first) raw = raw.slice(first, last + 1);
 
-  // ✅ Aqui era onde explodia com string vazia
   if (!raw || !raw.trim()) throw new Error("JSON vazio após recorte");
 
   return JSON.parse(raw);
