@@ -585,4 +585,35 @@ body {
   transform: translateY(-2px);
   border-color: rgba(196,75,4,.55);
 }
+.cq-input{
+  width:100%;
+  min-height:90px;
+  padding:10px 12px;
+  border-radius:12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.03);
+  color: inherit;
+  outline: none;
+  resize: vertical;
+  margin-top: 8px;
+}
+.light .cq-input{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.02);
+}
+
+.cq-row{
+  display:flex;
+  gap:8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.cq-check{
+  padding:8px 10px;
+  border-radius:12px;
+  border: 1px solid rgba(196,75,4,.35);
+  background: rgba(196,75,4,.12);
+  cursor:pointer;
+}
 
