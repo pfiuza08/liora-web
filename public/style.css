@@ -535,4 +535,54 @@ body {
   line-height:1.35;
 }
 
+/* ==============================
+   Flashcards — Liora Premium (cor e contraste)
+============================== */
+.flashcard-inner{
+  border-radius:16px;
+  border: 1px solid rgba(196,75,4,.35);
+  background: linear-gradient(135deg,
+    rgba(196,75,4,.16),
+    rgba(255,255,255,.04)
+  );
+  box-shadow: 0 6px 22px rgba(0,0,0,.22);
+}
+
+.light .flashcard-inner{
+  background: linear-gradient(135deg,
+    rgba(196,75,4,.12),
+    rgba(0,0,0,.02)
+  );
+  box-shadow: 0 6px 18px rgba(0,0,0,.10);
+}
+
+.flashcard-label{
+  font-weight:600;
+  letter-spacing:.02em;
+}
+
+.flashcard-front .flashcard-label{
+  color: rgba(196,75,4,.95);
+}
+
+.flashcard-back .flashcard-label{
+  color: rgba(196,75,4,.95);
+}
+
+.flashcard-text{
+  font-size:14px;
+}
+
+.flashcard-hint{
+  color: rgba(255,255,255,.65);
+}
+
+.light .flashcard-hint{
+  color: rgba(0,0,0,.55);
+}
+
+.flashcard:hover .flashcard-inner{
+  transform: translateY(-2px);
+  border-color: rgba(196,75,4,.55);
+}
 
