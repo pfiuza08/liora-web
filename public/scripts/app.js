@@ -59,8 +59,18 @@ function setupAuthMock() {
 
 function setupNav() {
   document.querySelectorAll("[data-nav]").forEach((el) => {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", (ev) => {
+      // ✅ Se tiver "em breve", bloqueia
+      const hasPill = !!el.querySelector(".pill");
+      if (hasPill) {
+        ev.preventDefault();
+        ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
+        return;
+      }
+
       const to = el.getAttribute("data-nav");
+      if (!to) return;
+
       router.go(to);
     });
   });
