@@ -20,6 +20,7 @@ export const planos = {
     if (saved?.sessoes?.length) {
       this.render(saved);
     }
+
     this._bindKeyboard();
     console.log("planos.js iniciado");
   },
@@ -62,7 +63,6 @@ export const planos = {
       }
 
       if (!res.ok) {
-        // ✅ mostra message primeiro (mais útil)
         throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       }
 
@@ -131,7 +131,7 @@ export const planos = {
     // ✅ pega progresso salvo (continuar de onde parou)
     const st = this._getState();
     const lastId = st?.currentId || null;
-    const idxLast = lastId ? this._sessoes.findIndex(s => s?.id === lastId) : -1;
+    const idxLast = lastId ? this._sessoes.findIndex((s) => s?.id === lastId) : -1;
 
     // se não achar, abre a primeira
     this._idxAtual = idxLast >= 0 ? idxLast : 0;
@@ -173,9 +173,7 @@ export const planos = {
     this._idxAtual = idx;
 
     // ativa botão na lista
-    lista
-      ?.querySelectorAll(".session-item")
-      .forEach((x) => x.classList.remove("active"));
+    lista?.querySelectorAll(".session-item").forEach((x) => x.classList.remove("active"));
 
     const btn = lista?.querySelector(`.session-item[data-index="${idx}"]`);
     btn?.classList.add("active");
@@ -388,19 +386,6 @@ export const planos = {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
-  }
- // -----------------------------
-  // ⌨️ Atalhos de teclado (A+)
-  // ← anterior | → próxima | C concluir
-  // -----------------------------
-  _escapeHtml(value) {
-    const str = String(value ?? "");
-    return str
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
   },
 
   // -----------------------------
@@ -408,7 +393,6 @@ export const planos = {
   // ← anterior | → próxima | C concluir
   // -----------------------------
   _bindKeyboard() {
-    // evita duplicar listener se init rodar 2x
     if (this._keyboardBound) return;
     this._keyboardBound = true;
 
