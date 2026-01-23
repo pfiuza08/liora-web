@@ -20,7 +20,7 @@ export const planos = {
     if (saved?.sessoes?.length) {
       this.render(saved);
     }
-
+    this._bindKeyboard();
     console.log("planos.js iniciado");
   },
 
@@ -389,4 +389,46 @@ export const planos = {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
   }
+ // -----------------------------
+  // ⌨️ Atalhos de teclado (A+)
+  // ← anterior | → próxima | C concluir
+  // -----------------------------
+  _bindKeyboard() {
+    // evita duplicar listener se init rodar 2x
+    if (this._keyboardBound) return;
+    this._keyboardBound = true;
+  
+    window.addEventListener("keydown", (ev) => this._onKeydown(ev));
+  },
+  
+  _onKeydown(ev) {
+    // não atrapalha digitação em inputs/selects/textareas
+    const tag = (ev.target?.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+  
+    // só funciona quando estiver na tela de "Tema"
+    const screenTema = document.getElementById("screen-tema");
+    const isTemaActive = !!screenTema?.classList.contains("active");
+    if (!isTemaActive) return;
+  
+    // precisa ter sessões carregadas
+    if (!this._sessoes?.length) return;
+  
+    // atalhos
+    if (ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      this._goPrev();
+    }
+  
+    if (ev.key === "ArrowRight") {
+      ev.preventDefault();
+      this._goNext();
+    }
+  
+    if (ev.key === "c" || ev.key === "C") {
+      ev.preventDefault();
+      this._toggleDoneCurrent();
+    }
+  },
+ 
 };
