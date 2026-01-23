@@ -305,11 +305,14 @@ export const planos = {
                .map((q, qi) => {
                  const tipo = q?.tipo || "mcq";
                  const pergunta = this._escapeHtml(q?.pergunta || "");
+
                  if (tipo === "mcq") {
                    const opcoes = Array.isArray(q?.opcoes) ? q.opcoes : [];
+
                    return `
                      <div class="cq" data-cq="${qi}">
                        <div class="cq-q"><span class="cq-tag">MCQ</span> ${pergunta}</div>
+
                        <div class="cq-opts">
                          ${opcoes
                            .map(
@@ -321,8 +324,16 @@ export const planos = {
                            )
                            .join("")}
                        </div>
+
                        <div class="cq-feedback" id="cq-fb-${qi}"></div>
-                       <button type="button" class="cq-show" data-show="${qi}">Mostrar explicação</button>
+
+                       <button type="button"
+                               class="cq-show"
+                               data-show="${qi}"
+                               data-show-label="explicação">
+                         Mostrar explicação
+                       </button>
+
                        <div class="cq-exp" id="cq-exp-${qi}" style="display:none;">
                          ${this._escapeHtml(q?.explicacao || "")}
                        </div>
@@ -330,11 +341,26 @@ export const planos = {
                    `;
                  }
 
-                 // curta
+                 // ✅ curta (com campo de resposta)
                  return `
                    <div class="cq" data-cq="${qi}">
                      <div class="cq-q"><span class="cq-tag">Curta</span> ${pergunta}</div>
-                     <button type="button" class="cq-show" data-show="${qi}">Mostrar gabarito</button>
+
+                     <textarea class="cq-input" id="cq-in-${qi}" placeholder="Escreva sua resposta aqui…"></textarea>
+
+                     <div class="cq-row">
+                       <button type="button" class="cq-check" data-check="${qi}">Comparar com gabarito</button>
+
+                       <button type="button"
+                               class="cq-show"
+                               data-show="${qi}"
+                               data-show-label="gabarito">
+                         Mostrar gabarito
+                       </button>
+                     </div>
+
+                     <div class="cq-feedback" id="cq-fb-${qi}"></div>
+
                      <div class="cq-exp" id="cq-exp-${qi}" style="display:none;">
                        ${this._escapeHtml(q?.gabarito || "")}
                      </div>
@@ -405,19 +431,23 @@ export const planos = {
       });
     });
 
-    // checkpoint: reveal exp/gabarito
+    // checkpoint: show/hide explicação/gabarito (texto correto)
     view.querySelectorAll("[data-show]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = btn.getAttribute("data-show");
+        const label = btn.getAttribute("data-show-label") || "conteúdo";
         const el = document.getElementById(`cq-exp-${qi}`);
         if (!el) return;
+
         const open = el.style.display !== "none";
         el.style.display = open ? "none" : "block";
-        btn.textContent = open ? "Mostrar explicação" : "Ocultar";
+
+        if (open) btn.textContent = `Mostrar ${label}`;
+        else btn.textContent = `Ocultar ${label}`;
       });
     });
 
-    // checkpoint: answer selection feedback
+    // checkpoint: answer selection feedback (MCQ)
     view.querySelectorAll(".cq-opt").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = Number(btn.getAttribute("data-q"));
@@ -440,6 +470,31 @@ export const planos = {
           btn.classList.add("wrong");
           fb.textContent = `❌ Quase. A correta é a opção ${correta + 1}.`;
         }
+      });
+    });
+
+    // curta: comparar com gabarito (feedback humano)
+    view.querySelectorAll("[data-check]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qi = btn.getAttribute("data-check");
+        const input = document.getElementById(`cq-in-${qi}`);
+        const fb = document.getElementById(`cq-fb-${qi}`);
+        const exp = document.getElementById(`cq-exp-${qi}`);
+
+        if (!input || !fb || !exp) return;
+
+        const userAns = (input.value || "").trim();
+        if (!userAns) {
+          fb.textContent = "✍️ Escreva uma resposta (mesmo curta) antes de comparar.";
+          return;
+        }
+
+        // mostra gabarito
+        exp.style.display = "block";
+
+        // feedback simples e útil
+        fb.textContent =
+          "✅ Ótimo. Compare sua resposta com o gabarito e ajuste 1 ponto se necessário.";
       });
     });
   },
