@@ -6,7 +6,7 @@ module.exports = async function handler(req, res) {
     }
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const { pages, nivel, nomeArquivo } = body || {};
+    const { pages, nivel, finalidade, nomeArquivo } = body || {};
 
     if (!Array.isArray(pages) || pages.length === 0) {
       return res.status(400).json({
@@ -118,7 +118,15 @@ module.exports = async function handler(req, res) {
           }
         ]
       }
-      
+
+      FINALIDADE (ajusta o MODO DE ESTUDO sem inventar conteúdo):
+      - estudo: foco em compreensão e estrutura do texto.
+      - prova: checklist prioriza pontos cobráveis do próprio texto; checkpoint mais objetivo.
+      - trabalho: checklist vira "o que executar/entregar" conforme o texto; exemplos focam aplicação do documento.
+      - procedimento: checklist vira passos e regras; erros comuns viram "quebras de conformidade" descritas no PDF.
+      - certificacao: checkpoint prioriza definições, critérios e regras presentes no material.
+      - leitura: foco em capítulos/ideias e resumo fiel, menos cobrança e mais sequência.
+         
       REGRAS DE FIDELIDADE (muito importante):
       - Cada sessão DEVE conter "fontes" com 2 a 4 itens.
       - Cada item de "fontes" deve ter:
@@ -156,14 +164,15 @@ module.exports = async function handler(req, res) {
 
     // ✅ O "user" manda páginas com texto (rastreável)
     const user = `
-ARQUIVO: ${nomeArquivo || "PDF"}
-NÍVEL: ${nivel || "iniciante"}
-
-PÁGINAS EXTRAÍDAS (use APENAS isto como fonte):
-${JSON.stringify(pages, null, 2)}
-
-Gere o plano completo ULTRA FIEL.
-`;
+      ARQUIVO: ${nomeArquivo || "PDF"}
+      NÍVEL: ${nivel || "iniciante"}
+      FINALIDADE: ${finalidade || "estudo"}
+      
+      PÁGINAS EXTRAÍDAS (use APENAS isto como fonte):
+      ${JSON.stringify(pages, null, 2)}
+      
+      Gere o plano completo ULTRA FIEL.
+      `;
 
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
