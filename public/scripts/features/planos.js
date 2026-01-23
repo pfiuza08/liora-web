@@ -41,7 +41,7 @@ export const planos = {
       ui.loading(true, "Gerando plano e sessões…");
       if (status) status.textContent = "Chamando IA…";
 
-      const res = await fetch("/api/gerarPlano.js", {
+      const res = await fetch("/api/gerarPlano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tema, nivel })
@@ -54,8 +54,10 @@ export const planos = {
       try {
         data = JSON.parse(text);
       } catch (err) {
-        console.error("Resposta não-JSON:", text);
-        throw new Error("Servidor retornou resposta inválida (não JSON).");
+      console.error("Resposta não-JSON:", text);
+    
+      const preview = text.slice(0, 120).replace(/\s+/g, " ");
+      throw new Error(`Servidor retornou resposta inválida (não JSON). Prévia: ${preview}`);
       }
 
       if (!res.ok) {
