@@ -117,41 +117,75 @@
      
       <!-- PDF -->
       <section id="screen-pdf" class="screen">
-        <div class="screen-head">
-          <button class="btn-link" data-nav="home">← Voltar</button>
-          <h3>Plano por PDF</h3>
+      <div class="screen-head">
+        <button class="btn-link" data-nav="home">← Voltar</button>
+        <h3>Plano por PDF</h3>
+      </div>
+    
+      <div class="panel">
+        <label class="label">Arquivo PDF</label>
+        <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
+    
+        <div class="grid-2">
+          <div>
+            <label class="label">Nível</label>
+            <select id="sel-nivel-pdf" class="input">
+              <option value="iniciante">Iniciante</option>
+              <option value="intermediario">Intermediário</option>
+              <option value="avancado">Avançado</option>
+            </select>
+          </div>
+    
+          <div>
+            <label class="label">Finalidade</label>
+            <select id="sel-finalidade-pdf" class="input">
+              <option value="estudo">Estudo geral</option>
+              <option value="prova">Prova / Concurso</option>
+              <option value="trabalho">Trabalho / Projeto</option>
+              <option value="procedimento">Procedimento / Manual</option>
+              <option value="certificacao">Certificação</option>
+              <option value="leitura">Leitura (livro)</option>
+            </select>
+          </div>
         </div>
-      
-        <div class="panel">
-          <label class="label">Selecione um PDF</label>
-          <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
-      
-          <label class="label">Nível</label>
-          <select id="sel-nivel-pdf" class="input">
-            <option value="iniciante">Iniciante</option>
-            <option value="intermediario">Intermediário</option>
-            <option value="avancado">Avançado</option>
-          </select>
-      
-          <button id="btn-gerar-pdf" class="btn-primary">Gerar plano</button>
-          <div id="pdf-status" class="muted small"></div>
-        </div>
-      
-        <div id="pdf-result" class="two-cols hidden">
-          <aside class="aside">
-            <div class="aside-title">Sessões</div>
-            <div id="pdf-lista-sessoes" class="list"></div>
-      
-            <div class="aside-actions">
-              <button id="btn-limpar-pdf" class="btn-secondary">Limpar plano</button>
+    
+        <button id="btn-gerar-pdf" class="btn-primary">
+          Gerar plano ultra fiel
+        </button>
+    
+        <button id="btn-limpar-pdf" class="btn-secondary" style="margin-top:10px;">
+          Limpar plano
+        </button>
+    
+        <div id="pdf-status" class="muted small" style="margin-top:10px;"></div>
+      </div>
+    
+      <div id="pdf-result" class="two-cols hidden">
+        <aside class="aside">
+          <div class="aside-title">Sessões</div>
+          <div id="pdf-lista-sessoes" class="list"></div>
+        </aside>
+    
+        <section class="content">
+    
+          <!-- ✅ Viewer embutido: abre quando clicar nas fontes -->
+          <div id="pdf-viewer-wrap" class="pdf-viewer-wrap hidden">
+            <div class="pdf-viewer-head">
+              <div class="pdf-viewer-title">📄 PDF</div>
+              <div class="pdf-viewer-actions">
+                <button id="btn-pdf-close" class="btn-secondary">Fechar PDF</button>
+              </div>
             </div>
-          </aside>
-      
-          <section class="content">
-            <div id="pdf-sessao-view" class="sessao"></div>
-          </section>
-        </div>
-      </section>
+    
+            <iframe id="pdf-iframe" class="pdf-iframe" src="" loading="lazy"></iframe>
+          </div>
+    
+          <!-- Sessão renderizada -->
+          <div id="pdf-sessao-view" class="sessao"></div>
+    
+        </section>
+      </div>
+    </section>
 
 
       <!-- SIMULADOS -->
