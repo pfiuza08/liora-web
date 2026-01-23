@@ -617,3 +617,147 @@ body {
   cursor:pointer;
 }
 
+/* ==============================
+   Checkpoint (MCQ + Curta) — legibilidade dark
+============================== */
+
+.cq{
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03);
+}
+
+.light .cq{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.02);
+}
+
+.cq-q{
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.cq-tag{
+  display:inline-block;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  margin-right: 8px;
+  border: 1px solid rgba(196,75,4,.35);
+  background: rgba(196,75,4,.12);
+  color: rgba(196,75,4,.95);
+}
+
+/* opções MCQ */
+.cq-opts{
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cq-opt{
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.92);
+  cursor: pointer;
+}
+
+.light .cq-opt{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.02);
+  color: rgba(0,0,0,.88);
+}
+
+.cq-opt:hover{
+  border-color: rgba(196,75,4,.45);
+  background: rgba(196,75,4,.10);
+}
+
+.cq-opt.selected{
+  border-color: rgba(196,75,4,.65);
+  background: rgba(196,75,4,.14);
+}
+
+.cq-opt.right{
+  border-color: rgba(66, 211, 146, .70);
+  background: rgba(66, 211, 146, .12);
+}
+
+.cq-opt.wrong{
+  border-color: rgba(239, 68, 68, .70);
+  background: rgba(239, 68, 68, .10);
+}
+
+/* feedback / explicação */
+.cq-feedback{
+  margin-top: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,.90);
+}
+
+.light .cq-feedback{
+  color: rgba(0,0,0,.82);
+}
+
+.cq-exp{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.92);
+  line-height: 1.45;
+}
+
+.light .cq-exp{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.02);
+  color: rgba(0,0,0,.88);
+}
+
+/* curta (textarea) */
+.cq-input{
+  width:100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.92);
+  outline: none;
+  resize: vertical;
+  margin-top: 8px;
+}
+
+.light .cq-input{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.02);
+  color: rgba(0,0,0,.88);
+}
+
+.cq-row{
+  display:flex;
+  gap:8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.cq-check{
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(196,75,4,.35);
+  background: rgba(196,75,4,.12);
+  color: rgba(255,255,255,.92);
+  cursor: pointer;
+}
+
+.light .cq-check{
+  color: rgba(0,0,0,.85);
+}
+
+
