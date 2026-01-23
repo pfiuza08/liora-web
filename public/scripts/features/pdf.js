@@ -1,4 +1,4 @@
-// scripts/features/pdf.js
+// /scripts/features/pdf.js
 export const pdf = {
   ctx: null,
 
@@ -12,17 +12,16 @@ export const pdf = {
     const btn = document.getElementById("btn-gerar-pdf");
     const limpar = document.getElementById("btn-limpar-pdf");
 
-    btn?.addEventListener("click", () => this.gerarPorPdf());
+    btn?.addEventListener("click", () => this.gerarPorPdfUltraFiel());
     limpar?.addEventListener("click", () => this.limparPlano());
 
-    // restore
     const saved = this.ctx.store.get("planoPdf");
     if (saved?.sessoes?.length) this.render(saved);
 
-    console.log("pdf.js iniciado");
+    console.log("pdf.js iniciado (Ultra Fiel)");
   },
 
-  async gerarPorPdf() {
+  async gerarPorPdfUltraFiel() {
     const { store, ui } = this.ctx;
 
     const inp = document.getElementById("inp-pdf");
@@ -36,16 +35,21 @@ export const pdf = {
     }
 
     try {
-      ui.loading(true, "Lendo PDF e gerando plano…");
-      if (status) status.textContent = "Extraindo texto do PDF…";
+      ui.loading(true, "Lendo PDF e gerando plano ultra fiel…");
+      if (status) status.textContent = "Extraindo texto por página…";
 
-      const texto = await this._extractPdfText(file);
+      const pages = await this._extractPdfPages(file);
 
-      if (!texto || texto.length < 200) {
-        throw new Error("Não consegui extrair texto suficiente do PDF.");
+      if (!Array.isArray(pages) || pages.length === 0) {
+        throw new Error("Não consegui extrair texto do PDF.");
       }
 
-      if (status) status.textContent = "Chamando IA…";
+      const joinedLen = pages.reduce((acc, p) => acc + (p?.text?.length || 0), 0);
+      if (joinedLen < 400) {
+        throw new Error("Texto extraído insuficiente. Seu PDF pode ser escaneado (imagem).");
+      }
+
+      if (status) status.textContent = "Chamando IA (ultra fiel)…";
 
       const res = await fetch("/api/gerarPlanoPdf", {
         method: "POST",
@@ -53,12 +57,13 @@ export const pdf = {
         body: JSON.stringify({
           nivel,
           nomeArquivo: file.name,
-          textoBase: texto.slice(0, 22000) // limite seguro
+          pages
         })
       });
 
       const raw = await res.text();
       let data = null;
+
       try {
         data = JSON.parse(raw);
       } catch {
@@ -81,7 +86,6 @@ export const pdf = {
 
       store.set("planoPdf", data);
       store.set("planoPdfState", { currentId: data?.sessoes?.[0]?.id || null, doneIds: [] });
-      store.set("planoPdfAprofCache", {});
 
       this.render(data);
 
@@ -99,13 +103,13 @@ export const pdf = {
     const { store } = this.ctx;
     store.remove("planoPdf");
     store.remove("planoPdfState");
-    store.remove("planoPdfAprofCache");
 
     this._plano = null;
     this._sessoes = [];
     this._idxAtual = 0;
 
     document.getElementById("pdf-result")?.classList.add("hidden");
+
     const status = document.getElementById("pdf-status");
     if (status) status.textContent = "";
 
@@ -171,6 +175,7 @@ export const pdf = {
     if (!opts.silentSave) this._saveState({ currentId: sessao?.id });
   },
 
+  // ✅ Agora o conteúdo vem ANTES de avaliação (fidelidade + leitura)
   renderSessao(s) {
     const view = document.getElementById("pdf-sessao-view");
     if (!view) return;
@@ -179,6 +184,7 @@ export const pdf = {
     const objetivo = s?.objetivo || "-";
 
     const tempo = Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : null;
+    const fontes = Array.isArray(s?.fontes) ? s.fontes : [];
     const checklist = Array.isArray(s?.checklist) ? s.checklist : [];
     const erros = Array.isArray(s?.errosComuns) ? s.errosComuns : [];
     const flashcards = Array.isArray(s?.flashcards) ? s.flashcards : [];
@@ -199,6 +205,35 @@ export const pdf = {
       arr.length
         ? `<ul>${arr.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>`
         : `<p class="muted">—</p>`;
+
+    const fontesHtml = fontes.length
+      ? `
+        <div class="box fontes-box">
+          <div class="fontes-head">
+            <b>Fontes do PDF</b>
+            <span class="muted small">ultra fiel</span>
+          </div>
+          <div class="fontes-list">
+            ${fontes
+              .slice(0, 4)
+              .map(
+                (f) => `
+                  <div class="fonte-item">
+                    <div class="fonte-tag">Pág. ${this._escapeHtml(f?.page ?? "")}</div>
+                    <div class="fonte-text">"${this._escapeHtml(f?.trecho || "")}"</div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+      `
+      : `
+        <div class="box fontes-box">
+          <b>Fontes do PDF</b>
+          <p class="muted small">Sem fontes retornadas (isso não deveria acontecer).</p>
+        </div>
+      `;
 
     const checklistHtml = checklist.length
       ? `<div class="box"><b>Checklist</b><ul>${checklist
@@ -241,7 +276,7 @@ export const pdf = {
       : "";
 
     const checkpointHtml = checkpoint.length
-      ? `<div class="box">
+      ? `<div class="box checkpoint-box">
           <b>Checkpoint</b>
           <div class="checkpoint">
             ${checkpoint
@@ -306,6 +341,8 @@ export const pdf = {
       <h4>${this._escapeHtml(titulo)}</h4>
       <p class="muted"><b>Objetivo:</b> ${this._escapeHtml(objetivo)}</p>
 
+      ${fontesHtml}
+
       <div class="box"><b>Introdução</b><p>${this._escapeHtml(introducao)}</p></div>
       <div class="box"><b>Conceitos</b>${listOrDash(conceitos)}</div>
       <div class="box"><b>Exemplos</b>${listOrDash(exemplos)}</div>
@@ -315,6 +352,7 @@ export const pdf = {
       ${checklistHtml}
       ${errosHtml}
       ${flashcardsHtml}
+
       ${checkpointHtml}
     `;
 
@@ -381,31 +419,43 @@ export const pdf = {
   },
 
   // -----------------------------
-  // PDF.js extraction (CDN)
+  // ✅ Extração por página (Ultra Fiel)
   // -----------------------------
-  async _extractPdfText(file) {
+  async _extractPdfPages(file) {
     const buf = await file.arrayBuffer();
 
-    // PDF.js via CDN (ESM)
     const pdfjs = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.mjs");
     pdfjs.GlobalWorkerOptions.workerSrc =
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.worker.mjs";
 
     const loadingTask = pdfjs.getDocument({ data: buf });
-    const pdf = await loadingTask.promise;
+    const doc = await loadingTask.promise;
 
-    const maxPages = Math.min(pdf.numPages, 12); // bom p/ custo + qualidade
-    let fullText = "";
+    const maxPages = Math.min(doc.numPages, 20);
+    const pages = [];
+
+    let totalChars = 0;
+    const maxTotalChars = 26000;
 
     for (let p = 1; p <= maxPages; p++) {
-      const page = await pdf.getPage(p);
+      const page = await doc.getPage(p);
       const content = await page.getTextContent();
-      const strings = content.items.map((it) => it.str);
-      fullText += strings.join(" ") + "\n";
-      if (fullText.length > 26000) break;
+
+      const strings = content.items.map((it) => it.str).filter(Boolean);
+      const text = strings.join(" ").replace(/\s+/g, " ").trim();
+
+      if (text.length >= 40) {
+        pages.push({
+          page: p,
+          text: text.slice(0, 5000) // corta por página, mas mantém rastreável
+        });
+        totalChars += Math.min(text.length, 5000);
+      }
+
+      if (totalChars >= maxTotalChars) break;
     }
 
-    return fullText.trim();
+    return pages;
   },
 
   // state
@@ -437,10 +487,14 @@ export const pdf = {
       titulo: s?.titulo || `Sessão ${i + 1}`,
       objetivo: s?.objetivo || "",
       tempoEstimadoMin: Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : 20,
+
+      fontes: Array.isArray(s?.fontes) ? s.fontes : [],
+
       checklist: Array.isArray(s?.checklist) ? s.checklist : [],
       errosComuns: Array.isArray(s?.errosComuns) ? s.errosComuns : [],
       flashcards: Array.isArray(s?.flashcards) ? s.flashcards : [],
       checkpoint: Array.isArray(s?.checkpoint) ? s.checkpoint : [],
+
       conteudo: {
         introducao: s?.conteudo?.introducao || "",
         conceitos: Array.isArray(s?.conteudo?.conceitos) ? s.conteudo.conceitos : [],
