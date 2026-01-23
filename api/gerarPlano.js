@@ -169,18 +169,45 @@ module.exports = async function handler(req, res) {
     }
 
     // Normaliza IDs
-    data.sessoes = data.sessoes.map((s, i) => ({
-      id: s?.id || `S${i + 1}`,
-      titulo: s?.titulo || `Sessão ${i + 1}`,
-      objetivo: s?.objetivo || "",
-      conteudo: {
-        introducao: s?.conteudo?.introducao || "",
-        conceitos: Array.isArray(s?.conteudo?.conceitos) ? s.conteudo.conceitos : [],
-        exemplos: Array.isArray(s?.conteudo?.exemplos) ? s.conteudo.exemplos : [],
-        aplicacoes: Array.isArray(s?.conteudo?.aplicacoes) ? s.conteudo.aplicacoes : [],
-        resumoRapido: Array.isArray(s?.conteudo?.resumoRapido) ? s.conteudo.resumoRapido : [],
-      },
-    }));
+    // ✅ Normaliza sessões (mantém campos premium)
+      data.sessoes = data.sessoes.map((s, i) => ({
+        id: s?.id || `S${i + 1}`,
+        titulo: s?.titulo || `Sessão ${i + 1}`,
+        objetivo: s?.objetivo || "",
+      
+        // Premium (opcionais)
+        tempoEstimadoMin: Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : 20,
+        checklist: Array.isArray(s?.checklist) ? s.checklist : [],
+        errosComuns: Array.isArray(s?.errosComuns) ? s.errosComuns : [],
+      
+        flashcards: Array.isArray(s?.flashcards)
+          ? s.flashcards.map(fc => ({
+              frente: fc?.frente || "",
+              verso: fc?.verso || ""
+            })).filter(fc => fc.frente || fc.verso)
+          : [],
+      
+        checkpoint: Array.isArray(s?.checkpoint)
+          ? s.checkpoint.map(q => ({
+              tipo: q?.tipo || "mcq",
+              pergunta: q?.pergunta || "",
+              opcoes: Array.isArray(q?.opcoes) ? q.opcoes : [],
+              correta: Number.isFinite(q?.correta) ? q.correta : 0,
+              explicacao: q?.explicacao || "",
+              gabarito: q?.gabarito || ""
+            }))
+          : [],
+      
+        // Conteúdo padrão
+        conteudo: {
+          introducao: s?.conteudo?.introducao || "",
+          conceitos: Array.isArray(s?.conteudo?.conceitos) ? s.conteudo.conceitos : [],
+          exemplos: Array.isArray(s?.conteudo?.exemplos) ? s.conteudo.exemplos : [],
+          aplicacoes: Array.isArray(s?.conteudo?.aplicacoes) ? s.conteudo.aplicacoes : [],
+          resumoRapido: Array.isArray(s?.conteudo?.resumoRapido) ? s.conteudo.resumoRapido : []
+        }
+      }));
+
 
     data.meta = data.meta || { tema, nivel };
     data.meta.tema = data.meta.tema || tema;
