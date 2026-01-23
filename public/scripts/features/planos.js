@@ -1,6 +1,11 @@
 export const planos = {
   ctx: null,
 
+  // estado runtime
+  _plano: null,
+  _idxAtual: 0,
+  _sessoes: [],
+
   init(ctx) {
     this.ctx = ctx;
 
@@ -21,9 +26,6 @@ export const planos = {
 
   // -----------------------------
   // 🔥 Geração por Tema (robusta)
-  // - nunca quebra com "Unexpected token A"
-  // - lê como TEXTO e faz parse controlado
-  // - mostra erro amigável se backend enviar html/texto
   // -----------------------------
   async gerarTema() {
     const { store, ui } = this.ctx;
@@ -41,6 +43,7 @@ export const planos = {
       ui.loading(true, "Gerando plano e sessões…");
       if (status) status.textContent = "Chamando IA…";
 
+      // ✅ endpoint correto (sem .js)
       const res = await fetch("/api/gerarPlano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,16 +57,14 @@ export const planos = {
       try {
         data = JSON.parse(text);
       } catch (err) {
-      console.error("Resposta não-JSON:", text);
-    
-      const preview = text.slice(0, 120).replace(/\s+/g, " ");
-      throw new Error(`Servidor retornou resposta inválida (não JSON). Prévia: ${preview}`);
+        console.error("Resposta não-JSON:", text);
+        throw new Error("Servidor retornou resposta inválida (não JSON).");
       }
 
       if (!res.ok) {
+        // ✅ mostra message primeiro (mais útil)
         throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       }
-
 
       if (!data?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
@@ -73,6 +74,10 @@ export const planos = {
       data = this._normalizePlano(data, { tema, nivel });
 
       store.set("planoTema", data);
+
+      // ✅ reset de progresso quando gera plano novo
+      this._resetStateForNewPlan(data);
+
       this.render(data);
 
       if (status) status.textContent = "Plano gerado!";
@@ -88,6 +93,11 @@ export const planos = {
   limparPlano() {
     const { store } = this.ctx;
     store.remove("planoTema");
+    store.remove("planoTemaState");
+
+    this._plano = null;
+    this._sessoes = [];
+    this._idxAtual = 0;
 
     const result = document.getElementById("tema-result");
     result?.classList.add("hidden");
@@ -111,38 +121,122 @@ export const planos = {
 
     if (!result || !lista || !view) return;
 
+    // guarda estado runtime
+    this._plano = data;
+    this._sessoes = Array.isArray(data?.sessoes) ? data.sessoes : [];
+
     result.classList.remove("hidden");
     lista.innerHTML = "";
 
-    const sessoes = Array.isArray(data?.sessoes) ? data.sessoes : [];
+    // ✅ pega progresso salvo (continuar de onde parou)
+    const st = this._getState();
+    const lastId = st?.currentId || null;
+    const idxLast = lastId ? this._sessoes.findIndex(s => s?.id === lastId) : -1;
 
-    sessoes.forEach((s, i) => {
+    // se não achar, abre a primeira
+    this._idxAtual = idxLast >= 0 ? idxLast : 0;
+
+    // render da lista
+    this._sessoes.forEach((s, i) => {
       const btn = document.createElement("button");
       btn.className = "session-item";
       btn.type = "button";
-      btn.textContent = s.titulo || `Sessão ${i + 1}`;
+      btn.dataset.index = String(i);
+
+      const done = this._isDone(s?.id);
+      const prefix = done ? "✅ " : "";
+      btn.textContent = prefix + (s.titulo || `Sessão ${i + 1}`);
 
       btn.addEventListener("click", () => {
-        lista
-          .querySelectorAll(".session-item")
-          .forEach((x) => x.classList.remove("active"));
-
-        btn.classList.add("active");
-        this.renderSessao(s);
+        this._setCurrentIndex(i);
       });
 
       lista.appendChild(btn);
-
-      // auto abre primeira
-      if (i === 0) {
-        btn.classList.add("active");
-        this.renderSessao(s);
-      }
     });
 
-    console.log("Plano renderizado:", sessoes.length, "sessões");
+    // abre a sessão correta
+    this._setCurrentIndex(this._idxAtual, { silentSave: true });
+
+    console.log("Plano renderizado:", this._sessoes.length, "sessões");
   },
 
+  // -----------------------------
+  // 🧭 Navegação + Progresso
+  // -----------------------------
+  _setCurrentIndex(i, opts = {}) {
+    const lista = document.getElementById("lista-sessoes");
+    const n = this._sessoes.length;
+    if (!n) return;
+
+    // clamp
+    const idx = Math.max(0, Math.min(n - 1, Number(i || 0)));
+    this._idxAtual = idx;
+
+    // ativa botão na lista
+    lista
+      ?.querySelectorAll(".session-item")
+      .forEach((x) => x.classList.remove("active"));
+
+    const btn = lista?.querySelector(`.session-item[data-index="${idx}"]`);
+    btn?.classList.add("active");
+
+    // render sessão
+    const sessao = this._sessoes[idx];
+    this.renderSessao(sessao);
+
+    // salva progresso atual
+    if (!opts.silentSave) {
+      this._saveState({ currentId: sessao?.id });
+    }
+  },
+
+  _goPrev() {
+    this._setCurrentIndex(this._idxAtual - 1);
+  },
+
+  _goNext() {
+    this._setCurrentIndex(this._idxAtual + 1);
+  },
+
+  _toggleDoneCurrent() {
+    const sessao = this._sessoes[this._idxAtual];
+    if (!sessao?.id) return;
+
+    const st = this._getState();
+    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+
+    if (done.has(sessao.id)) done.delete(sessao.id);
+    else done.add(sessao.id);
+
+    this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
+
+    // re-render lista (para atualizar ✅)
+    this._refreshListChecks();
+
+    // re-render sessão (para atualizar botão)
+    this.renderSessao(sessao);
+  },
+
+  _refreshListChecks() {
+    const lista = document.getElementById("lista-sessoes");
+    if (!lista) return;
+
+    const st = this._getState();
+    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+
+    lista.querySelectorAll(".session-item").forEach((btn) => {
+      const idx = Number(btn.dataset.index || 0);
+      const s = this._sessoes[idx];
+      const isDone = done.has(s?.id);
+
+      const title = s?.titulo || `Sessão ${idx + 1}`;
+      btn.textContent = (isDone ? "✅ " : "") + title;
+    });
+  },
+
+  // -----------------------------
+  // 🧱 Render Sessão (com toolbar)
+  // -----------------------------
   renderSessao(s) {
     const view = document.getElementById("sessao-view");
     if (!view) return;
@@ -163,7 +257,28 @@ export const planos = {
         ? `<ul>${arr.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>`
         : `<p class="muted">—</p>`;
 
+    const n = this._sessoes.length;
+    const pos = this._idxAtual + 1;
+
+    const isDone = this._isDone(s?.id);
+    const btnDoneLabel = isDone ? "✅ Concluída (desmarcar)" : "Marcar como concluída";
+
+    const prevDisabled = this._idxAtual <= 0 ? "disabled" : "";
+    const nextDisabled = this._idxAtual >= n - 1 ? "disabled" : "";
+
     view.innerHTML = `
+      <div class="sessao-toolbar">
+        <div class="sessao-progress">
+          Sessão <b>${pos}</b> / ${n}
+        </div>
+
+        <div class="sessao-actions">
+          <button class="btn-secondary" id="btn-prev-sessao" ${prevDisabled}>← Anterior</button>
+          <button class="btn-secondary" id="btn-next-sessao" ${nextDisabled}>Próxima →</button>
+          <button class="btn-primary" id="btn-done-sessao">${btnDoneLabel}</button>
+        </div>
+      </div>
+
       <h4>${this._escapeHtml(titulo)}</h4>
       <p class="muted"><b>Objetivo:</b> ${this._escapeHtml(objetivo)}</p>
 
@@ -192,6 +307,42 @@ export const planos = {
         ${listOrDash(resumo)}
       </div>
     `;
+
+    // bind toolbar buttons
+    const bPrev = document.getElementById("btn-prev-sessao");
+    const bNext = document.getElementById("btn-next-sessao");
+    const bDone = document.getElementById("btn-done-sessao");
+
+    bPrev?.addEventListener("click", () => this._goPrev());
+    bNext?.addEventListener("click", () => this._goNext());
+    bDone?.addEventListener("click", () => this._toggleDoneCurrent());
+  },
+
+  // -----------------------------
+  // 🧠 Progresso no store
+  // -----------------------------
+  _getState() {
+    return this.ctx?.store?.get("planoTemaState") || { currentId: null, doneIds: [] };
+  },
+
+  _saveState(patch) {
+    const st = this._getState();
+    const next = {
+      currentId: patch?.currentId ?? st.currentId ?? null,
+      doneIds: Array.isArray(patch?.doneIds) ? patch.doneIds : (st.doneIds || [])
+    };
+    this.ctx.store.set("planoTemaState", next);
+  },
+
+  _resetStateForNewPlan(data) {
+    const firstId = data?.sessoes?.[0]?.id || null;
+    this.ctx.store.set("planoTemaState", { currentId: firstId, doneIds: [] });
+  },
+
+  _isDone(id) {
+    const st = this._getState();
+    const done = Array.isArray(st.doneIds) ? st.doneIds : [];
+    return !!id && done.includes(id);
   },
 
   // -----------------------------
