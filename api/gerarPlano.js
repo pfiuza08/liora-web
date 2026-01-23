@@ -91,16 +91,28 @@ Restrições de quantidade:
   - correta: índice 0..3
   - explicacao: 1 a 3 frases
 
-Qualidade obrigatória (anti-vago):
-- Introdução: 2 a 4 frases, com contexto concreto e propósito.
-- Conceitos: cada item deve ter definição curta + detalhe prático (sem “é importante”).
-- Exemplos: específicos (com cenário real, número, regra, caso ou mini-situação).
-- Aplicações: usos reais do tema (prova, trabalho, decisão, implementação).
-- Resumo rápido: frases curtas e acionáveis (como "Se aparecer X, faça Y").
-- Evite frases genéricas como “é fundamental”, “é importante”, “de forma geral”.
-- Flashcards: frente = pergunta/termo; verso = resposta objetiva (1–2 frases).
-- Checkpoint MCQ: opções plausíveis e mutuamente exclusivas (sem pegadinha boba).
-- Distribua a alternativa correta entre 0..3 (não pode ser sempre 0).
+Qualidade obrigatória (anti-vago e pró-profundo):
+- Introdução: 4 a 6 frases. Deve incluir:
+  (1) o que é, (2) por que importa, (3) onde cai (prova/trabalho), (4) como estudar.
+- Conceitos: 4 a 6 itens, cada item deve ter:
+  "Termo — definição curta + como reconhecer na prática".
+- Exemplos: 3 a 6 itens e cada exemplo deve seguir este formato:
+  "Cenário: ... → Como resolver/usar: ..."
+  (sem exemplo genérico).
+- Aplicações: 3 a 6 itens com ação:
+  "Quando X acontecer, faça Y".
+- Resumo rápido: 4 a 6 itens, estilo checklist.
+- checklist: coisas observáveis para dominar (não opinião).
+- errosComuns: cada erro deve ter correção ("Erro: ... / Correção: ...").
+- Flashcards: frente = pergunta objetiva; verso = resposta objetiva + 1 detalhe.
+- Checkpoint MCQ:
+  - opções devem ser diferentes entre si e plausíveis
+  - correta distribuída entre 0..3 (não pode repetir sempre)
+- Checkpoint curta:
+  - gabarito deve ter 2 a 4 linhas, com resposta direta e justificativa.
+Proibido:
+- frases como "é importante", "de forma geral", "fundamental" sem explicar o porquê.
+
 
 Conteúdo em português, didático, direto, sem enrolação.
 `.trim();
