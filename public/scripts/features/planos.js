@@ -16,9 +16,15 @@ export const planos = {
       this.render(saved);
     }
 
-    console.log("📚 planos.js iniciado");
+    console.log("planos.js iniciado");
   },
 
+  // -----------------------------
+  // 🔥 Geração por Tema (robusta)
+  // - nunca quebra com "Unexpected token A"
+  // - lê como TEXTO e faz parse controlado
+  // - mostra erro amigável se backend enviar html/texto
+  // -----------------------------
   async gerarTema() {
     const { store, ui } = this.ctx;
 
@@ -41,20 +47,36 @@ export const planos = {
         body: JSON.stringify({ tema, nivel })
       });
 
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      // ✅ lê como texto (evita crash quando vem erro não-JSON)
+      const text = await res.text();
+      let data = null;
+
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error("Resposta não-JSON:", text);
+        throw new Error("Servidor retornou resposta inválida (não JSON).");
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+      }
 
       if (!data?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
       }
 
+      // normalização leve (garante estrutura)
+      data = this._normalizePlano(data, { tema, nivel });
+
       store.set("planoTema", data);
       this.render(data);
 
-      if (status) status.textContent = "✅ Plano gerado!";
+      if (status) status.textContent = "Plano gerado!";
     } catch (e) {
       console.error(e);
       ui.error(e?.message || "Falha ao gerar plano por tema.");
+      if (status) status.textContent = "";
     } finally {
       ui.loading(false);
     }
@@ -70,7 +92,13 @@ export const planos = {
     const status = document.getElementById("tema-status");
     if (status) status.textContent = "";
 
-    console.log("🧹 Plano removido");
+    const view = document.getElementById("sessao-view");
+    if (view) view.innerHTML = "";
+
+    const lista = document.getElementById("lista-sessoes");
+    if (lista) lista.innerHTML = "";
+
+    console.log("Plano removido");
   },
 
   render(data) {
@@ -83,7 +111,8 @@ export const planos = {
     result.classList.remove("hidden");
     lista.innerHTML = "";
 
-    const sessoes = data.sessoes || [];
+    const sessoes = Array.isArray(data?.sessoes) ? data.sessoes : [];
+
     sessoes.forEach((s, i) => {
       const btn = document.createElement("button");
       btn.className = "session-item";
@@ -91,7 +120,10 @@ export const planos = {
       btn.textContent = s.titulo || `Sessão ${i + 1}`;
 
       btn.addEventListener("click", () => {
-        lista.querySelectorAll(".session-item").forEach(x => x.classList.remove("active"));
+        lista
+          .querySelectorAll(".session-item")
+          .forEach((x) => x.classList.remove("active"));
+
         btn.classList.add("active");
         this.renderSessao(s);
       });
@@ -105,47 +137,102 @@ export const planos = {
       }
     });
 
-    console.log("✅ Plano renderizado:", sessoes.length, "sessões");
+    console.log("Plano renderizado:", sessoes.length, "sessões");
   },
 
   renderSessao(s) {
     const view = document.getElementById("sessao-view");
     if (!view) return;
 
-    const c = s.conteudo || {};
-    const conceitos = Array.isArray(c.conceitos) ? c.conceitos : [];
-    const exemplos = Array.isArray(c.exemplos) ? c.exemplos : [];
-    const aplicacoes = Array.isArray(c.aplicacoes) ? c.aplicacoes : [];
-    const resumo = Array.isArray(c.resumoRapido) ? c.resumoRapido : [];
+    const titulo = s?.titulo || "Sessão";
+    const objetivo = s?.objetivo || "-";
+
+    const c = s?.conteudo || {};
+    const introducao = c?.introducao || "—";
+
+    const conceitos = Array.isArray(c?.conceitos) ? c.conceitos : [];
+    const exemplos = Array.isArray(c?.exemplos) ? c.exemplos : [];
+    const aplicacoes = Array.isArray(c?.aplicacoes) ? c.aplicacoes : [];
+    const resumo = Array.isArray(c?.resumoRapido) ? c.resumoRapido : [];
+
+    const listOrDash = (arr) =>
+      arr.length
+        ? `<ul>${arr.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>`
+        : `<p class="muted">—</p>`;
 
     view.innerHTML = `
-      <h4>${s.titulo || "Sessão"}</h4>
-      <p class="muted"><b>Objetivo:</b> ${s.objetivo || "-"}</p>
+      <h4>${this._escapeHtml(titulo)}</h4>
+      <p class="muted"><b>Objetivo:</b> ${this._escapeHtml(objetivo)}</p>
 
       <div class="box">
         <b>Introdução</b>
-        <p>${c.introducao || "—"}</p>
+        <p>${this._escapeHtml(introducao)}</p>
       </div>
 
       <div class="box">
         <b>Conceitos</b>
-        ${conceitos.length ? `<ul>${conceitos.map(x => `<li>${x}</li>`).join("")}</ul>` : "<p class='muted'>—</p>"}
+        ${listOrDash(conceitos)}
       </div>
 
       <div class="box">
         <b>Exemplos</b>
-        ${exemplos.length ? `<ul>${exemplos.map(x => `<li>${x}</li>`).join("")}</ul>` : "<p class='muted'>—</p>"}
+        ${listOrDash(exemplos)}
       </div>
 
       <div class="box">
         <b>Aplicações</b>
-        ${aplicacoes.length ? `<ul>${aplicacoes.map(x => `<li>${x}</li>`).join("")}</ul>` : "<p class='muted'>—</p>"}
+        ${listOrDash(aplicacoes)}
       </div>
 
       <div class="box">
         <b>Resumo rápido</b>
-        ${resumo.length ? `<ul>${resumo.map(x => `<li>${x}</li>`).join("")}</ul>` : "<p class='muted'>—</p>"}
+        ${listOrDash(resumo)}
       </div>
     `;
+  },
+
+  // -----------------------------
+  // Helpers
+  // -----------------------------
+  _normalizePlano(data, fallback) {
+    const meta = data?.meta || {};
+    const tema = meta?.tema || fallback?.tema || "Tema";
+    const nivel = meta?.nivel || fallback?.nivel || "iniciante";
+
+    const sessoes = Array.isArray(data?.sessoes) ? data.sessoes : [];
+
+    const sessoesNorm = sessoes
+      .map((s, i) => {
+        const conteudo = s?.conteudo || {};
+
+        return {
+          id: s?.id || `S${i + 1}`,
+          titulo: s?.titulo || `Sessão ${i + 1}`,
+          objetivo: s?.objetivo || "",
+          conteudo: {
+            introducao: conteudo?.introducao || "",
+            conceitos: Array.isArray(conteudo?.conceitos) ? conteudo.conceitos : [],
+            exemplos: Array.isArray(conteudo?.exemplos) ? conteudo.exemplos : [],
+            aplicacoes: Array.isArray(conteudo?.aplicacoes) ? conteudo.aplicacoes : [],
+            resumoRapido: Array.isArray(conteudo?.resumoRapido) ? conteudo.resumoRapido : []
+          }
+        };
+      })
+      .filter((s) => s.titulo);
+
+    return {
+      meta: { tema, nivel },
+      sessoes: sessoesNorm
+    };
+  },
+
+  _escapeHtml(value) {
+    const str = String(value ?? "");
+    return str
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 };
