@@ -61,8 +61,9 @@ export const planos = {
       }
 
       if (!res.ok) {
-        throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       }
+
 
       if (!data?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
