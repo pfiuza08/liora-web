@@ -1120,4 +1120,39 @@ html.light select option {
   background: #ffffff;
   color: #111827;
 }
+/* =========================================================
+   ✅ Progress bar (Tema/PDF)
+========================================================= */
+.progress-wrap {
+  margin-top: 10px;
+}
+
+.progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.progress-bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+}
+
+html.light .progress-bar {
+  border-color: rgba(0,0,0,0.12);
+  background: rgba(0,0,0,0.06);
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: rgba(196, 75, 4, 0.95); /* laranja */
+  transition: width 250ms ease;
+}
 
