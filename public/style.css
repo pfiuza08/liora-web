@@ -1387,4 +1387,18 @@ html.light .checkpoint-box .cq-input {
   background: #fff;
   border-color: rgba(0,0,0,.12);
 }
+.panel-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:12px;
+}
+
+.panel-actions .btn-primary{
+  flex:1;
+}
+
+.panel-actions .btn-secondary{
+  white-space:nowrap;
+}
 
