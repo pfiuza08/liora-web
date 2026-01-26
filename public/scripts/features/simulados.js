@@ -326,8 +326,8 @@ export const simulados = {
         </div>
 
         <div class="sim-cta">
-          <button class="btn-primary" data-action="startSimulado">Iniciar</button>
-          <button class="btn-ghost" data-action="openConfig">Configurar</button>
+          <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
+          <button class="btn-outline" data-action="openConfig">Configurar</button>
         </div>
 
         <div class="sim-meta">
@@ -371,8 +371,8 @@ export const simulados = {
         <div class="sim-actions">
           <button class="btn-ghost" data-action="openConfig" title="Configurar">⚙️</button>
           <div class="spacer"></div>
-          <button class="btn-ghost" data-action="nextQuestao" id="btn-next">Próxima</button>
-          <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
+            <button class="btn-outline" data-action="nextQuestao" id="btn-next">Próxima</button>
+            <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
         </div>
       </div>
 
@@ -476,9 +476,9 @@ export const simulados = {
         </div>
 
         <div class="sim-cta">
-          <button class="btn-primary" data-action="startSimulado">Refazer</button>
-          <button class="btn-ghost" data-action="restartSimulado">Zerar</button>
-          <button class="btn-ghost" data-action="reviewToggle">Revisão</button>
+         <button class="btn-primary" data-action="startSimulado">Refazer</button>
+        <button class="btn-outline" data-action="restartSimulado">Zerar</button>
+        <button class="btn-outline" data-action="reviewToggle">Revisão</button>
         </div>
       </div>
 
