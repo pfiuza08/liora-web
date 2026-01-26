@@ -1038,4 +1038,43 @@ html.light .cq-input {
   gap: 10px;
   flex-wrap: wrap;
 }
+/* ===== PDF viewer embutido ===== */
+.pdf-viewer-wrap {
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+html.light .pdf-viewer-wrap {
+  border-color: rgba(0,0,0,0.10);
+  background: rgba(0,0,0,0.03);
+}
+
+.pdf-viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+
+html.light .pdf-viewer-head {
+  border-bottom-color: rgba(0,0,0,0.10);
+}
+
+.pdf-viewer-title {
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0.95;
+}
+
+.pdf-iframe {
+  width: 100%;
+  height: 340px;
+  border: 0;
+  background: transparent;
+}
 
