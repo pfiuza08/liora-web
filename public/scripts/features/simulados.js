@@ -1,14 +1,13 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.1-PRODUCT (API + fallback + explicação)
+// Versão: v2.2-PRODUCT (Clean UI)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração
 // ✔ Start direto (botão principal)
 // ✔ Configurar no FAB/btn secundário
 // ✔ Timer + progresso + resultado
-// ✔ Questões via API (/api/gerarSimulado)
-// ✔ Fallback para mock se API falhar
+// ✔ Questões via API (/api/gerarSimulado) + fallback mock
 // ✔ Eventos canônicos (liora:*)
 // ✔ Salvamento em localStorage
 // ✔ Revisão com explicação (quando disponível)
@@ -42,12 +41,10 @@ export const simulados = {
   // -----------------------------
   init(ctx) {
     this.ctx = ctx;
-
-    // binds
     this.bindUI();
     this.restoreIfAny();
 
-    console.log("📝 simulados.js v2.1 — Product Mode iniciado");
+    console.log("📝 simulados.js v2.2 — Clean UI iniciado");
   },
 
   // -----------------------------
@@ -60,7 +57,6 @@ export const simulados = {
       return;
     }
 
-    // Delegação de eventos por data-action
     root.addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-action]");
       if (!btn) return;
@@ -79,7 +75,6 @@ export const simulados = {
       if (action === "reviewToggle") this.toggleReview();
     });
 
-    // Seleção de alternativa
     root.addEventListener("change", (ev) => {
       const inp = ev.target;
       if (!inp?.matches?.("input[name='alt']")) return;
@@ -87,12 +82,10 @@ export const simulados = {
       this.pickAlternative(val);
     });
 
-    // Evento canônico: abrir simulados via sistema
     window.addEventListener("liora:open-simulados", () => {
       this.showScreen();
     });
 
-    // Evento canônico: start externo (se quiser)
     window.addEventListener("liora:start-simulado", () => {
       this.showScreen();
       this.start();
@@ -104,8 +97,7 @@ export const simulados = {
   // -----------------------------
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-    const s = document.getElementById("screen-simulados");
-    s?.classList.add("active");
+    document.getElementById("screen-simulados")?.classList.add("active");
   },
 
   // -----------------------------
@@ -115,7 +107,6 @@ export const simulados = {
     const modal = document.getElementById("sim-config");
     if (!modal) return;
 
-    // Prefill inputs
     const c = this.STATE.config;
     this.setValue("sim-banca", c.banca);
     this.setValue("sim-qtd", c.qtd);
@@ -133,6 +124,7 @@ export const simulados = {
   closeConfig() {
     const modal = document.getElementById("sim-config");
     if (!modal) return;
+
     modal.classList.remove("open");
     document.body.classList.remove("liora-modal-open");
 
@@ -156,9 +148,10 @@ export const simulados = {
     };
 
     this.STATE.timer.enabled = timerMode === "on";
-
     this.persistConfig();
-    this.toast("Configurações salvas ✅");
+
+    // Sem emoji, sem excesso
+    this.toast("Configurações salvas.");
 
     this.closeConfig();
     this.renderIdle();
@@ -168,10 +161,8 @@ export const simulados = {
   // START / FLOW (API)
   // -----------------------------
   async start() {
-    // Se já está rodando, ignora
     if (this.STATE.running) return;
 
-    // Evento canônico
     window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...this.STATE.config } }));
 
     this.STATE.running = true;
@@ -179,7 +170,6 @@ export const simulados = {
     this.STATE.respostas = [];
     this.STATE.questoes = [];
 
-    // Timer
     if (this.STATE.timer.enabled) {
       this.STATE.timer.totalSec = this.STATE.config.tempo * 60;
       this.STATE.timer.leftSec = this.STATE.timer.totalSec;
@@ -190,27 +180,21 @@ export const simulados = {
       this.STATE.timer.leftSec = 0;
     }
 
-    // UI loading
     this.renderRunning();
-    this.setHTML("sim-enunciado", "Gerando questões com IA... ⏳");
-    this.setHTML(
-      "sim-alts",
-      `<div class="muted small">Preparando o treino... (se a internet falhar, eu continuo no modo offline ✅)</div>`
-    );
+    this.setText("sim-enunciado", "Gerando questões...");
+    this.setHTML("sim-alts", `<div class="muted small">Isso pode levar alguns segundos.</div>`);
     this.renderButtonsState();
 
-    // ✅ Busca via API com fallback
     try {
       const questoes = await this.fetchQuestoesAPI(this.STATE.config);
       if (!questoes?.length) throw new Error("API retornou vazio.");
       this.STATE.questoes = questoes;
     } catch (err) {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
-      this.toast("Falha ao gerar por IA. Usando modo offline ✅");
+      this.toast("Não foi possível gerar agora. Usando modo offline.");
       this.STATE.questoes = this.buildMockQuestions(this.STATE.config);
     }
 
-    // segue fluxo
     this.persistRun();
     this.renderQuestion();
   },
@@ -223,7 +207,6 @@ export const simulados = {
 
     const correta = index === q.corretaIndex;
 
-    // salva ou substitui resposta na questão atual
     const existing = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
     const payload = {
       idx: this.STATE.atual,
@@ -235,11 +218,8 @@ export const simulados = {
       explicacao: q.explicacao || ""
     };
 
-    if (existing) {
-      Object.assign(existing, payload);
-    } else {
-      this.STATE.respostas.push(payload);
-    }
+    if (existing) Object.assign(existing, payload);
+    else this.STATE.respostas.push(payload);
 
     this.persistRun();
     this.renderProgress();
@@ -308,6 +288,7 @@ export const simulados = {
       if (!this.STATE.running) return;
 
       this.STATE.timer.leftSec -= 1;
+
       if (this.STATE.timer.leftSec <= 0) {
         this.STATE.timer.leftSec = 0;
         this.renderTimer();
@@ -338,15 +319,15 @@ export const simulados = {
       "sim-body",
       `
       <div class="card">
-        <div class="card-title">Pronto para treinar? 🧠⚡</div>
+        <div class="card-title">Simulado</div>
         <div class="muted">
           Configure banca, quantidade e tema (opcional).<br>
-          Depois é só clicar em <b>Iniciar simulado</b>.
+          Depois clique em <b>Iniciar</b>.
         </div>
 
         <div class="sim-cta">
-          <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
-          <button class="btn-ghost" data-action="openConfig">⚙️ Configurar</button>
+          <button class="btn-primary" data-action="startSimulado">Iniciar</button>
+          <button class="btn-ghost" data-action="openConfig">Configurar</button>
         </div>
 
         <div class="sim-meta">
@@ -354,9 +335,7 @@ export const simulados = {
           <div><span class="pill">Questões</span> ${this.STATE.config.qtd}</div>
           <div><span class="pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
           <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
-          <div><span class="pill">Timer</span> ${
-            this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "desligado"
-          }</div>
+          <div><span class="pill">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
         </div>
       </div>
     `
@@ -376,7 +355,7 @@ export const simulados = {
         </div>
 
         <div class="sim-timer ${this.STATE.timer.enabled ? "" : "hidden"}" id="sim-timer">
-          ⏳ <span id="sim-timer-text">--:--</span>
+          <span id="sim-timer-text">--:--</span>
         </div>
       </div>
 
@@ -387,21 +366,18 @@ export const simulados = {
         </div>
 
         <div class="sim-enunciado" id="sim-enunciado"></div>
-
         <div class="sim-alts" id="sim-alts"></div>
 
         <div class="sim-actions">
           <button class="btn-ghost" data-action="openConfig" title="Configurar">⚙️</button>
-
           <div class="spacer"></div>
-
-          <button class="btn-ghost" data-action="nextQuestao" id="btn-next">Próxima →</button>
+          <button class="btn-ghost" data-action="nextQuestao" id="btn-next">Próxima</button>
           <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
         </div>
       </div>
 
       <div class="muted small" id="sim-hint">
-        Dica: responda uma alternativa para liberar a próxima questão.
+        Selecione uma alternativa para liberar a próxima questão.
       </div>
     `
     );
@@ -475,8 +451,7 @@ export const simulados = {
 
   renderTimer() {
     if (!this.STATE.timer.enabled) return;
-    const t = this.formatTime(this.STATE.timer.leftSec);
-    this.setText("sim-timer-text", t);
+    this.setText("sim-timer-text", this.formatTime(this.STATE.timer.leftSec));
   },
 
   renderResult(result) {
@@ -486,11 +461,11 @@ export const simulados = {
       "sim-body",
       `
       <div class="card">
-        <div class="card-title">Resultado 🎯</div>
+        <div class="card-title">Resultado</div>
 
         <div class="sim-score">
           <div class="score-main">${pct}%</div>
-          <div class="muted">Você acertou <b>${acertos}</b> de <b>${total}</b> questões.</div>
+          <div class="muted">Acertos: <b>${acertos}</b> de <b>${total}</b></div>
         </div>
 
         <div class="sim-meta">
@@ -501,15 +476,15 @@ export const simulados = {
         </div>
 
         <div class="sim-cta">
-          <button class="btn-primary" data-action="startSimulado">Refazer agora</button>
+          <button class="btn-primary" data-action="startSimulado">Refazer</button>
           <button class="btn-ghost" data-action="restartSimulado">Zerar</button>
-          <button class="btn-ghost" data-action="reviewToggle">Ver revisão</button>
+          <button class="btn-ghost" data-action="reviewToggle">Revisão</button>
         </div>
       </div>
 
       <div class="card hidden" id="sim-review">
-        <div class="card-title">Revisão rápida 🧾</div>
-        <div class="muted small">Mostrando suas respostas, a correta e a explicação.</div>
+        <div class="card-title">Revisão</div>
+        <div class="muted small">Respostas e alternativa correta.</div>
         <div class="sim-review-list" id="sim-review-list"></div>
       </div>
     `
@@ -541,7 +516,7 @@ export const simulados = {
         <div class="sim-review-item ${ok ? "ok" : "bad"}">
           <div class="sim-review-head">
             <div class="sim-review-q">Q${i + 1}</div>
-            <div class="sim-review-badge">${ok ? "✅ Acertou" : "❌ Errou"}</div>
+            <div class="sim-review-badge">${ok ? "Correta" : "Incorreta"}</div>
           </div>
 
           <div class="sim-review-enun">${this.escape(r.enunciado)}</div>
@@ -551,11 +526,7 @@ export const simulados = {
             <div><b>Correta:</b> ${letter(correta)}. ${this.escape(r.alternativas[correta])}</div>
           </div>
 
-          ${
-            explicacao
-              ? `<div class="sim-review-exp"><b>Explicação:</b> ${this.escape(explicacao)}</div>`
-              : ""
-          }
+          ${explicacao ? `<div class="sim-review-exp"><b>Explicação:</b> ${this.escape(explicacao)}</div>` : ""}
         </div>
       `;
     });
@@ -573,7 +544,7 @@ export const simulados = {
   },
 
   // -----------------------------
-  // API (gerarSimulado)
+  // API
   // -----------------------------
   async fetchQuestoesAPI(config) {
     const payload = {
@@ -597,26 +568,18 @@ export const simulados = {
     const data = await res.json();
     const questoes = data?.questoes || [];
 
-    // saneamento mínimo
-    const sane = questoes
-      .filter(
-        (q) =>
-          q?.enunciado &&
-          Array.isArray(q?.alternativas) &&
-          q.alternativas.length >= 4
-      )
+    return questoes
+      .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 4)
       .map((q) => ({
         enunciado: String(q.enunciado).trim(),
         alternativas: q.alternativas.slice(0, 4).map((a) => String(a).trim()),
         corretaIndex: Number.isInteger(q.corretaIndex) ? q.corretaIndex : 0,
         explicacao: q.explicacao ? String(q.explicacao).trim() : ""
       }));
-
-    return sane;
   },
 
   // -----------------------------
-  // MOCK DATA (fallback)
+  // MOCK (fallback)
   // -----------------------------
   buildMockQuestions(config) {
     const qtd = config.qtd || 5;
@@ -625,7 +588,7 @@ export const simulados = {
 
     const base = [
       {
-        enunciado: `(${banca}) Em ${tema}, qual alternativa define melhor o objetivo principal de uma revisão periódica?`,
+        enunciado: `(${banca}) Em ${tema}, qual alternativa descreve melhor o objetivo de uma revisão periódica?`,
         alternativas: [
           "Aumentar complexidade sem necessidade",
           "Identificar falhas e corrigir inconsistências",
@@ -633,51 +596,18 @@ export const simulados = {
           "Substituir testes por opinião"
         ],
         corretaIndex: 1,
-        explicacao: "Uma revisão periódica serve para encontrar erros, inconsistências e ajustar o que for necessário."
+        explicacao: "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
       },
       {
         enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
         alternativas: [
-          "Ignorar o conteúdo teórico",
-          "Treinar sob pressão e consolidar padrão de prova",
-          "Garantir 100% de acerto sem revisão",
-          "Evitar qualquer tipo de feedback"
+          "Ignorar teoria",
+          "Treinar padrão de prova e consolidar conteúdo",
+          "Garantir acerto sem revisão",
+          "Evitar feedback"
         ],
         corretaIndex: 1,
-        explicacao: "Simulados ajudam a treinar tempo, identificar lacunas e reconhecer padrões de cobrança."
-      },
-      {
-        enunciado: `(${banca}) O que melhor caracteriza um “erro por pressa” em prova?`,
-        alternativas: [
-          "Escolher com base em evidência",
-          "Ler com calma e revisar",
-          "Responder sem validar enunciado e pegadinhas",
-          "Checar alternativas e eliminar incorretas"
-        ],
-        corretaIndex: 2,
-        explicacao: "Pressa costuma gerar leitura superficial e erro em detalhes do enunciado."
-      },
-      {
-        enunciado: `(${banca}) Uma boa estratégia de tempo em simulado é:`,
-        alternativas: [
-          "Gastar todo o tempo na primeira questão",
-          "Deixar as fáceis para o final",
-          "Manter ritmo, marcar difíceis e voltar depois",
-          "Não usar rascunho nunca"
-        ],
-        corretaIndex: 2,
-        explicacao: "Ritmo constante e retorno às difíceis melhora o aproveitamento do tempo."
-      },
-      {
-        enunciado: `(${banca}) O que é uma “pista” típica de alternativa errada?`,
-        alternativas: [
-          "Termos absolutos como “sempre” e “nunca”",
-          "Explicação coerente e específica",
-          "Conexão direta com o enunciado",
-          "Consistência com o conteúdo estudado"
-        ],
-        corretaIndex: 0,
-        explicacao: "Absolutismos geralmente indicam generalização incorreta em alternativas de prova."
+        explicacao: "Simulados ajudam a consolidar conteúdo e ajustar estratégia de prova."
       }
     ];
 
@@ -685,7 +615,7 @@ export const simulados = {
     for (let i = 0; i < qtd; i++) {
       const item = base[i % base.length];
       out.push({
-        enunciado: item.enunciado.replace("revisão periódica", `revisão periódica (Q${i + 1})`),
+        enunciado: item.enunciado,
         alternativas: [...item.alternativas],
         corretaIndex: item.corretaIndex,
         explicacao: item.explicacao || ""
@@ -757,7 +687,6 @@ export const simulados = {
   },
 
   restoreIfAny() {
-    // restore config
     try {
       const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
       if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
@@ -768,7 +697,6 @@ export const simulados = {
       if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
     } catch {}
 
-    // restore run
     try {
       const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
       if (run?.running && run?.questoes?.length) {
