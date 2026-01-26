@@ -1077,4 +1077,47 @@ html.light .pdf-viewer-head {
   border: 0;
   background: transparent;
 }
+/* =========================================================
+   ✅ SELECT / DROPDOWN — legível no dark/light
+========================================================= */
+
+/* ajuda o browser a renderizar controles nativos no tema certo */
+html.dark { color-scheme: dark; }
+html.light { color-scheme: light; }
+
+/* o select (campo fechado) */
+select.input,
+.input[type="file"],
+.input {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+html.light select.input,
+html.light .input[type="file"],
+html.light .input {
+  background: rgba(0,0,0,0.04);
+  color: rgba(0,0,0,0.92);
+  border: 1px solid rgba(0,0,0,0.10);
+}
+
+/* foco (acessível) */
+select.input:focus,
+.input:focus {
+  outline: none;
+  border-color: rgba(196, 75, 4, 0.65); /* seu laranja */
+  box-shadow: 0 0 0 3px rgba(196, 75, 4, 0.22);
+}
+
+/* as opções no dropdown (nem todo browser respeita, mas ajuda MUITO) */
+select option {
+  background: #0f1115;
+  color: #e9eef7;
+}
+
+html.light select option {
+  background: #ffffff;
+  color: #111827;
+}
 
