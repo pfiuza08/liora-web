@@ -1401,4 +1401,36 @@ html.light .checkpoint-box .cq-input {
 .panel-actions .btn-secondary{
   white-space:nowrap;
 }
+/* =========================================================
+   ✅ ACTIONS ROW (Tema/PDF) — botão principal + secundário
+========================================================= */
+.actions-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:10px;
+}
+
+.actions-row .btn-primary{
+  flex:1;
+  min-width:180px;
+}
+
+.actions-row .btn-secondary{
+  white-space:nowrap;
+  padding-left:14px;
+  padding-right:14px;
+}
+
+/* Mobile: empilha (fica lindo e funcional) */
+@media (max-width: 520px){
+  .actions-row{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .actions-row .btn-primary,
+  .actions-row .btn-secondary{
+    width:100%;
+  }
+}
 
