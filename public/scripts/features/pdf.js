@@ -6,6 +6,9 @@ export const pdf = {
   _sessoes: [],
   _idxAtual: 0,
 
+  // viewer runtime
+  _blobUrl: null,
+
   async init(ctx) {
     this.ctx = ctx;
 
@@ -15,10 +18,13 @@ export const pdf = {
     btn?.addEventListener("click", () => this.gerarPorPdfUltraFiel());
     limpar?.addEventListener("click", () => this.limparPlano());
 
+    // fechar viewer
+    document.getElementById("btn-pdf-close")?.addEventListener("click", () => this._closeViewer());
+
     const saved = this.ctx.store.get("planoPdf");
     if (saved?.sessoes?.length) this.render(saved);
 
-    console.log("pdf.js iniciado (Ultra Fiel)");
+    console.log("pdf.js iniciado (Ultra Fiel + viewer)");
   },
 
   async gerarPorPdfUltraFiel() {
@@ -37,13 +43,13 @@ export const pdf = {
 
     try {
       ui.loading(true, "Lendo PDF e gerando plano ultra fiel…");
+      if (status) status.textContent = "Preparando PDF…";
+
+      // ✅ cria blobUrl para abrir no iframe
+      this._setBlobUrl(file);
+
       if (status) status.textContent = "Extraindo texto por página…";
-
       const pages = await this._extractPdfPages(file);
-
-      if (!Array.isArray(pages) || pages.length === 0) {
-        throw new Error("Não consegui extrair texto do PDF.");
-      }
 
       const joinedLen = pages.reduce((acc, p) => acc + (p?.text?.length || 0), 0);
       if (joinedLen < 400) {
@@ -61,7 +67,6 @@ export const pdf = {
           nomeArquivo: file.name,
           pages
         })
-
       });
 
       const raw = await res.text();
@@ -85,8 +90,7 @@ export const pdf = {
       data = this._normalizePlano(data, {
         tema: `PDF: ${file.name}`,
         nivel
-      });  
-
+      });
 
       store.set("planoPdf", data);
       store.set("planoPdfState", { currentId: data?.sessoes?.[0]?.id || null, doneIds: [] });
@@ -122,6 +126,9 @@ export const pdf = {
 
     const lista = document.getElementById("pdf-lista-sessoes");
     if (lista) lista.innerHTML = "";
+
+    this._closeViewer();
+    this._clearBlobUrl();
 
     console.log("Plano PDF removido");
   },
@@ -179,7 +186,7 @@ export const pdf = {
     if (!opts.silentSave) this._saveState({ currentId: sessao?.id });
   },
 
-  // ✅ Agora o conteúdo vem ANTES de avaliação (fidelidade + leitura)
+  // ✅ conteúdo primeiro, avaliação depois + fontes clicáveis
   renderSessao(s) {
     const view = document.getElementById("pdf-sessao-view");
     if (!view) return;
@@ -201,8 +208,6 @@ export const pdf = {
     const aplicacoes = Array.isArray(c?.aplicacoes) ? c.aplicacoes : [];
     const resumo = Array.isArray(c?.resumoRapido) ? c.resumoRapido : [];
 
-    const n = this._sessoes.length;
-    const pos = this._idxAtual + 1;
     const tempoChip = tempo ? `<span class="chip">⏱ ${tempo} min</span>` : "";
 
     const listOrDash = (arr) =>
@@ -215,17 +220,17 @@ export const pdf = {
         <div class="box fontes-box">
           <div class="fontes-head">
             <b>Fontes do PDF</b>
-            <span class="muted small">ultra fiel</span>
+            <span class="muted small">clique para abrir na página</span>
           </div>
           <div class="fontes-list">
             ${fontes
               .slice(0, 4)
               .map(
-                (f) => `
-                  <div class="fonte-item">
+                (f, i) => `
+                  <button class="fonte-item fonte-click" type="button" data-open-page="${this._escapeHtml(f?.page ?? "")}">
                     <div class="fonte-tag">Pág. ${this._escapeHtml(f?.page ?? "")}</div>
                     <div class="fonte-text">"${this._escapeHtml(f?.trecho || "")}"</div>
-                  </div>
+                  </button>
                 `
               )
               .join("")}
@@ -339,7 +344,7 @@ export const pdf = {
 
     view.innerHTML = `
       <div class="sessao-toolbar">
-        <div class="sessao-progress">Sessão <b>${pos}</b> / ${n} ${tempoChip}</div>
+        <div class="sessao-progress">${tempoChip}</div>
       </div>
 
       <h4>${this._escapeHtml(titulo)}</h4>
@@ -356,16 +361,23 @@ export const pdf = {
       ${checklistHtml}
       ${errosHtml}
       ${flashcardsHtml}
-
       ${checkpointHtml}
     `;
+
+    // ✅ bind fontes clicáveis: abre no viewer na página
+    view.querySelectorAll("[data-open-page]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = Number(btn.getAttribute("data-open-page"));
+        if (Number.isFinite(p) && p > 0) this._openViewerAtPage(p);
+      });
+    });
 
     // flashcards
     view.querySelectorAll("[data-flashcard]").forEach((btn) => {
       btn.addEventListener("click", () => btn.classList.toggle("flipped"));
     });
 
-    // show/hide exp
+    // show/hide explicação/gabarito
     view.querySelectorAll("[data-show]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = btn.getAttribute("data-show");
@@ -422,9 +434,36 @@ export const pdf = {
     });
   },
 
-  // -----------------------------
-  // ✅ Extração por página (Ultra Fiel)
-  // -----------------------------
+  // ===== Viewer =====
+  _setBlobUrl(file) {
+    this._clearBlobUrl();
+    this._blobUrl = URL.createObjectURL(file);
+  },
+
+  _clearBlobUrl() {
+    if (this._blobUrl) {
+      URL.revokeObjectURL(this._blobUrl);
+      this._blobUrl = null;
+    }
+  },
+
+  _openViewerAtPage(pageNum) {
+    const wrap = document.getElementById("pdf-viewer-wrap");
+    const iframe = document.getElementById("pdf-iframe");
+    if (!wrap || !iframe || !this._blobUrl) return;
+
+    wrap.classList.remove("hidden");
+    iframe.src = `${this._blobUrl}#page=${pageNum}`;
+  },
+
+  _closeViewer() {
+    const wrap = document.getElementById("pdf-viewer-wrap");
+    const iframe = document.getElementById("pdf-iframe");
+    wrap?.classList.add("hidden");
+    if (iframe) iframe.src = "";
+  },
+
+  // ===== Extract pages =====
   async _extractPdfPages(file) {
     const buf = await file.arrayBuffer();
 
@@ -451,7 +490,7 @@ export const pdf = {
       if (text.length >= 40) {
         pages.push({
           page: p,
-          text: text.slice(0, 5000) // corta por página, mas mantém rastreável
+          text: text.slice(0, 5000)
         });
         totalChars += Math.min(text.length, 5000);
       }
@@ -493,7 +532,6 @@ export const pdf = {
       tempoEstimadoMin: Number.isFinite(s?.tempoEstimadoMin) ? s.tempoEstimadoMin : 20,
 
       fontes: Array.isArray(s?.fontes) ? s.fontes : [],
-
       checklist: Array.isArray(s?.checklist) ? s.checklist : [],
       errosComuns: Array.isArray(s?.errosComuns) ? s.errosComuns : [],
       flashcards: Array.isArray(s?.flashcards) ? s.flashcards : [],
