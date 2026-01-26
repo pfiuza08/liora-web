@@ -920,7 +920,7 @@ export const planos = {
     window.addEventListener("keydown", (ev) => this._onKeydown(ev));
   },
 
-  _onKeydown(ev) {
+   _onKeydown(ev) {
     const tag = (ev.target?.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select") return;
 
@@ -947,87 +947,82 @@ export const planos = {
       this._toggleDoneCurrent();
       return;
     }
+  },
+
+  // =========================================================
+  // ✅ PROGRESS UI (Tema) - barra com % + etapas
+  // Requer no HTML:
+  // #tema-progress, #tema-progress-fill, #tema-progress-pct
+  // =========================================================
+  _progressShow() {
+    const wrap = document.getElementById("tema-progress");
+    if (!wrap) return;
+
+    wrap.classList.remove("hidden");
+    this._progressSet(0, "Iniciando…");
+  },
+
+  _progressHide() {
+    const wrap = document.getElementById("tema-progress");
+    if (!wrap) return;
+
+    wrap.classList.add("hidden");
+    this._progressSet(0, "");
+  },
+
+  _progressSet(pct, text = "") {
+    const fill = document.getElementById("tema-progress-fill");
+    const pctEl = document.getElementById("tema-progress-pct");
+    const status = document.getElementById("tema-status");
+
+    const p = Math.max(0, Math.min(100, Number(pct || 0)));
+
+    if (fill) fill.style.width = `${p}%`;
+    if (pctEl) pctEl.textContent = `${p}%`;
+    if (status && text) status.textContent = text;
+  },
+
+  _progressSimulateDuringAi(startPct = 18, endPct = 88) {
+    let running = true;
+    let current = startPct;
+
+    const msgs = [
+      "Gerando com IA…",
+      "Organizando as sessões…",
+      "Estruturando conteúdos…",
+      "Preparando checklist e erros comuns…",
+      "Criando flashcards…",
+      "Montando checkpoint…",
+      "Finalizando ajustes…"
+    ];
+
+    let msgIndex = 0;
+
+    const tick = () => {
+      if (!running) return;
+
+      const remaining = Math.max(1, endPct - current);
+      const stepBase = remaining > 20 ? 2.2 : remaining > 8 ? 1.4 : 0.7;
+      const stepJitter = Math.random() * 0.9;
+      const step = Math.max(0.35, stepBase * 0.55 + stepJitter);
+
+      current = Math.min(endPct, current + step);
+
+      if (Math.random() < 0.35) {
+        msgIndex = (msgIndex + 1) % msgs.length;
+      }
+
+      this._progressSet(Math.round(current), msgs[msgIndex]);
+
+      if (current < endPct) {
+        setTimeout(tick, 420 + Math.random() * 260);
+      }
+    };
+
+    setTimeout(tick, 250);
+
+    return () => {
+      running = false;
+    };
   }
-
-// =========================================================
-// ✅ PROGRESS UI (Tema) - barra com % + etapas
-// Requer no HTML:
-// #tema-progress, #tema-progress-fill, #tema-progress-pct
-// =========================================================
-_progressShow() {
-  const wrap = document.getElementById("tema-progress");
-  if (!wrap) return;
-
-  wrap.classList.remove("hidden");
-  this._progressSet(0, "Iniciando…");
-},
-
-_progressHide() {
-  const wrap = document.getElementById("tema-progress");
-  if (!wrap) return;
-
-  wrap.classList.add("hidden");
-  this._progressSet(0, "");
-},
-
-_progressSet(pct, text = "") {
-  const fill = document.getElementById("tema-progress-fill");
-  const pctEl = document.getElementById("tema-progress-pct");
-  const status = document.getElementById("tema-status");
-
-  const p = Math.max(0, Math.min(100, Number(pct || 0)));
-
-  if (fill) fill.style.width = `${p}%`;
-  if (pctEl) pctEl.textContent = `${p}%`;
-  if (status && text) status.textContent = text;
-},
-
-_progressSimulateDuringAi(startPct = 18, endPct = 88) {
-  let running = true;
-  let current = startPct;
-
-  const msgs = [
-    "Gerando com IA…",
-    "Organizando as sessões…",
-    "Estruturando conteúdos…",
-    "Preparando checklist e erros comuns…",
-    "Criando flashcards…",
-    "Montando checkpoint…",
-    "Finalizando ajustes…"
-  ];
-
-  let msgIndex = 0;
-
-  const tick = () => {
-    if (!running) return;
-
-    // sobe com "vida real": lento, irregular e com desaceleração perto do teto
-    const remaining = Math.max(1, endPct - current);
-    const stepBase = remaining > 20 ? 2.2 : remaining > 8 ? 1.4 : 0.7;
-    const stepJitter = Math.random() * 0.9; // 0..0.9
-    const step = Math.max(0.35, stepBase * 0.55 + stepJitter);
-
-    current = Math.min(endPct, current + step);
-
-    // alterna mensagens de tempos em tempos
-    if (Math.random() < 0.35) {
-      msgIndex = (msgIndex + 1) % msgs.length;
-    }
-
-    this._progressSet(Math.round(current), msgs[msgIndex]);
-
-    if (current < endPct) {
-      setTimeout(tick, 420 + Math.random() * 260);
-    }
-  };
-
-  setTimeout(tick, 250);
-
-  // stop()
-  return () => {
-    running = false;
-  };
-},
-
-  
 };
