@@ -219,15 +219,81 @@
         <div class="screen-head">
           <button class="btn-link" data-nav="home">← Voltar</button>
           <h3>Simulados</h3>
+          <span class="badge" id="sim-mode">Pronto</span>
         </div>
-
+      
         <div class="panel">
-          <div class="muted">
-            Em breve ✅<br>
-            Vamos implementar depois de fechar Tema + PDF.
+          <div id="sim-body"></div>
+        </div>
+      
+        <!-- MODAL CONFIG -->
+        <div class="modal" id="sim-config" aria-hidden="true">
+          <div class="modal-backdrop" data-action="closeConfig"></div>
+      
+          <div class="modal-card">
+            <div class="modal-head">
+              <div class="modal-title">Configurar simulado ⚙️</div>
+              <button class="btn-ghost" data-action="closeConfig">✕</button>
+            </div>
+      
+            <div class="modal-body">
+              <div class="grid-2">
+                <label class="field">
+                  <span class="label">Banca</span>
+                  <select id="sim-banca" class="input">
+                    <option value="FGV">FGV</option>
+                    <option value="CESPE/CEBRASPE">CESPE/CEBRASPE</option>
+                    <option value="FCC">FCC</option>
+                    <option value="VUNESP">VUNESP</option>
+                    <option value="IBFC">IBFC</option>
+                    <option value="AOCP">AOCP</option>
+                    <option value="Fundação Getúlio Vargas">Fundação Getúlio Vargas</option>
+                  </select>
+                </label>
+      
+                <label class="field">
+                  <span class="label">Quantidade</span>
+                  <input id="sim-qtd" class="input" type="number" min="3" max="30" value="5" />
+                </label>
+      
+                <label class="field">
+                  <span class="label">Dificuldade</span>
+                  <select id="sim-dificuldade" class="input">
+                    <option value="misturado">Misturado</option>
+                    <option value="facil">Fácil</option>
+                    <option value="medio">Médio</option>
+                    <option value="dificil">Difícil</option>
+                  </select>
+                </label>
+      
+                <label class="field">
+                  <span class="label">Tempo (min)</span>
+                  <input id="sim-tempo" class="input" type="number" min="5" max="180" value="20" />
+                </label>
+              </div>
+      
+              <label class="field">
+                <span class="label">Tema (opcional)</span>
+                <input id="sim-tema" class="input" type="text" placeholder="Ex.: LGPD, SQL, Raciocínio lógico, Redes..." />
+              </label>
+      
+              <label class="field">
+                <span class="label">Timer</span>
+                <select id="sim-timer" class="input">
+                  <option value="on">Ligado</option>
+                  <option value="off">Desligado</option>
+                </select>
+              </label>
+            </div>
+      
+            <div class="modal-foot">
+              <button class="btn-ghost" data-action="closeConfig">Cancelar</button>
+              <button class="btn-primary" data-action="saveConfig">Salvar ✅</button>
+            </div>
           </div>
         </div>
       </section>
+
 
       <!-- DASHBOARD -->
       <section id="screen-dashboard" class="screen">
