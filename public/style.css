@@ -1433,4 +1433,31 @@ html.light .checkpoint-box .cq-input {
     width:100%;
   }
 }
+/* ✅ Botões lado a lado, iguais e centralizados (Tema + PDF) */
+.btn-row{
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* ambos com o mesmo tamanho */
+.btn-row .btn-primary,
+.btn-row .btn-secondary{
+  flex: 1;
+  max-width: 220px;   /* controla o "tamanho bonito" e centralizado */
+  width: 100%;
+}
+
+/* em telas menores, deixa fluido */
+@media (max-width: 520px){
+  .btn-row{
+    flex-direction: column;
+  }
+  .btn-row .btn-primary,
+  .btn-row .btn-secondary{
+    max-width: 100%;
+  }
+}
 
