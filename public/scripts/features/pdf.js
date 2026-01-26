@@ -51,7 +51,7 @@ export const pdf = {
     if (wrap) wrap.classList.add("hidden");
   },
 
-  async gerarPorPdfUltraFiel() {
+    async gerarPorPdfUltraFiel() {
     const { store, ui } = this.ctx;
 
     const inp = document.getElementById("inp-pdf");
@@ -65,31 +65,32 @@ export const pdf = {
       return;
     }
 
+    let stopSim = null;
+
     try {
       ui.loading(true, "Lendo PDF e gerando plano ultra fiel…");
-      if (status) status.textContent = "Preparando PDF…";
 
-      this._setProgress("pdf", 8);
+      // ✅ liga a barra
+      this._progressShow();
+      this._progressSet(3, "Preparando PDF…");
 
       // ✅ cria blobUrl para abrir no iframe
       this._setBlobUrl(file);
-      this._setProgress("pdf", 15);
 
-      if (status) status.textContent = "Extraindo texto por página…";
-
-      const pages = await this._extractPdfPages(file, (pct) => {
-        // pct vindo do loop de extração (0..100)
-        const mapped = 15 + Math.round((pct / 100) * 40); // 15..55
-        this._setProgress("pdf", mapped);
-      });
+      // etapa 1: extração
+      this._progressSet(12, "Extraindo texto por página…");
+      const pages = await this._extractPdfPages(file);
 
       const joinedLen = pages.reduce((acc, p) => acc + (p?.text?.length || 0), 0);
       if (joinedLen < 400) {
         throw new Error("Texto extraído insuficiente. Seu PDF pode ser escaneado (imagem).");
       }
 
-      if (status) status.textContent = "Chamando IA (ultra fiel)…";
-      this._setProgress("pdf", 62);
+      // etapa 2: IA
+      this._progressSet(38, "Preparando envio para IA…");
+
+      // ✅ simula progresso enquanto espera IA
+      stopSim = this._progressSimulateDuringAi(40, 86);
 
       const res = await fetch("/api/gerarPlanoPdf", {
         method: "POST",
@@ -103,9 +104,8 @@ export const pdf = {
       });
 
       const raw = await res.text();
-      this._setProgress("pdf", 78);
-
       let data = null;
+
       try {
         data = JSON.parse(raw);
       } catch {
@@ -121,6 +121,13 @@ export const pdf = {
         throw new Error("Resposta inválida: sem sessões.");
       }
 
+      // ✅ para simulação quando IA terminou
+      if (stopSim) stopSim();
+      stopSim = null;
+
+      // etapa 3: normaliza + salva
+      this._progressSet(90, "Organizando sessões…");
+
       data = this._normalizePlano(data, {
         tema: `PDF: ${file.name}`,
         nivel
@@ -129,22 +136,23 @@ export const pdf = {
       store.set("planoPdf", data);
       store.set("planoPdfState", { currentId: data?.sessoes?.[0]?.id || null, doneIds: [] });
 
-      // ✅ limpa cache de aprofundar do PDF
-      store.set("planoPdfAprofCache", {});
-
-      this._setProgress("pdf", 92);
-
+      // etapa 4: render
+      this._progressSet(96, "Renderizando conteúdo…");
       this.render(data);
 
-      if (status) status.textContent = "Plano gerado!";
-      this._setProgress("pdf", 100);
+      this._progressSet(100, "Plano gerado!");
+      setTimeout(() => this._progressHide(), 700);
+
     } catch (e) {
+      if (stopSim) stopSim();
+
       console.error(e);
       ui.error(e?.message || "Falha ao gerar plano por PDF.");
+
       if (status) status.textContent = "";
+      this._progressHide();
     } finally {
       ui.loading(false);
-      setTimeout(() => this._hideProgress("pdf"), 650);
     }
   },
 
@@ -948,4 +956,61 @@ export const pdf = {
       return;
     }
   }
+  // =========================================================
+  // ✅ PROGRESS UI (barra com % + etapas)
+  // =========================================================
+  _progressShow() {
+    const wrap = document.getElementById("pdf-progress");
+    if (!wrap) return;
+
+    wrap.classList.remove("hidden");
+    this._progressSet(0, "Iniciando…");
+  },
+
+  _progressHide() {
+    const wrap = document.getElementById("pdf-progress");
+    if (!wrap) return;
+
+    wrap.classList.add("hidden");
+    this._progressSet(0, "");
+  },
+
+  _progressSet(pct, text = "") {
+    const fill = document.getElementById("pdf-progress-fill");
+    const pctEl = document.getElementById("pdf-progress-pct");
+    const status = document.getElementById("pdf-status");
+
+    const p = Math.max(0, Math.min(100, Number(pct || 0)));
+
+    if (fill) fill.style.width = `${p}%`;
+    if (pctEl) pctEl.textContent = `${p}%`;
+    if (status && text) status.textContent = text;
+  },
+
+  _progressSimulateDuringAi(startPct = 45, endPct = 85) {
+    // anima suavemente enquanto a IA roda
+    // retorna uma função "stop()" que você chama depois
+    let running = true;
+    let current = startPct;
+
+    const tick = () => {
+      if (!running) return;
+
+      // avanço lento com "efeito vida real"
+      const step = Math.random() * 2.2 + 0.6; // 0.6% .. 2.8%
+      current = Math.min(endPct, current + step);
+
+      this._progressSet(Math.round(current), "Gerando plano com IA (ultra fiel)…");
+
+      if (current < endPct) {
+        setTimeout(tick, 450 + Math.random() * 300);
+      }
+    };
+
+    setTimeout(tick, 350);
+
+    return () => {
+      running = false;
+    };
+  },
 };
