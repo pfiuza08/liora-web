@@ -24,7 +24,31 @@ export const pdf = {
     const saved = this.ctx.store.get("planoPdf");
     if (saved?.sessoes?.length) this.render(saved);
 
-    console.log("pdf.js iniciado (Ultra Fiel + viewer)");
+    this._bindKeyboard();
+
+    console.log("pdf.js iniciado (Ultra Fiel + viewer + progresso + aprofundar)");
+  },
+
+  // -----------------------------
+  // ✅ Progress bar helpers (PDF)
+  // Requer no HTML:
+  // #pdf-progress, #pdf-progress-fill, #pdf-progress-pct
+  // -----------------------------
+  _setProgress(kind, pct) {
+    const wrap = document.getElementById(`${kind}-progress`);
+    const fill = document.getElementById(`${kind}-progress-fill`);
+    const label = document.getElementById(`${kind}-progress-pct`);
+    if (!wrap || !fill || !label) return;
+
+    const v = Math.max(0, Math.min(100, Number(pct || 0)));
+    wrap.classList.remove("hidden");
+    fill.style.width = `${v}%`;
+    label.textContent = `${v}%`;
+  },
+
+  _hideProgress(kind) {
+    const wrap = document.getElementById(`${kind}-progress`);
+    if (wrap) wrap.classList.add("hidden");
   },
 
   async gerarPorPdfUltraFiel() {
@@ -45,11 +69,19 @@ export const pdf = {
       ui.loading(true, "Lendo PDF e gerando plano ultra fiel…");
       if (status) status.textContent = "Preparando PDF…";
 
+      this._setProgress("pdf", 8);
+
       // ✅ cria blobUrl para abrir no iframe
       this._setBlobUrl(file);
+      this._setProgress("pdf", 15);
 
       if (status) status.textContent = "Extraindo texto por página…";
-      const pages = await this._extractPdfPages(file);
+
+      const pages = await this._extractPdfPages(file, (pct) => {
+        // pct vindo do loop de extração (0..100)
+        const mapped = 15 + Math.round((pct / 100) * 40); // 15..55
+        this._setProgress("pdf", mapped);
+      });
 
       const joinedLen = pages.reduce((acc, p) => acc + (p?.text?.length || 0), 0);
       if (joinedLen < 400) {
@@ -57,6 +89,7 @@ export const pdf = {
       }
 
       if (status) status.textContent = "Chamando IA (ultra fiel)…";
+      this._setProgress("pdf", 62);
 
       const res = await fetch("/api/gerarPlanoPdf", {
         method: "POST",
@@ -70,8 +103,9 @@ export const pdf = {
       });
 
       const raw = await res.text();
-      let data = null;
+      this._setProgress("pdf", 78);
 
+      let data = null;
       try {
         data = JSON.parse(raw);
       } catch {
@@ -95,15 +129,22 @@ export const pdf = {
       store.set("planoPdf", data);
       store.set("planoPdfState", { currentId: data?.sessoes?.[0]?.id || null, doneIds: [] });
 
+      // ✅ limpa cache de aprofundar do PDF
+      store.set("planoPdfAprofCache", {});
+
+      this._setProgress("pdf", 92);
+
       this.render(data);
 
       if (status) status.textContent = "Plano gerado!";
+      this._setProgress("pdf", 100);
     } catch (e) {
       console.error(e);
       ui.error(e?.message || "Falha ao gerar plano por PDF.");
       if (status) status.textContent = "";
     } finally {
       ui.loading(false);
+      setTimeout(() => this._hideProgress("pdf"), 650);
     }
   },
 
@@ -111,6 +152,7 @@ export const pdf = {
     const { store } = this.ctx;
     store.remove("planoPdf");
     store.remove("planoPdfState");
+    store.remove("planoPdfAprofCache");
 
     this._plano = null;
     this._sessoes = [];
@@ -129,6 +171,7 @@ export const pdf = {
 
     this._closeViewer();
     this._clearBlobUrl();
+    this._hideProgress("pdf");
 
     console.log("Plano PDF removido");
   },
@@ -186,7 +229,50 @@ export const pdf = {
     if (!opts.silentSave) this._saveState({ currentId: sessao?.id });
   },
 
+  _goPrev() {
+    this._setCurrentIndex(this._idxAtual - 1);
+  },
+
+  _goNext() {
+    this._setCurrentIndex(this._idxAtual + 1);
+  },
+
+  _toggleDoneCurrent() {
+    const sessao = this._sessoes[this._idxAtual];
+    if (!sessao?.id) return;
+
+    const st = this._getState();
+    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+
+    if (done.has(sessao.id)) done.delete(sessao.id);
+    else done.add(sessao.id);
+
+    this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
+
+    this._refreshListChecks();
+    this.renderSessao(sessao);
+  },
+
+  _refreshListChecks() {
+    const lista = document.getElementById("pdf-lista-sessoes");
+    if (!lista) return;
+
+    const st = this._getState();
+    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+
+    lista.querySelectorAll(".session-item").forEach((btn) => {
+      const idx = Number(btn.dataset.index || 0);
+      const s = this._sessoes[idx];
+      const isDone = done.has(s?.id);
+
+      const title = s?.titulo || `Sessão ${idx + 1}`;
+      btn.textContent = (isDone ? "✅ " : "") + title;
+    });
+  },
+
   // ✅ conteúdo primeiro, avaliação depois + fontes clicáveis
+  // ✅ + toolbar (prev/next/done)
+  // ✅ + conceitos com Aprofundar
   renderSessao(s) {
     const view = document.getElementById("pdf-sessao-view");
     if (!view) return;
@@ -208,6 +294,15 @@ export const pdf = {
     const aplicacoes = Array.isArray(c?.aplicacoes) ? c.aplicacoes : [];
     const resumo = Array.isArray(c?.resumoRapido) ? c.resumoRapido : [];
 
+    const n = this._sessoes.length;
+    const pos = this._idxAtual + 1;
+
+    const prevDisabled = this._idxAtual <= 0 ? "disabled" : "";
+    const nextDisabled = this._idxAtual >= n - 1 ? "disabled" : "";
+
+    const isDone = this._isDone(s?.id);
+    const btnDoneLabel = isDone ? "✅ Concluída (desmarcar)" : "Marcar como concluída";
+
     const tempoChip = tempo ? `<span class="chip">⏱ ${tempo} min</span>` : "";
 
     const listOrDash = (arr) =>
@@ -226,7 +321,7 @@ export const pdf = {
             ${fontes
               .slice(0, 4)
               .map(
-                (f, i) => `
+                (f) => `
                   <button class="fonte-item fonte-click" type="button" data-open-page="${this._escapeHtml(f?.page ?? "")}">
                     <div class="fonte-tag">Pág. ${this._escapeHtml(f?.page ?? "")}</div>
                     <div class="fonte-text">"${this._escapeHtml(f?.trecho || "")}"</div>
@@ -283,6 +378,41 @@ export const pdf = {
           </div>
         </div>`
       : "";
+
+    // ✅ Conceitos com aprofundamento (igual ao Tema)
+    const conceitosHtml = conceitos.length
+      ? `<ul class="conceitos-list">
+          ${conceitos
+            .map((item, ci) => {
+              const sid = s?.id || `S${this._idxAtual + 1}`;
+              const key = this._aprofundarKey(sid, ci);
+              const cached = this._getAprofCache()?.[key] || null;
+
+              const hint = cached ? "✅ já aprofundado" : "🔎 aprofundar";
+              const btnLabel = cached ? "Ver aprofundamento" : "Aprofundar";
+
+              return `
+                <li class="conceito-item">
+                  <div class="conceito-row">
+                    <span class="conceito-text">${this._escapeHtml(item)}</span>
+                    <button type="button"
+                            class="btn-secondary btn-aprofundar"
+                            data-aprof-sid="${this._escapeHtml(sid)}"
+                            data-aprof-ci="${ci}"
+                            title="${hint}">
+                      ${btnLabel}
+                    </button>
+                  </div>
+
+                  <div class="aprofundar-slot" id="pdf-aprof-slot-${sid}-${ci}">
+                    ${cached ? this._renderAprof(cached) : ""}
+                  </div>
+                </li>
+              `;
+            })
+            .join("")}
+        </ul>`
+      : `<p class="muted">—</p>`;
 
     const checkpointHtml = checkpoint.length
       ? `<div class="box checkpoint-box">
@@ -344,7 +474,15 @@ export const pdf = {
 
     view.innerHTML = `
       <div class="sessao-toolbar">
-        <div class="sessao-progress">${tempoChip}</div>
+        <div class="sessao-progress">
+          Sessão <b>${pos}</b> / ${n} ${tempoChip}
+        </div>
+
+        <div class="sessao-actions">
+          <button class="btn-secondary" id="btn-pdf-prev" ${prevDisabled}>← Anterior</button>
+          <button class="btn-secondary" id="btn-pdf-next" ${nextDisabled}>Próxima →</button>
+          <button class="btn-primary" id="btn-pdf-done">${btnDoneLabel}</button>
+        </div>
       </div>
 
       <h4>${this._escapeHtml(titulo)}</h4>
@@ -352,17 +490,26 @@ export const pdf = {
 
       ${fontesHtml}
 
+      <!-- ✅ CONTEÚDO PRIMEIRO -->
       <div class="box"><b>Introdução</b><p>${this._escapeHtml(introducao)}</p></div>
-      <div class="box"><b>Conceitos</b>${listOrDash(conceitos)}</div>
+      <div class="box"><b>Conceitos (com aprofundamento)</b>${conceitosHtml}</div>
       <div class="box"><b>Exemplos</b>${listOrDash(exemplos)}</div>
       <div class="box"><b>Aplicações</b>${listOrDash(aplicacoes)}</div>
       <div class="box"><b>Resumo rápido</b>${listOrDash(resumo)}</div>
 
+      <!-- ✅ SUPORTE -->
       ${checklistHtml}
       ${errosHtml}
       ${flashcardsHtml}
+
+      <!-- ✅ AVALIAÇÃO POR ÚLTIMO -->
       ${checkpointHtml}
     `;
+
+    // toolbar
+    document.getElementById("btn-pdf-prev")?.addEventListener("click", () => this._goPrev());
+    document.getElementById("btn-pdf-next")?.addEventListener("click", () => this._goNext());
+    document.getElementById("btn-pdf-done")?.addEventListener("click", () => this._toggleDoneCurrent());
 
     // ✅ bind fontes clicáveis: abre no viewer na página
     view.querySelectorAll("[data-open-page]").forEach((btn) => {
@@ -432,6 +579,203 @@ export const pdf = {
         fb.textContent = "✅ Compare sua resposta com o gabarito e ajuste 1 ponto se necessário.";
       });
     });
+
+    // ✅ aprofundar bind
+    view.querySelectorAll(".btn-aprofundar").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const sid = btn.getAttribute("data-aprof-sid");
+        const ci = Number(btn.getAttribute("data-aprof-ci"));
+        if (!sid || !Number.isFinite(ci)) return;
+        await this._aprofundarConceito(s, sid, ci);
+      });
+    });
+  },
+
+  // -----------------------------
+  // 🔎 Aprofundar (PDF)
+  // Premium + limite Free (compartilha o mesmo contador diário)
+  // -----------------------------
+  async _aprofundarConceito(sessao, sid, ci) {
+    const { store, ui } = this.ctx;
+
+    const conceitoTxt =
+      Array.isArray(sessao?.conteudo?.conceitos) ? sessao.conteudo.conceitos[ci] : null;
+
+    if (!conceitoTxt) {
+      ui.error("Conceito inválido para aprofundar.");
+      return;
+    }
+
+    const key = this._aprofundarKey(sid, ci);
+    const cache = this._getAprofCache();
+    if (cache?.[key]) {
+      this._toggleAprofSlot(sid, ci);
+      return;
+    }
+
+    // limite Free
+    const user = store.get("user") || null;
+    const isPremium = !!user?.premium;
+
+    if (!isPremium) {
+      const can = this._canUseAprofFree();
+      if (!can.ok) {
+        ui.error(`Você já usou seus ${can.limit}/dia de Aprofundar no plano Free. Desbloqueie ilimitado no Premium.`);
+        return;
+      }
+    }
+
+    const slot = document.getElementById(`pdf-aprof-slot-${sid}-${ci}`);
+    if (!slot) return;
+
+    try {
+      slot.style.display = "block";
+      slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
+
+      const metaTema = this._plano?.meta?.tema || "";
+      const metaNivel = this._plano?.meta?.nivel || "iniciante";
+
+      const res = await fetch("/api/aprofundar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tema: metaTema,
+          nivel: metaNivel,
+          sessaoId: sid,
+          sessaoTitulo: sessao?.titulo || "",
+          conceito: conceitoTxt
+        })
+      });
+
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.error("Aprofundar PDF não-JSON:", text);
+        throw new Error("Resposta inválida do servidor (não JSON).");
+      }
+
+      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+      if (!data?.topico || !data?.explicacaoLonga) throw new Error("Aprofundamento inválido (faltando campos).");
+
+      const nextCache = { ...(cache || {}) };
+      nextCache[key] = data;
+      store.set("planoPdfAprofCache", nextCache);
+
+      if (!isPremium) this._incAprofFreeUse();
+
+      slot.innerHTML = this._renderAprof(data);
+
+      // atualiza label botão
+      const btn = document.querySelector(
+        `.btn-aprofundar[data-aprof-sid="${this._escapeAttr(sid)}"][data-aprof-ci="${ci}"]`
+      );
+      if (btn) btn.textContent = "Ver aprofundamento";
+    } catch (e) {
+      console.error(e);
+      slot.innerHTML = "";
+      ui.error(e?.message || "Falha ao gerar aprofundamento.");
+    }
+  },
+
+  _renderAprof(data) {
+    const topico = this._escapeHtml(data?.topico || "Aprofundamento");
+    const explicacao = this._escapeHtml(data?.explicacaoLonga || "");
+    const pegadinha = this._escapeHtml(data?.pegadinha || "");
+    const exemplo = Array.isArray(data?.exemploResolvido) ? data.exemploResolvido : [];
+    const mini = Array.isArray(data?.miniCheck) ? data.miniCheck : [];
+
+    const exemploHtml = exemplo.length
+      ? `<div class="aprof-box">
+          <b>Exemplo resolvido</b>
+          <ol>${exemplo.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ol>
+        </div>`
+      : "";
+
+    const pegadinhaHtml = pegadinha
+      ? `<div class="aprof-box">
+          <b>Pegadinha comum</b>
+          <p>${pegadinha}</p>
+        </div>`
+      : "";
+
+    const miniHtml = mini.length
+      ? `<div class="aprof-box">
+          <b>Mini-check</b>
+          <ul>${mini.map((x) => `<li>${this._escapeHtml(x)}</li>`).join("")}</ul>
+        </div>`
+      : "";
+
+    return `
+      <div class="aprof-panel">
+        <div class="aprof-title">🔎 Zoom: ${topico}</div>
+        <div class="aprof-box">
+          <b>Explicação aprofundada</b>
+          <p>${explicacao}</p>
+        </div>
+        ${exemploHtml}
+        ${pegadinhaHtml}
+        ${miniHtml}
+      </div>
+    `;
+  },
+
+  _toggleAprofSlot(sid, ci) {
+    const slot = document.getElementById(`pdf-aprof-slot-${sid}-${ci}`);
+    if (!slot) return;
+
+    const isHidden = slot.style.display === "none" || slot.style.display === "";
+    slot.style.display = isHidden ? "block" : "none";
+  },
+
+  _aprofundarKey(sessaoId, conceitoIndex) {
+    return `${String(sessaoId)}::C${String(conceitoIndex)}`;
+  },
+
+  _getAprofCache() {
+    return this.ctx?.store?.get("planoPdfAprofCache") || {};
+  },
+
+  // -----------------------------
+  // 🔒 Free limit (3 por dia) - compartilhado
+  // -----------------------------
+  _todayKey() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  },
+
+  _getAprofUsage() {
+    return this.ctx?.store?.get("aprofUsage") || { date: this._todayKey(), used: 0, limit: 3 };
+  },
+
+  _canUseAprofFree() {
+    const st = this._getAprofUsage();
+    const today = this._todayKey();
+    const limit = Number.isFinite(st?.limit) ? st.limit : 3;
+
+    if (st?.date !== today) {
+      const reset = { date: today, used: 0, limit };
+      this.ctx.store.set("aprofUsage", reset);
+      return { ok: true, used: 0, limit };
+    }
+
+    const used = Number.isFinite(st?.used) ? st.used : 0;
+    return { ok: used < limit, used, limit };
+  },
+
+  _incAprofFreeUse() {
+    const st = this._getAprofUsage();
+    const today = this._todayKey();
+    const limit = Number.isFinite(st?.limit) ? st.limit : 3;
+
+    const used = st?.date === today ? (Number.isFinite(st.used) ? st.used : 0) : 0;
+
+    const next = { date: today, used: used + 1, limit };
+    this.ctx.store.set("aprofUsage", next);
   },
 
   // ===== Viewer =====
@@ -464,7 +808,7 @@ export const pdf = {
   },
 
   // ===== Extract pages =====
-  async _extractPdfPages(file) {
+  async _extractPdfPages(file, onProgress) {
     const buf = await file.arrayBuffer();
 
     const pdfjs = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.mjs");
@@ -494,6 +838,9 @@ export const pdf = {
         });
         totalChars += Math.min(text.length, 5000);
       }
+
+      const pct = Math.round((p / maxPages) * 100);
+      if (typeof onProgress === "function") onProgress(pct);
 
       if (totalChars >= maxTotalChars) break;
     }
@@ -557,5 +904,48 @@ export const pdf = {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  },
+
+  _escapeAttr(value) {
+    return String(value ?? "").replaceAll('"', '\\"');
+  },
+
+  // -----------------------------
+  // ⌨️ Atalhos PDF
+  // ← anterior | → próxima | C concluir
+  // -----------------------------
+  _bindKeyboard() {
+    if (this._keyboardBound) return;
+    this._keyboardBound = true;
+    window.addEventListener("keydown", (ev) => this._onKeydown(ev));
+  },
+
+  _onKeydown(ev) {
+    const tag = (ev.target?.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+    const screenPdf = document.getElementById("screen-pdf");
+    const isPdfActive = !!screenPdf?.classList.contains("active");
+    if (!isPdfActive) return;
+
+    if (!this._sessoes?.length) return;
+
+    if (ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      this._goPrev();
+      return;
+    }
+
+    if (ev.key === "ArrowRight") {
+      ev.preventDefault();
+      this._goNext();
+      return;
+    }
+
+    if (ev.key === "c" || ev.key === "C") {
+      ev.preventDefault();
+      this._toggleDoneCurrent();
+      return;
+    }
   }
 };
