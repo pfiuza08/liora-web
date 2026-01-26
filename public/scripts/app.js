@@ -61,9 +61,16 @@ function setupAuthMock() {
 function setupNav() {
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.addEventListener("click", (ev) => {
-      // ✅ Se tiver "em breve", bloqueia
-      const hasPill = !!el.querySelector(".pill");
-      if (hasPill) {
+      // ✅ Bloqueia apenas quando o item estiver marcado como "em breve"
+      // Regras:
+      // 1) se tiver data-soon="1" -> bloqueia
+      // 2) se a pill existir E tiver texto "em breve" -> bloqueia
+      const isSoon = el.getAttribute("data-soon") === "1";
+      const pill = el.querySelector(".pill");
+      const pillText = (pill?.innerText || "").toLowerCase().trim();
+      const pillSaysSoon = pillText.includes("em breve");
+
+      if (isSoon || pillSaysSoon) {
         ev.preventDefault();
         ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
         return;
