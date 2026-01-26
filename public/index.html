@@ -78,7 +78,7 @@
           <h3>Plano por Tema</h3>
         </div>
 
-       <div class="panel">
+        <div class="panel">
         <label class="label">Tema</label>
         <input id="inp-tema" class="input" placeholder="Ex.: IA Generativa, Direito Constitucional..." />
       
@@ -89,10 +89,15 @@
           <option value="avancado">Avançado</option>
         </select>
       
-        <!-- ✅ AÇÕES JUNTAS (igual ao PDF) -->
-        <div class="panel-actions">
-          <button id="btn-gerar-tema" class="btn-primary">Gerar plano</button>
-          <button id="btn-limpar-plano" class="btn-secondary">Limpar</button>
+        <!-- ✅ Ações lado a lado (igual ao PDF) -->
+        <div class="actions-row" style="display:flex; gap:10px; align-items:center;">
+          <button id="btn-gerar-tema" class="btn-primary" style="flex:1;">
+            Gerar plano
+          </button>
+      
+          <button id="btn-limpar-plano" class="btn-secondary">
+            Limpar plano
+          </button>
         </div>
       
         <div id="tema-status" class="muted small"></div>
