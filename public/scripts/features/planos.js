@@ -51,76 +51,96 @@ export const planos = {
   // 🔥 Geração por Tema (robusta)
   // ✅ com barra de progresso
   // -----------------------------
-  async gerarTema() {
+   async gerarTema() {
     const { store, ui } = this.ctx;
-
+  
     const tema = (document.getElementById("inp-tema")?.value || "").trim();
     const nivel = document.getElementById("sel-nivel")?.value || "iniciante";
     const status = document.getElementById("tema-status");
-
+  
     if (!tema) {
       ui.error("Digite um tema para gerar o plano.");
       return;
     }
-
+  
+    let stopSim = null;
+  
     try {
       ui.loading(true, "Gerando plano e sessões…");
-      if (status) status.textContent = "Chamando IA…";
-
-      this._setProgress("tema", 10);
-
+  
+      // ✅ barra viva desde o início
+      this._progressShow();
+      this._progressSet(6, "Preparando…");
+  
+      // etapa 1: chamando IA
+      this._progressSet(14, "Chamando IA…");
+  
+      // ✅ simula progresso enquanto espera IA (evita sensação de travado)
+      stopSim = this._progressSimulateDuringAi(16, 88);
+  
       const res = await fetch("/api/gerarPlano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tema, nivel })
       });
-
-      this._setProgress("tema", 35);
-
+  
       const text = await res.text();
       let data = null;
-
+  
       try {
         data = JSON.parse(text);
       } catch (err) {
         console.error("Resposta não-JSON:", text);
         throw new Error("Servidor retornou resposta inválida (não JSON).");
       }
-
+  
       if (!res.ok) {
         throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       }
-
+  
       if (!data?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
       }
-
-      this._setProgress("tema", 60);
-
+  
+      // ✅ IA terminou, para simulação
+      if (stopSim) stopSim();
+      stopSim = null;
+  
+      // etapa 2: normaliza + salva
+      this._progressSet(92, "Organizando sessões…");
+  
       data = this._normalizePlano(data, { tema, nivel });
+  
       store.set("planoTema", data);
-
+  
       // reset de progresso quando gera plano novo
       this._resetStateForNewPlan(data);
-
+  
       // limpa cache/uso de aprofundar do plano (não apaga contagem diária)
       this.ctx.store.set("planoTemaAprofCache", {});
-
-      this._setProgress("tema", 85);
-
+  
+      // etapa 3: render
+      this._progressSet(97, "Renderizando conteúdo…");
+  
       this.render(data);
-
+  
+      // final
+      this._progressSet(100, "Plano gerado!");
       if (status) status.textContent = "Plano gerado!";
-      this._setProgress("tema", 100);
+  
+      setTimeout(() => this._progressHide(), 700);
     } catch (e) {
+      if (stopSim) stopSim();
+  
       console.error(e);
-      this.ctx.ui.error(e?.message || "Falha ao gerar plano por tema.");
+      ui.error(e?.message || "Falha ao gerar plano por tema.");
       if (status) status.textContent = "";
+      this._progressHide();
     } finally {
-      this.ctx.ui.loading(false);
-      setTimeout(() => this._hideProgress("tema"), 650);
+      ui.loading(false);
     }
   },
+
 
   limparPlano() {
     const { store } = this.ctx;
@@ -928,4 +948,86 @@ export const planos = {
       return;
     }
   }
+
+// =========================================================
+// ✅ PROGRESS UI (Tema) - barra com % + etapas
+// Requer no HTML:
+// #tema-progress, #tema-progress-fill, #tema-progress-pct
+// =========================================================
+_progressShow() {
+  const wrap = document.getElementById("tema-progress");
+  if (!wrap) return;
+
+  wrap.classList.remove("hidden");
+  this._progressSet(0, "Iniciando…");
+},
+
+_progressHide() {
+  const wrap = document.getElementById("tema-progress");
+  if (!wrap) return;
+
+  wrap.classList.add("hidden");
+  this._progressSet(0, "");
+},
+
+_progressSet(pct, text = "") {
+  const fill = document.getElementById("tema-progress-fill");
+  const pctEl = document.getElementById("tema-progress-pct");
+  const status = document.getElementById("tema-status");
+
+  const p = Math.max(0, Math.min(100, Number(pct || 0)));
+
+  if (fill) fill.style.width = `${p}%`;
+  if (pctEl) pctEl.textContent = `${p}%`;
+  if (status && text) status.textContent = text;
+},
+
+_progressSimulateDuringAi(startPct = 18, endPct = 88) {
+  let running = true;
+  let current = startPct;
+
+  const msgs = [
+    "Gerando com IA…",
+    "Organizando as sessões…",
+    "Estruturando conteúdos…",
+    "Preparando checklist e erros comuns…",
+    "Criando flashcards…",
+    "Montando checkpoint…",
+    "Finalizando ajustes…"
+  ];
+
+  let msgIndex = 0;
+
+  const tick = () => {
+    if (!running) return;
+
+    // sobe com "vida real": lento, irregular e com desaceleração perto do teto
+    const remaining = Math.max(1, endPct - current);
+    const stepBase = remaining > 20 ? 2.2 : remaining > 8 ? 1.4 : 0.7;
+    const stepJitter = Math.random() * 0.9; // 0..0.9
+    const step = Math.max(0.35, stepBase * 0.55 + stepJitter);
+
+    current = Math.min(endPct, current + step);
+
+    // alterna mensagens de tempos em tempos
+    if (Math.random() < 0.35) {
+      msgIndex = (msgIndex + 1) % msgs.length;
+    }
+
+    this._progressSet(Math.round(current), msgs[msgIndex]);
+
+    if (current < endPct) {
+      setTimeout(tick, 420 + Math.random() * 260);
+    }
+  };
+
+  setTimeout(tick, 250);
+
+  // stop()
+  return () => {
+    running = false;
+  };
+},
+
+  
 };
