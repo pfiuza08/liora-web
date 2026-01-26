@@ -26,7 +26,30 @@ export const planos = {
   },
 
   // -----------------------------
+  // ✅ Progress bar helpers (Tema)
+  // Requer no HTML:
+  // #tema-progress, #tema-progress-fill, #tema-progress-pct
+  // -----------------------------
+  _setProgress(kind, pct) {
+    const wrap = document.getElementById(`${kind}-progress`);
+    const fill = document.getElementById(`${kind}-progress-fill`);
+    const label = document.getElementById(`${kind}-progress-pct`);
+    if (!wrap || !fill || !label) return;
+
+    const v = Math.max(0, Math.min(100, Number(pct || 0)));
+    wrap.classList.remove("hidden");
+    fill.style.width = `${v}%`;
+    label.textContent = `${v}%`;
+  },
+
+  _hideProgress(kind) {
+    const wrap = document.getElementById(`${kind}-progress`);
+    if (wrap) wrap.classList.add("hidden");
+  },
+
+  // -----------------------------
   // 🔥 Geração por Tema (robusta)
+  // ✅ com barra de progresso
   // -----------------------------
   async gerarTema() {
     const { store, ui } = this.ctx;
@@ -44,11 +67,15 @@ export const planos = {
       ui.loading(true, "Gerando plano e sessões…");
       if (status) status.textContent = "Chamando IA…";
 
+      this._setProgress("tema", 10);
+
       const res = await fetch("/api/gerarPlano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tema, nivel })
       });
+
+      this._setProgress("tema", 35);
 
       const text = await res.text();
       let data = null;
@@ -68,8 +95,9 @@ export const planos = {
         throw new Error("Resposta inválida: sem sessões.");
       }
 
-      data = this._normalizePlano(data, { tema, nivel });
+      this._setProgress("tema", 60);
 
+      data = this._normalizePlano(data, { tema, nivel });
       store.set("planoTema", data);
 
       // reset de progresso quando gera plano novo
@@ -78,15 +106,19 @@ export const planos = {
       // limpa cache/uso de aprofundar do plano (não apaga contagem diária)
       this.ctx.store.set("planoTemaAprofCache", {});
 
+      this._setProgress("tema", 85);
+
       this.render(data);
 
       if (status) status.textContent = "Plano gerado!";
+      this._setProgress("tema", 100);
     } catch (e) {
       console.error(e);
       this.ctx.ui.error(e?.message || "Falha ao gerar plano por tema.");
       if (status) status.textContent = "";
     } finally {
       this.ctx.ui.loading(false);
+      setTimeout(() => this._hideProgress("tema"), 650);
     }
   },
 
@@ -111,6 +143,8 @@ export const planos = {
 
     const lista = document.getElementById("lista-sessoes");
     if (lista) lista.innerHTML = "";
+
+    this._hideProgress("tema");
 
     console.log("Plano removido");
   },
@@ -303,7 +337,7 @@ export const planos = {
       : "";
 
     const checkpointHtml = checkpoint.length
-      ? `<div class="box">
+      ? `<div class="box checkpoint-box">
            <b>Checkpoint rápido</b>
            <div class="checkpoint">
              ${checkpoint
@@ -346,7 +380,7 @@ export const planos = {
                    `;
                  }
 
-                 // curta (com campo de resposta)
+                 // ✅ curta (com campo + gabarito)
                  return `
                    <div class="cq" data-cq="${qi}">
                      <div class="cq-q"><span class="cq-tag">Curta</span> ${pergunta}</div>
@@ -354,7 +388,9 @@ export const planos = {
                      <textarea class="cq-input" id="cq-in-${qi}" placeholder="Escreva sua resposta aqui…"></textarea>
 
                      <div class="cq-row">
-                       <button type="button" class="cq-check" data-check="${qi}">Comparar com gabarito</button>
+                       <button type="button" class="cq-check" data-check="${qi}">
+                         Comparar com gabarito
+                       </button>
 
                        <button type="button"
                                class="cq-show"
@@ -475,7 +511,7 @@ export const planos = {
       });
     });
 
-    // show/hide explicação/gabarito
+    // ✅ show/hide explicação/gabarito
     view.querySelectorAll("[data-show]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const qi = btn.getAttribute("data-show");
@@ -591,7 +627,7 @@ export const planos = {
     if (!slot) return;
 
     try {
-      // UI local (sem travar tudo)
+      slot.style.display = "block";
       slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
 
       // infos do plano atual
@@ -640,10 +676,9 @@ export const planos = {
       // renderiza
       slot.innerHTML = this._renderAprof(data);
 
-      // atualiza label do botão (ver aprofundamento)
-      const btn = document.querySelector(
-        `.btn-aprofundar[data-aprof-sid="${CSS.escape(sid)}"][data-aprof-ci="${ci}"]`
-      );
+      // atualiza label do botão
+      const selector = `.btn-aprofundar[data-aprof-sid="${this._escapeAttr(sid)}"][data-aprof-ci="${ci}"]`;
+      const btn = document.querySelector(selector);
       if (btn) btn.textContent = "Ver aprofundamento";
     } catch (e) {
       console.error(e);
@@ -697,8 +732,9 @@ export const planos = {
   _toggleAprofSlot(sid, ci) {
     const slot = document.getElementById(`aprof-slot-${sid}-${ci}`);
     if (!slot) return;
-    const open = slot.style.display !== "none";
-    slot.style.display = open ? "none" : "block";
+
+    const isHidden = slot.style.display === "none" || slot.style.display === "";
+    slot.style.display = isHidden ? "block" : "none";
   },
 
   _aprofundarKey(sessaoId, conceitoIndex) {
@@ -847,6 +883,11 @@ export const planos = {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  },
+
+  // para montar seletor sem quebrar por aspas
+  _escapeAttr(value) {
+    return String(value ?? "").replaceAll('"', '\\"');
   },
 
   // -----------------------------
