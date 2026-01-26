@@ -1,9 +1,9 @@
 // /api/gerarSimulado.js
 // ==========================================================
-// LIORA — API GERAR SIMULADO (BLINDADA)
-// - Gera N questões com alternativas + corretaIndex + explicacao
-// - Retorna SEMPRE JSON (até em erro)
-// - Compatível com ambientes CJS/ESM (sem import no topo)
+// LIORA — API GERAR SIMULADO (SEM SDK openai)
+// - Chama OpenAI via fetch direto
+// - Retorna SEMPRE JSON
+// - Questões: enunciado + alternativas + corretaIndex + explicacao
 // ==========================================================
 
 function clamp(n, min, max) {
@@ -12,19 +12,17 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, x));
 }
 
-// Extrai o primeiro JSON válido dentro de um texto (mesmo com lixo antes/depois)
+// Extrai JSON mesmo que venha com texto extra
 function extractJsonObject(text) {
   if (!text) return null;
 
   const s = String(text);
-
   const start = s.indexOf("{");
   const end = s.lastIndexOf("}");
 
   if (start === -1 || end === -1 || end <= start) return null;
 
   const candidate = s.slice(start, end + 1);
-
   try {
     return JSON.parse(candidate);
   } catch {
@@ -33,7 +31,6 @@ function extractJsonObject(text) {
 }
 
 export default async function handler(req, res) {
-  // ✅ Responde JSON SEMPRE
   try {
     if (req.method !== "POST") {
       return res.status(405).json({ ok: false, error: "Use POST" });
@@ -53,12 +50,6 @@ export default async function handler(req, res) {
         error: "OPENAI_API_KEY ausente no ambiente"
       });
     }
-
-    // ✅ Import dinâmico: evita crash no carregamento (ESM/CJS)
-    const mod = await import("openai");
-    const OpenAI = mod.default;
-
-    const openai = new OpenAI({ apiKey });
 
     const prompt = `
 Você é um gerador de questões de simulado.
@@ -88,39 +79,61 @@ Regras:
 }
 `.trim();
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.4,
-      messages: [
-        { role: "system", content: "Você gera questões de múltipla escolha em JSON rigoroso." },
-        { role: "user", content: prompt }
-      ]
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.4,
+        messages: [
+          { role: "system", content: "Você gera questões de múltipla escolha em JSON rigoroso." },
+          { role: "user", content: prompt }
+        ]
+      })
     });
 
-    const raw = completion?.choices?.[0]?.message?.content || "";
+    const rawText = await resp.text();
 
-    // ✅ Tenta parse robusto
+    if (!resp.ok) {
+      // aqui a OpenAI pode devolver JSON de erro, ou texto
+      let errJson = null;
+      try {
+        errJson = JSON.parse(rawText);
+      } catch {}
+
+      return res.status(500).json({
+        ok: false,
+        error: "OpenAI retornou erro",
+        status: resp.status,
+        detail: errJson?.error?.message || rawText.slice(0, 300)
+      });
+    }
+
+    // A resposta da OpenAI é JSON
+    const data = JSON.parse(rawText);
+    const content = data?.choices?.[0]?.message?.content || "";
+
+    // parse do JSON das questões
     let parsed = null;
-
-    // Caso já venha puro
     try {
-      if (String(raw).trim().startsWith("{")) {
-        parsed = JSON.parse(String(raw).trim());
+      if (String(content).trim().startsWith("{")) {
+        parsed = JSON.parse(String(content).trim());
       }
     } catch {}
 
-    // Caso venha com texto extra
-    if (!parsed) parsed = extractJsonObject(raw);
+    if (!parsed) parsed = extractJsonObject(content);
 
     if (!parsed || !Array.isArray(parsed.questoes)) {
       return res.status(200).json({
         ok: false,
         error: "Modelo não retornou JSON no formato esperado",
-        rawPreview: String(raw).slice(0, 300)
+        rawPreview: String(content).slice(0, 300)
       });
     }
 
-    // ✅ saneamento forte
     const sane = parsed.questoes
       .filter(
         (q) =>
@@ -141,7 +154,7 @@ Regras:
       return res.status(200).json({
         ok: false,
         error: "Questões inválidas após validação",
-        rawPreview: String(raw).slice(0, 300)
+        rawPreview: String(content).slice(0, 300)
       });
     }
 
@@ -151,7 +164,6 @@ Regras:
       meta: { banca: BANCA, dificuldade: DIFICULDADE, tema: TEMA, qtd: QTD }
     });
   } catch (err) {
-    // ✅ JSON até no erro
     console.error("❌ gerarSimulado error:", err);
     return res.status(500).json({
       ok: false,
