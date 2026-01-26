@@ -1228,4 +1228,163 @@ html.light .cq-input {
   background: rgba(0,0,0,0.02);
   color: rgba(0,0,0,0.92);
 }
+/* =========================================================
+   ✅ FIX SELECT/DROPDOWN (modo escuro)
+   - resolve opções invisíveis no select
+   ========================================================= */
+select.input {
+  color: var(--text, #eaeaea);
+  background: var(--panel, #141414);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+select.input option {
+  background: #111 !important;
+  color: #f2f2f2 !important;
+}
+
+/* no tema claro */
+html.light select.input {
+  color: #111;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.12);
+}
+
+html.light select.input option {
+  background: #fff !important;
+  color: #111 !important;
+}
+
+
+/* =========================================================
+   ✅ PROGRESS BAR (PDF / Tema)
+   ========================================================= */
+.progress {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 10px;
+  background: rgba(255,255,255,.10);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff7a18, #c44b04);
+  transition: width .25s ease;
+}
+
+.progress-pct {
+  min-width: 42px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,.85);
+}
+
+html.light .progress-bar {
+  background: rgba(0,0,0,.08);
+  border: 1px solid rgba(0,0,0,.08);
+}
+
+html.light .progress-pct {
+  color: rgba(0,0,0,.75);
+}
+
+
+/* =========================================================
+   ✅ CHECKPOINT/QUESTÕES (modo escuro mais legível)
+   ========================================================= */
+.checkpoint-box .cq {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.checkpoint-box .cq-q {
+  color: rgba(255,255,255,.92);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.checkpoint-box .cq-opt {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.92);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  width: 100%;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.checkpoint-box .cq-opt:hover {
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.09);
+}
+
+.checkpoint-box .cq-opt.selected {
+  outline: 2px solid rgba(196,75,4,.55);
+}
+
+.checkpoint-box .cq-opt.right {
+  border-color: rgba(0,200,120,.55);
+  background: rgba(0,200,120,.12);
+}
+
+.checkpoint-box .cq-opt.wrong {
+  border-color: rgba(255,80,80,.55);
+  background: rgba(255,80,80,.10);
+}
+
+.checkpoint-box .cq-feedback {
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(255,255,255,.78);
+}
+
+.checkpoint-box .cq-input {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  color: rgba(255,255,255,.92);
+}
+
+html.light .checkpoint-box .cq {
+  background: rgba(0,0,0,.03);
+  border-color: rgba(0,0,0,.10);
+}
+
+html.light .checkpoint-box .cq-q,
+html.light .checkpoint-box .cq-opt,
+html.light .checkpoint-box .cq-feedback,
+html.light .checkpoint-box .cq-input {
+  color: rgba(0,0,0,.85);
+}
+
+html.light .checkpoint-box .cq-opt {
+  background: rgba(0,0,0,.03);
+  border-color: rgba(0,0,0,.10);
+}
+
+html.light .checkpoint-box .cq-input {
+  background: #fff;
+  border-color: rgba(0,0,0,.12);
+}
 
