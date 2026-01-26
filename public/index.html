@@ -163,11 +163,19 @@
           <button id="btn-gerar-pdf" class="btn-primary">
             Gerar plano ultra fiel
           </button>
-      
+          
           <button id="btn-limpar-pdf" class="btn-secondary" style="margin-top:10px;">
             Limpar plano
           </button>
-      
+
+          <div id="pdf-progress" class="progress hidden" aria-label="Progresso de geração">
+            <div class="progress-bar">
+              <div id="pdf-progress-fill" class="progress-fill" style="width:0%"></div>
+            </div>
+            <div id="pdf-progress-pct" class="progress-pct">0%</div>
+          </div>
+   
+     
           <div id="pdf-status" class="muted small" style="margin-top:10px;"></div>
           <div id="pdf-progress" class="progress-wrap hidden">
             <div class="progress-top">
