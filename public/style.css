@@ -1707,5 +1707,16 @@ html.light .checkpoint-box .cq-input {
   color: inherit;
   outline: none;
 }
+/* Simulados — explicação no review */
+.sim-review-exp{
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(196,75,4,.35);
+  background: rgba(196,75,4,.08);
+  font-size: 12.5px;
+  line-height: 1.35;
+  opacity: .95;
+}
 
 
