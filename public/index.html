@@ -78,34 +78,35 @@
           <h3>Plano por Tema</h3>
         </div>
 
-        <div class="panel">
-          <label class="label">Tema</label>
-          <input id="inp-tema" class="input" placeholder="Ex.: IA Generativa, Direito Constitucional..." />
-
-          <label class="label">Nível</label>
-          <select id="sel-nivel" class="input">
-            <option value="iniciante">Iniciante</option>
-            <option value="intermediario">Intermediário</option>
-            <option value="avancado">Avançado</option>
-          </select>
-
-          <button id="btn-gerar-tema" class="btn-primary">
-            Gerar plano
-          </button>
-
-          <div id="tema-status" class="muted small"></div>
-
-            <div id="tema-progress" class="progress-wrap hidden">
-              <div class="progress-top">
-                <span class="muted small">Progresso</span>
-                <span id="tema-progress-pct" class="muted small">0%</span>
-              </div>
-              <div class="progress-bar">
-                <div id="tema-progress-fill" class="progress-fill" style="width:0%"></div>
-              </div>
-            </div>
-        
+       <div class="panel">
+        <label class="label">Tema</label>
+        <input id="inp-tema" class="input" placeholder="Ex.: IA Generativa, Direito Constitucional..." />
+      
+        <label class="label">Nível</label>
+        <select id="sel-nivel" class="input">
+          <option value="iniciante">Iniciante</option>
+          <option value="intermediario">Intermediário</option>
+          <option value="avancado">Avançado</option>
+        </select>
+      
+        <!-- ✅ AÇÕES JUNTAS (igual ao PDF) -->
+        <div class="panel-actions">
+          <button id="btn-gerar-tema" class="btn-primary">Gerar plano</button>
+          <button id="btn-limpar-plano" class="btn-secondary">Limpar</button>
         </div>
+      
+        <div id="tema-status" class="muted small"></div>
+      
+        <div id="tema-progress" class="progress-wrap hidden">
+          <div class="progress-top">
+            <span class="muted small">Progresso</span>
+            <span id="tema-progress-pct" class="muted small">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div id="tema-progress-fill" class="progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
 
         <div id="tema-result" class="two-cols hidden">
           <aside class="aside">
