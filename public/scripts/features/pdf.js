@@ -67,31 +67,51 @@ export const pdf = {
     if (status && text) status.textContent = text;
   },
 
-  _progressSimulateDuringAi(startPct = 45, endPct = 85) {
-    // anima suavemente enquanto a IA roda
-    // retorna uma função "stop()" que você chama depois
-    let running = true;
-    let current = startPct;
+     _progressSimulateDuringAi(startPct = 40, endPct = 86) {
+      let running = true;
+      let current = startPct;
+    
+      const msgs = [
+        "Enviando páginas para IA…",
+        "Analisando estrutura do PDF…",
+        "Mapeando tópicos por seção…",
+        "Montando sessões ultra fiéis…",
+        "Selecionando fontes e trechos…",
+        "Finalizando conteúdo e checkpoints…"
+      ];
+    
+      let msgIndex = 0;
+    
+      const tick = () => {
+        if (!running) return;
+    
+        // sobe com desaceleração perto do fim
+        const remaining = Math.max(1, endPct - current);
+        const stepBase = remaining > 18 ? 2.0 : remaining > 7 ? 1.2 : 0.6;
+        const stepJitter = Math.random() * 0.9;
+        const step = Math.max(0.35, stepBase * 0.6 + stepJitter);
+    
+        current = Math.min(endPct, current + step);
+    
+        // troca mensagem em ritmo suave
+        if (Math.random() < 0.30) {
+          msgIndex = (msgIndex + 1) % msgs.length;
+        }
+    
+        this._progressSet(Math.round(current), msgs[msgIndex]);
+    
+        if (current < endPct) {
+          setTimeout(tick, 430 + Math.random() * 280);
+        }
+      };
+    
+      setTimeout(tick, 260);
+    
+      return () => {
+        running = false;
+      };
+    },
 
-    const tick = () => {
-      if (!running) return;
-
-      const step = Math.random() * 2.2 + 0.6; // 0.6% .. 2.8%
-      current = Math.min(endPct, current + step);
-
-      this._progressSet(Math.round(current), "Gerando plano com IA (ultra fiel)…");
-
-      if (current < endPct) {
-        setTimeout(tick, 450 + Math.random() * 300);
-      }
-    };
-
-    setTimeout(tick, 350);
-
-    return () => {
-      running = false;
-    };
-  },
 
   // =========================================================
   // ✅ GERAR PLANO POR PDF (ULTRA FIEL)
