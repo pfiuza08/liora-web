@@ -9,6 +9,9 @@ export const pdf = {
   // viewer runtime
   _blobUrl: null,
 
+  // keyboard flag
+  _keyboardBound: false,
+
   async init(ctx) {
     this.ctx = ctx;
 
@@ -19,7 +22,9 @@ export const pdf = {
     limpar?.addEventListener("click", () => this.limparPlano());
 
     // fechar viewer
-    document.getElementById("btn-pdf-close")?.addEventListener("click", () => this._closeViewer());
+    document
+      .getElementById("btn-pdf-close")
+      ?.addEventListener("click", () => this._closeViewer());
 
     const saved = this.ctx.store.get("planoPdf");
     if (saved?.sessoes?.length) this.render(saved);
@@ -29,35 +34,74 @@ export const pdf = {
     console.log("pdf.js iniciado (Ultra Fiel + viewer + progresso + aprofundar)");
   },
 
-  // -----------------------------
-  // ✅ Progress bar helpers (PDF)
+  // =========================================================
+  // ✅ PROGRESS UI (barra com % + etapas)
   // Requer no HTML:
   // #pdf-progress, #pdf-progress-fill, #pdf-progress-pct
-  // -----------------------------
-  _setProgress(kind, pct) {
-    const wrap = document.getElementById(`${kind}-progress`);
-    const fill = document.getElementById(`${kind}-progress-fill`);
-    const label = document.getElementById(`${kind}-progress-pct`);
-    if (!wrap || !fill || !label) return;
+  // =========================================================
+  _progressShow() {
+    const wrap = document.getElementById("pdf-progress");
+    if (!wrap) return;
 
-    const v = Math.max(0, Math.min(100, Number(pct || 0)));
     wrap.classList.remove("hidden");
-    fill.style.width = `${v}%`;
-    label.textContent = `${v}%`;
+    this._progressSet(0, "Iniciando…");
   },
 
-  _hideProgress(kind) {
-    const wrap = document.getElementById(`${kind}-progress`);
-    if (wrap) wrap.classList.add("hidden");
+  _progressHide() {
+    const wrap = document.getElementById("pdf-progress");
+    if (!wrap) return;
+
+    wrap.classList.add("hidden");
+    this._progressSet(0, "");
   },
 
-    async gerarPorPdfUltraFiel() {
+  _progressSet(pct, text = "") {
+    const fill = document.getElementById("pdf-progress-fill");
+    const pctEl = document.getElementById("pdf-progress-pct");
+    const status = document.getElementById("pdf-status");
+
+    const p = Math.max(0, Math.min(100, Number(pct || 0)));
+
+    if (fill) fill.style.width = `${p}%`;
+    if (pctEl) pctEl.textContent = `${p}%`;
+    if (status && text) status.textContent = text;
+  },
+
+  _progressSimulateDuringAi(startPct = 45, endPct = 85) {
+    // anima suavemente enquanto a IA roda
+    // retorna uma função "stop()" que você chama depois
+    let running = true;
+    let current = startPct;
+
+    const tick = () => {
+      if (!running) return;
+
+      const step = Math.random() * 2.2 + 0.6; // 0.6% .. 2.8%
+      current = Math.min(endPct, current + step);
+
+      this._progressSet(Math.round(current), "Gerando plano com IA (ultra fiel)…");
+
+      if (current < endPct) {
+        setTimeout(tick, 450 + Math.random() * 300);
+      }
+    };
+
+    setTimeout(tick, 350);
+
+    return () => {
+      running = false;
+    };
+  },
+
+  // =========================================================
+  // ✅ GERAR PLANO POR PDF (ULTRA FIEL)
+  // =========================================================
+  async gerarPorPdfUltraFiel() {
     const { store, ui } = this.ctx;
 
     const inp = document.getElementById("inp-pdf");
     const nivel = document.getElementById("sel-nivel-pdf")?.value || "iniciante";
     const finalidade = document.getElementById("sel-finalidade-pdf")?.value || "estudo";
-    const status = document.getElementById("pdf-status");
 
     const file = inp?.files?.[0] || null;
     if (!file) {
@@ -70,16 +114,20 @@ export const pdf = {
     try {
       ui.loading(true, "Lendo PDF e gerando plano ultra fiel…");
 
-      // ✅ liga a barra
+      // liga barra
       this._progressShow();
       this._progressSet(3, "Preparando PDF…");
 
-      // ✅ cria blobUrl para abrir no iframe
+      // cria blobUrl para abrir no iframe
       this._setBlobUrl(file);
 
       // etapa 1: extração
-      this._progressSet(12, "Extraindo texto por página…");
-      const pages = await this._extractPdfPages(file);
+      this._progressSet(10, "Extraindo texto por página…");
+      const pages = await this._extractPdfPages(file, (pct) => {
+        // progresso local da extração (10%..30%)
+        const mapped = 10 + Math.round((pct / 100) * 20);
+        this._progressSet(mapped, `Extraindo texto do PDF… (${pct}%)`);
+      });
 
       const joinedLen = pages.reduce((acc, p) => acc + (p?.text?.length || 0), 0);
       if (joinedLen < 400) {
@@ -89,7 +137,7 @@ export const pdf = {
       // etapa 2: IA
       this._progressSet(38, "Preparando envio para IA…");
 
-      // ✅ simula progresso enquanto espera IA
+      // simula progresso enquanto espera IA
       stopSim = this._progressSimulateDuringAi(40, 86);
 
       const res = await fetch("/api/gerarPlanoPdf", {
@@ -121,7 +169,7 @@ export const pdf = {
         throw new Error("Resposta inválida: sem sessões.");
       }
 
-      // ✅ para simulação quando IA terminou
+      // para simulação quando IA terminou
       if (stopSim) stopSim();
       stopSim = null;
 
@@ -134,7 +182,13 @@ export const pdf = {
       });
 
       store.set("planoPdf", data);
-      store.set("planoPdfState", { currentId: data?.sessoes?.[0]?.id || null, doneIds: [] });
+      store.set("planoPdfState", {
+        currentId: data?.sessoes?.[0]?.id || null,
+        doneIds: []
+      });
+
+      // cache do aprofundar do PDF
+      store.set("planoPdfAprofCache", {});
 
       // etapa 4: render
       this._progressSet(96, "Renderizando conteúdo…");
@@ -142,14 +196,11 @@ export const pdf = {
 
       this._progressSet(100, "Plano gerado!");
       setTimeout(() => this._progressHide(), 700);
-
     } catch (e) {
       if (stopSim) stopSim();
 
       console.error(e);
       ui.error(e?.message || "Falha ao gerar plano por PDF.");
-
-      if (status) status.textContent = "";
       this._progressHide();
     } finally {
       ui.loading(false);
@@ -179,7 +230,7 @@ export const pdf = {
 
     this._closeViewer();
     this._clearBlobUrl();
-    this._hideProgress("pdf");
+    this._progressHide();
 
     console.log("Plano PDF removido");
   },
@@ -278,9 +329,11 @@ export const pdf = {
     });
   },
 
-  // ✅ conteúdo primeiro, avaliação depois + fontes clicáveis
-  // ✅ + toolbar (prev/next/done)
-  // ✅ + conceitos com Aprofundar
+  // =========================================================
+  // ✅ SESSÃO PDF
+  // Conteúdo primeiro, avaliação depois
+  // Toolbar + fontes clicáveis + aprofundar
+  // =========================================================
   renderSessao(s) {
     const view = document.getElementById("pdf-sessao-view");
     if (!view) return;
@@ -387,7 +440,7 @@ export const pdf = {
         </div>`
       : "";
 
-    // ✅ Conceitos com aprofundamento (igual ao Tema)
+    // ✅ Conceitos com aprofundamento
     const conceitosHtml = conceitos.length
       ? `<ul class="conceitos-list">
           ${conceitos
@@ -519,7 +572,7 @@ export const pdf = {
     document.getElementById("btn-pdf-next")?.addEventListener("click", () => this._goNext());
     document.getElementById("btn-pdf-done")?.addEventListener("click", () => this._toggleDoneCurrent());
 
-    // ✅ bind fontes clicáveis: abre no viewer na página
+    // fontes clicáveis
     view.querySelectorAll("[data-open-page]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const p = Number(btn.getAttribute("data-open-page"));
@@ -553,7 +606,10 @@ export const pdf = {
         const q = checkpoint[qi];
         const correta = Number.isFinite(q?.correta) ? q.correta : -1;
 
-        view.querySelectorAll(`.cq-opt[data-q="${qi}"]`).forEach((b) => b.classList.remove("selected", "right", "wrong"));
+        view
+          .querySelectorAll(`.cq-opt[data-q="${qi}"]`)
+          .forEach((b) => b.classList.remove("selected", "right", "wrong"));
+
         btn.classList.add("selected");
 
         const fb = document.getElementById(`pdf-cq-fb-${qi}`);
@@ -583,12 +639,13 @@ export const pdf = {
           fb.textContent = "✍️ Escreva uma resposta antes de comparar.";
           return;
         }
+
         exp.style.display = "block";
         fb.textContent = "✅ Compare sua resposta com o gabarito e ajuste 1 ponto se necessário.";
       });
     });
 
-    // ✅ aprofundar bind
+    // aprofundar bind
     view.querySelectorAll(".btn-aprofundar").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const sid = btn.getAttribute("data-aprof-sid");
@@ -599,10 +656,10 @@ export const pdf = {
     });
   },
 
-  // -----------------------------
+  // =========================================================
   // 🔎 Aprofundar (PDF)
   // Premium + limite Free (compartilha o mesmo contador diário)
-  // -----------------------------
+  // =========================================================
   async _aprofundarConceito(sessao, sid, ci) {
     const { store, ui } = this.ctx;
 
@@ -675,9 +732,10 @@ export const pdf = {
 
       slot.innerHTML = this._renderAprof(data);
 
-      // atualiza label botão
+      // atualiza label botão (com CSS.escape)
+      const safeSid = (window.CSS && CSS.escape) ? CSS.escape(sid) : sid;
       const btn = document.querySelector(
-        `.btn-aprofundar[data-aprof-sid="${this._escapeAttr(sid)}"][data-aprof-ci="${ci}"]`
+        `.btn-aprofundar[data-aprof-sid="${safeSid}"][data-aprof-ci="${ci}"]`
       );
       if (btn) btn.textContent = "Ver aprofundamento";
     } catch (e) {
@@ -745,9 +803,9 @@ export const pdf = {
     return this.ctx?.store?.get("planoPdfAprofCache") || {};
   },
 
-  // -----------------------------
+  // =========================================================
   // 🔒 Free limit (3 por dia) - compartilhado
-  // -----------------------------
+  // =========================================================
   _todayKey() {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -786,7 +844,9 @@ export const pdf = {
     this.ctx.store.set("aprofUsage", next);
   },
 
+  // =========================================================
   // ===== Viewer =====
+  // =========================================================
   _setBlobUrl(file) {
     this._clearBlobUrl();
     this._blobUrl = URL.createObjectURL(file);
@@ -815,7 +875,9 @@ export const pdf = {
     if (iframe) iframe.src = "";
   },
 
+  // =========================================================
   // ===== Extract pages =====
+  // =========================================================
   async _extractPdfPages(file, onProgress) {
     const buf = await file.arrayBuffer();
 
@@ -856,10 +918,13 @@ export const pdf = {
     return pages;
   },
 
+  // =========================================================
   // state
+  // =========================================================
   _getState() {
     return this.ctx?.store?.get("planoPdfState") || { currentId: null, doneIds: [] };
   },
+
   _saveState(patch) {
     const st = this._getState();
     const next = {
@@ -868,6 +933,7 @@ export const pdf = {
     };
     this.ctx.store.set("planoPdfState", next);
   },
+
   _isDone(id) {
     const st = this._getState();
     const done = Array.isArray(st.doneIds) ? st.doneIds : [];
@@ -914,14 +980,10 @@ export const pdf = {
       .replaceAll("'", "&#039;");
   },
 
-  _escapeAttr(value) {
-    return String(value ?? "").replaceAll('"', '\\"');
-  },
-
-  // -----------------------------
+  // =========================================================
   // ⌨️ Atalhos PDF
   // ← anterior | → próxima | C concluir
-  // -----------------------------
+  // =========================================================
   _bindKeyboard() {
     if (this._keyboardBound) return;
     this._keyboardBound = true;
@@ -956,61 +1018,4 @@ export const pdf = {
       return;
     }
   }
-  // =========================================================
-  // ✅ PROGRESS UI (barra com % + etapas)
-  // =========================================================
-  _progressShow() {
-    const wrap = document.getElementById("pdf-progress");
-    if (!wrap) return;
-
-    wrap.classList.remove("hidden");
-    this._progressSet(0, "Iniciando…");
-  },
-
-  _progressHide() {
-    const wrap = document.getElementById("pdf-progress");
-    if (!wrap) return;
-
-    wrap.classList.add("hidden");
-    this._progressSet(0, "");
-  },
-
-  _progressSet(pct, text = "") {
-    const fill = document.getElementById("pdf-progress-fill");
-    const pctEl = document.getElementById("pdf-progress-pct");
-    const status = document.getElementById("pdf-status");
-
-    const p = Math.max(0, Math.min(100, Number(pct || 0)));
-
-    if (fill) fill.style.width = `${p}%`;
-    if (pctEl) pctEl.textContent = `${p}%`;
-    if (status && text) status.textContent = text;
-  },
-
-  _progressSimulateDuringAi(startPct = 45, endPct = 85) {
-    // anima suavemente enquanto a IA roda
-    // retorna uma função "stop()" que você chama depois
-    let running = true;
-    let current = startPct;
-
-    const tick = () => {
-      if (!running) return;
-
-      // avanço lento com "efeito vida real"
-      const step = Math.random() * 2.2 + 0.6; // 0.6% .. 2.8%
-      current = Math.min(endPct, current + step);
-
-      this._progressSet(Math.round(current), "Gerando plano com IA (ultra fiel)…");
-
-      if (current < endPct) {
-        setTimeout(tick, 450 + Math.random() * 300);
-      }
-    };
-
-    setTimeout(tick, 350);
-
-    return () => {
-      running = false;
-    };
-  },
 };
