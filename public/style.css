@@ -1460,4 +1460,252 @@ html.light .checkpoint-box .cq-input {
     max-width: 100%;
   }
 }
+/* ================================
+   SIMULADOS — UI (mínimo bonito)
+================================ */
+.badge {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  opacity: .9;
+}
+
+.card {
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.sim-cta {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.sim-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  margin-right: 8px;
+}
+.pill.ok { border-color: rgba(0,255,160,.35); }
+.pill.bad { border-color: rgba(255,70,70,.35); }
+
+.sim-topbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.sim-progress { flex: 1; }
+.bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: rgba(196,75,4,.95);
+  width: 0%;
+  transition: width .25s ease;
+}
+
+.sim-timer {
+  font-weight: 700;
+  border: 1px solid rgba(255,255,255,.12);
+  padding: 8px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.hidden { display: none !important; }
+
+.sim-question .sim-q-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sim-enunciado {
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
+.sim-alts {
+  display: grid;
+  gap: 10px;
+}
+
+.sim-alt {
+  display: block;
+  cursor: pointer;
+}
+.sim-alt input { display: none; }
+
+.sim-alt-body {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.02);
+  transition: transform .12s ease, border-color .12s ease;
+}
+
+.sim-alt:hover .sim-alt-body {
+  transform: translateY(-1px);
+  border-color: rgba(196,75,4,.45);
+}
+
+.sim-alt input:checked + .sim-alt-body {
+  border-color: rgba(196,75,4,.9);
+  box-shadow: 0 0 0 3px rgba(196,75,4,.12);
+}
+
+.sim-alt-letter {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  background: rgba(196,75,4,.16);
+  border: 1px solid rgba(196,75,4,.35);
+}
+
+.sim-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.spacer { flex: 1; }
+.small { font-size: 12px; }
+
+.score-main {
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1;
+  margin: 10px 0 6px;
+}
+
+.sim-review-item {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.02);
+  margin-top: 10px;
+}
+.sim-review-item.ok { border-color: rgba(0,255,160,.25); }
+.sim-review-item.bad { border-color: rgba(255,70,70,.25); }
+
+.sim-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.sim-review-q { font-weight: 800; }
+.sim-review-badge { font-weight: 700; font-size: 12px; opacity: .9; }
+
+.sim-review-enun {
+  font-size: 13px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+  opacity: .95;
+}
+.sim-review-ans {
+  font-size: 12px;
+  opacity: .9;
+  display: grid;
+  gap: 6px;
+}
+
+/* Modal (se você ainda não tem) */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 999;
+}
+.modal.open { display: block; }
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+}
+
+.modal-card {
+  position: relative;
+  max-width: 720px;
+  margin: 8vh auto;
+  background: rgba(20,20,20,.95);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.modal-head, .modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-title { font-weight: 800; }
+
+.modal-body {
+  margin: 12px 0 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+}
+
+.field .label {
+  display: block;
+  font-size: 12px;
+  opacity: .85;
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: inherit;
+  outline: none;
+}
+
 
