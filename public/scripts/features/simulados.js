@@ -1,15 +1,17 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.0-PRODUCT (screen-first)
+// Versão: v2.1-PRODUCT (API + fallback + explicação)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração
 // ✔ Start direto (botão principal)
 // ✔ Configurar no FAB/btn secundário
 // ✔ Timer + progresso + resultado
-// ✔ Questões mock (trocar por API depois)
+// ✔ Questões via API (/api/gerarSimulado)
+// ✔ Fallback para mock se API falhar
 // ✔ Eventos canônicos (liora:*)
 // ✔ Salvamento em localStorage
+// ✔ Revisão com explicação (quando disponível)
 // =============================================================
 
 export const simulados = {
@@ -26,7 +28,7 @@ export const simulados = {
     },
     questoes: [],
     atual: 0,
-    respostas: [], // { idx, escolha, correta, enunciado, alternativas[], corretaIndex }
+    respostas: [], // { idx, escolha, correta, enunciado, alternativas[], corretaIndex, explicacao? }
     timer: {
       enabled: true,
       totalSec: 0,
@@ -45,7 +47,7 @@ export const simulados = {
     this.bindUI();
     this.restoreIfAny();
 
-    console.log("📝 simulados.js v2.0 — Product Mode iniciado");
+    console.log("📝 simulados.js v2.1 — Product Mode iniciado");
   },
 
   // -----------------------------
@@ -101,8 +103,6 @@ export const simulados = {
   // SCREEN CONTROL
   // -----------------------------
   showScreen() {
-    // Se você já tem um roteador de screens, isso pode ser desnecessário.
-    // Aqui a gente só garante que o screen está visível.
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     const s = document.getElementById("screen-simulados");
     s?.classList.add("active");
@@ -165,9 +165,9 @@ export const simulados = {
   },
 
   // -----------------------------
-  // START / FLOW
+  // START / FLOW (API)
   // -----------------------------
-  start() {
+  async start() {
     // Se já está rodando, ignora
     if (this.STATE.running) return;
 
@@ -177,7 +177,7 @@ export const simulados = {
     this.STATE.running = true;
     this.STATE.atual = 0;
     this.STATE.respostas = [];
-    this.STATE.questoes = this.buildMockQuestions(this.STATE.config);
+    this.STATE.questoes = [];
 
     // Timer
     if (this.STATE.timer.enabled) {
@@ -190,8 +190,28 @@ export const simulados = {
       this.STATE.timer.leftSec = 0;
     }
 
-    this.persistRun();
+    // UI loading
     this.renderRunning();
+    this.setHTML("sim-enunciado", "Gerando questões com IA... ⏳");
+    this.setHTML(
+      "sim-alts",
+      `<div class="muted small">Preparando o treino... (se a internet falhar, eu continuo no modo offline ✅)</div>`
+    );
+    this.renderButtonsState();
+
+    // ✅ Busca via API com fallback
+    try {
+      const questoes = await this.fetchQuestoesAPI(this.STATE.config);
+      if (!questoes?.length) throw new Error("API retornou vazio.");
+      this.STATE.questoes = questoes;
+    } catch (err) {
+      console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
+      this.toast("Falha ao gerar por IA. Usando modo offline ✅");
+      this.STATE.questoes = this.buildMockQuestions(this.STATE.config);
+    }
+
+    // segue fluxo
+    this.persistRun();
     this.renderQuestion();
   },
 
@@ -211,7 +231,8 @@ export const simulados = {
       correta,
       enunciado: q.enunciado,
       alternativas: q.alternativas,
-      corretaIndex: q.corretaIndex
+      corretaIndex: q.corretaIndex,
+      explicacao: q.explicacao || ""
     };
 
     if (existing) {
@@ -313,7 +334,9 @@ export const simulados = {
   // RENDERING
   // -----------------------------
   renderIdle() {
-    this.setHTML("sim-body", `
+    this.setHTML(
+      "sim-body",
+      `
       <div class="card">
         <div class="card-title">Pronto para treinar? 🧠⚡</div>
         <div class="muted">
@@ -331,16 +354,21 @@ export const simulados = {
           <div><span class="pill">Questões</span> ${this.STATE.config.qtd}</div>
           <div><span class="pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
           <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
-          <div><span class="pill">Timer</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "desligado"}</div>
+          <div><span class="pill">Timer</span> ${
+            this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "desligado"
+          }</div>
         </div>
       </div>
-    `);
+    `
+    );
 
     this.renderHeaderState({ mode: "idle" });
   },
 
   renderRunning() {
-    this.setHTML("sim-body", `
+    this.setHTML(
+      "sim-body",
+      `
       <div class="sim-topbar">
         <div class="sim-progress">
           <div class="muted" id="sim-progress-text">Carregando...</div>
@@ -375,7 +403,8 @@ export const simulados = {
       <div class="muted small" id="sim-hint">
         Dica: responda uma alternativa para liberar a próxima questão.
       </div>
-    `);
+    `
+    );
 
     this.renderHeaderState({ mode: "running" });
     this.renderProgress();
@@ -429,7 +458,6 @@ export const simulados = {
     }
 
     if (btnFinish) {
-      // liberar finalizar só quando responder pelo menos 1 questão
       btnFinish.disabled = this.STATE.respostas.length === 0;
       btnFinish.classList.toggle("disabled", btnFinish.disabled);
     }
@@ -454,7 +482,9 @@ export const simulados = {
   renderResult(result) {
     const { total, acertos, erros, pct } = result;
 
-    this.setHTML("sim-body", `
+    this.setHTML(
+      "sim-body",
+      `
       <div class="card">
         <div class="card-title">Resultado 🎯</div>
 
@@ -479,10 +509,11 @@ export const simulados = {
 
       <div class="card hidden" id="sim-review">
         <div class="card-title">Revisão rápida 🧾</div>
-        <div class="muted small">Mostrando suas respostas e a correta.</div>
+        <div class="muted small">Mostrando suas respostas, a correta e a explicação.</div>
         <div class="sim-review-list" id="sim-review-list"></div>
       </div>
-    `);
+    `
+    );
 
     this.renderHeaderState({ mode: "result" });
     this.renderReview(result);
@@ -504,6 +535,8 @@ export const simulados = {
       const correta = r.corretaIndex;
       const letter = (n) => String.fromCharCode(65 + n);
 
+      const explicacao = (r.explicacao || "").trim();
+
       return `
         <div class="sim-review-item ${ok ? "ok" : "bad"}">
           <div class="sim-review-head">
@@ -517,6 +550,12 @@ export const simulados = {
             <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${this.escape(r.alternativas[sua])}` : "—"}</div>
             <div><b>Correta:</b> ${letter(correta)}. ${this.escape(r.alternativas[correta])}</div>
           </div>
+
+          ${
+            explicacao
+              ? `<div class="sim-review-exp"><b>Explicação:</b> ${this.escape(explicacao)}</div>`
+              : ""
+          }
         </div>
       `;
     });
@@ -525,7 +564,6 @@ export const simulados = {
   },
 
   renderHeaderState({ mode }) {
-    // Atualiza pequenos estados no header da screen (se quiser)
     const badge = document.getElementById("sim-mode");
     if (!badge) return;
 
@@ -535,14 +573,56 @@ export const simulados = {
   },
 
   // -----------------------------
-  // MOCK DATA (trocar por API depois)
+  // API (gerarSimulado)
+  // -----------------------------
+  async fetchQuestoesAPI(config) {
+    const payload = {
+      banca: config.banca,
+      qtd: config.qtd,
+      dificuldade: config.dificuldade,
+      tema: config.tema || ""
+    };
+
+    const res = await fetch("/api/gerarSimulado", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} — ${txt}`);
+    }
+
+    const data = await res.json();
+    const questoes = data?.questoes || [];
+
+    // saneamento mínimo
+    const sane = questoes
+      .filter(
+        (q) =>
+          q?.enunciado &&
+          Array.isArray(q?.alternativas) &&
+          q.alternativas.length >= 4
+      )
+      .map((q) => ({
+        enunciado: String(q.enunciado).trim(),
+        alternativas: q.alternativas.slice(0, 4).map((a) => String(a).trim()),
+        corretaIndex: Number.isInteger(q.corretaIndex) ? q.corretaIndex : 0,
+        explicacao: q.explicacao ? String(q.explicacao).trim() : ""
+      }));
+
+    return sane;
+  },
+
+  // -----------------------------
+  // MOCK DATA (fallback)
   // -----------------------------
   buildMockQuestions(config) {
     const qtd = config.qtd || 5;
     const tema = config.tema || "Geral";
     const banca = config.banca || "FGV";
 
-    // base simples (mas já “com cara de sistema”)
     const base = [
       {
         enunciado: `(${banca}) Em ${tema}, qual alternativa define melhor o objetivo principal de uma revisão periódica?`,
@@ -552,7 +632,8 @@ export const simulados = {
           "Evitar documentação",
           "Substituir testes por opinião"
         ],
-        corretaIndex: 1
+        corretaIndex: 1,
+        explicacao: "Uma revisão periódica serve para encontrar erros, inconsistências e ajustar o que for necessário."
       },
       {
         enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
@@ -562,7 +643,8 @@ export const simulados = {
           "Garantir 100% de acerto sem revisão",
           "Evitar qualquer tipo de feedback"
         ],
-        corretaIndex: 1
+        corretaIndex: 1,
+        explicacao: "Simulados ajudam a treinar tempo, identificar lacunas e reconhecer padrões de cobrança."
       },
       {
         enunciado: `(${banca}) O que melhor caracteriza um “erro por pressa” em prova?`,
@@ -572,7 +654,8 @@ export const simulados = {
           "Responder sem validar enunciado e pegadinhas",
           "Checar alternativas e eliminar incorretas"
         ],
-        corretaIndex: 2
+        corretaIndex: 2,
+        explicacao: "Pressa costuma gerar leitura superficial e erro em detalhes do enunciado."
       },
       {
         enunciado: `(${banca}) Uma boa estratégia de tempo em simulado é:`,
@@ -582,7 +665,8 @@ export const simulados = {
           "Manter ritmo, marcar difíceis e voltar depois",
           "Não usar rascunho nunca"
         ],
-        corretaIndex: 2
+        corretaIndex: 2,
+        explicacao: "Ritmo constante e retorno às difíceis melhora o aproveitamento do tempo."
       },
       {
         enunciado: `(${banca}) O que é uma “pista” típica de alternativa errada?`,
@@ -592,19 +676,19 @@ export const simulados = {
           "Conexão direta com o enunciado",
           "Consistência com o conteúdo estudado"
         ],
-        corretaIndex: 0
+        corretaIndex: 0,
+        explicacao: "Absolutismos geralmente indicam generalização incorreta em alternativas de prova."
       }
     ];
 
-    // Repete/varia para completar qtd
     const out = [];
     for (let i = 0; i < qtd; i++) {
       const item = base[i % base.length];
-      // clona para evitar referência compartilhada
       out.push({
         enunciado: item.enunciado.replace("revisão periódica", `revisão periódica (Q${i + 1})`),
         alternativas: [...item.alternativas],
-        corretaIndex: item.corretaIndex
+        corretaIndex: item.corretaIndex,
+        explicacao: item.explicacao || ""
       });
     }
     return out;
@@ -617,7 +701,6 @@ export const simulados = {
     const total = this.STATE.questoes.length;
     const detalhes = [];
 
-    // garante ordem
     for (let i = 0; i < total; i++) {
       const q = this.STATE.questoes[i];
       const r = this.STATE.respostas.find((x) => x.idx === i);
@@ -627,6 +710,7 @@ export const simulados = {
         enunciado: q.enunciado,
         alternativas: q.alternativas,
         corretaIndex: q.corretaIndex,
+        explicacao: q.explicacao || "",
         escolha: r?.escolha ?? null,
         correta: r ? r.escolha === q.corretaIndex : false
       });
@@ -684,7 +768,7 @@ export const simulados = {
       if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
     } catch {}
 
-    // restore run (se estava em andamento)
+    // restore run
     try {
       const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
       if (run?.running && run?.questoes?.length) {
@@ -707,7 +791,6 @@ export const simulados = {
       }
     } catch {}
 
-    // padrão
     this.renderIdle();
   },
 
@@ -763,7 +846,6 @@ export const simulados = {
   },
 
   toast(msg) {
-    // se você tiver ui.toast, usa. Senão, fallback.
     try {
       this.ctx?.ui?.toast?.(msg);
     } catch {}
