@@ -25,27 +25,6 @@ export const planos = {
     console.log("planos.js iniciado");
   },
 
-  // -----------------------------
-  // ✅ Progress bar helpers (Tema)
-  // Requer no HTML:
-  // #tema-progress, #tema-progress-fill, #tema-progress-pct
-  // -----------------------------
-  _setProgress(kind, pct) {
-    const wrap = document.getElementById(`${kind}-progress`);
-    const fill = document.getElementById(`${kind}-progress-fill`);
-    const label = document.getElementById(`${kind}-progress-pct`);
-    if (!wrap || !fill || !label) return;
-
-    const v = Math.max(0, Math.min(100, Number(pct || 0)));
-    wrap.classList.remove("hidden");
-    fill.style.width = `${v}%`;
-    label.textContent = `${v}%`;
-  },
-
-  _hideProgress(kind) {
-    const wrap = document.getElementById(`${kind}-progress`);
-    if (wrap) wrap.classList.add("hidden");
-  },
 
   // -----------------------------
   // 🔥 Geração por Tema (robusta)
@@ -164,7 +143,7 @@ export const planos = {
     const lista = document.getElementById("lista-sessoes");
     if (lista) lista.innerHTML = "";
 
-    this._hideProgress("tema");
+    this._progressHide();
 
     console.log("Plano removido");
   },
