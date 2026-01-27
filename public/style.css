@@ -2193,5 +2193,47 @@ html.light .checkpoint-box .cq-input {
 :root.light #sim-config .btn-ghost:hover{
   background: rgba(0,0,0,.03);
 }
+/* =========================================================
+   ✅ SIMULADOS — Badge de status (Pronto / Em andamento / Concluído)
+   Padrão Liora: retangular com cantos arredondados (tipo "Entrar")
+========================================================= */
+#sim-mode{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 14px; /* igual vibe do botão Entrar */
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03);
+  color: rgba(255,255,255,.88);
+}
+
+html.light #sim-mode{
+  border: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.03);
+  color: rgba(0,0,0,.80);
+}
+
+/* variações por estado */
+#sim-mode[data-mode="idle"]{
+  border-color: rgba(255,255,255,.12);
+}
+
+#sim-mode[data-mode="running"]{
+  border-color: rgba(196,75,4,.35);
+  background: rgba(196,75,4,.10);
+  color: rgba(255,255,255,.92);
+}
+
+html.light #sim-mode[data-mode="running"]{
+  color: rgba(0,0,0,.85);
+}
+
+#sim-mode[data-mode="result"]{
+  border-color: rgba(0,200,120,.35);
+  background: rgba(0,200,120,.10);
+}
 
 
