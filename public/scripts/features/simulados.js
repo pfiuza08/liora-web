@@ -363,47 +363,55 @@ export const simulados = {
     this.renderHeaderState({ mode: "idle" });
   },
 
-  renderRunning() {
-    this.setHTML(
-      "sim-body",
-      `
-      <div class="sim-topbar">
-        <div class="sim-progress">
-          <div class="muted" id="sim-progress-text">Carregando...</div>
-          <div class="bar"><div class="bar-fill" id="sim-progress-bar" style="width:0%"></div></div>
-        </div>
-
-        <div class="sim-timer ${this.STATE.timer.enabled ? "" : "hidden"}" id="sim-timer">
-          <span id="sim-timer-text">--:--</span>
+ renderRunning() {
+  this.setHTML(
+    "sim-body",
+    `
+    <div class="sim-topbar">
+      <div class="sim-progress">
+        <div class="muted" id="sim-progress-text">Carregando...</div>
+        <div class="bar">
+          <div class="bar-fill" id="sim-progress-bar" style="width:0%"></div>
         </div>
       </div>
 
-      <div class="card sim-question">
-        <div class="sim-q-head">
-          <div class="sim-q-label" id="sim-q-label"></div>
+      <div class="sim-timer ${this.STATE.timer.enabled ? "" : "hidden"}" id="sim-timer">
+        <span id="sim-timer-text">--:--</span>
+      </div>
+    </div>
+
+    <div class="card sim-question">
+      <div class="sim-q-head">
+        <div class="sim-q-label" id="sim-q-label"></div>
+
+        <div class="sim-q-actions">
+          <button class="btn-secondary" data-action="openConfig">Configurar</button>
           <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
         </div>
-
-        <div class="sim-enunciado" id="sim-enunciado"></div>
-        <div class="sim-alts" id="sim-alts"></div>
-
-        <div class="sim-actions">
-          <button class="btn-outline" data-action="prevQuestao" id="btn-prev">← Anterior</button>
-          <button class="btn-outline" data-action="nextQuestao" id="btn-next">Próxima →</button>
-          <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
-        </div>
       </div>
 
-      <div class="muted small" id="sim-hint">
-        Selecione uma alternativa para liberar a próxima questão.
-      </div>
-    `
-    );
+      <div class="sim-enunciado" id="sim-enunciado"></div>
+      <div class="sim-alts" id="sim-alts"></div>
 
-    this.renderHeaderState({ mode: "running" });
-    this.renderProgress();
-    this.renderTimer();
-  },
+      <div class="sim-actions">
+        <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
+        <div class="spacer"></div>
+        <button class="btn-secondary" data-action="nextQuestao" id="btn-next">Próxima</button>
+        <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
+      </div>
+    </div>
+
+    <div class="muted small" id="sim-hint">
+      Selecione uma alternativa para liberar a próxima questão.
+    </div>
+  `
+  );
+
+  this.renderHeaderState({ mode: "running" });
+  this.renderProgress();
+  this.renderTimer();
+},
+
 
   renderQuestion() {
     const q = this.STATE.questoes[this.STATE.atual];
