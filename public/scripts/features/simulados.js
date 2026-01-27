@@ -452,7 +452,7 @@ renderRunning() {
   this.renderProgress();
   this.renderTimer();
   this.renderButtonsState();
-}
+},
 
 
   renderQuestion() {
@@ -578,7 +578,7 @@ renderRunning() {
 
   this.renderHeaderState({ mode: "result" });
   this.renderReview(result);
-}
+},
 
   renderReview(result) {
     const list = document.getElementById("sim-review-list");
@@ -656,18 +656,7 @@ renderRunning() {
       }
     },
     
-    discardRun() {
-      this.stopTimer();
-      this.STATE.running = false;
-      this.STATE.questoes = [];
-      this.STATE.atual = 0;
-      this.STATE.respostas = [];
-      this.clearRun();
-      this.renderIdle({ hasResume: false });
-      this.toast("Simulado descartado.");
-    },
-
-  resumeSimulado() {
+   resumeSimulado() {
   const run = this.STATE._savedRun || null;
   if (!run?.questoes?.length) {
     this.toast("Não há simulado para continuar.");
