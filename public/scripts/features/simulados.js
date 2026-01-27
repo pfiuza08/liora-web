@@ -133,60 +133,75 @@ export const simulados = {
       backdrop.addEventListener("click", () => this.closeConfig());
     }
   },
+openConfig() {
+  const modal = document.getElementById("sim-config");
+  if (!modal) return;
 
-  openConfig() {
-    const modal = document.getElementById("sim-config");
-    if (!modal) return;
+  const c = this.STATE.config;
 
-    const c = this.STATE.config;
-    this.setValue("sim-banca", c.banca);
-    this.setValue("sim-qtd", c.qtd);
-    this.setValue("sim-dificuldade", c.dificuldade);
-    this.setValue("sim-tema", c.tema);
-    this.setValue("sim-tempo", c.tempo);
-    this.setValue("sim-timer", this.STATE.timer.enabled ? "on" : "off");
+  this.setValue("sim-banca", c.banca);
+  this.setValue("sim-qtd", c.qtd);
+  this.setValue("sim-dificuldade", c.dificuldade);
+  this.setValue("sim-tema", c.tema);
+  this.setValue("sim-tempo", c.tempo);
 
-    modal.classList.add("open");
-    document.body.classList.add("liora-modal-open");
-    this._ensureModalDisplay(modal, true);
+  // ✅ id correto do select do timer (no seu HTML)
+  this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
 
-    window.dispatchEvent(new CustomEvent("liora:modal-open", { detail: { id: "sim-config" } }));
-  },
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("liora-modal-open");
 
-  closeConfig() {
-    const modal = document.getElementById("sim-config");
-    if (!modal) return;
+  // ✅ garantia extra caso seu CSS do modal seja parcial
+  modal.style.display = "block";
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.zIndex = "9999";
 
-    modal.classList.remove("open");
-    document.body.classList.remove("liora-modal-open");
-    this._ensureModalDisplay(modal, false);
+  window.dispatchEvent(new CustomEvent("liora:modal-open", { detail: { id: "sim-config" } }));
+},
 
-    window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
-  },
 
-  saveConfig() {
-    const banca = this.getValue("sim-banca") || "FGV";
-    const qtd = Number(this.getValue("sim-qtd") || 5);
-    const dificuldade = this.getValue("sim-dificuldade") || "misturado";
-    const tema = (this.getValue("sim-tema") || "").trim();
-    const tempo = Number(this.getValue("sim-tempo") || 20);
-    const timerMode = this.getValue("sim-timer") || "on";
+closeConfig() {
+  const modal = document.getElementById("sim-config");
+  if (!modal) return;
 
-    this.STATE.config = {
-      banca,
-      qtd: this.clamp(qtd, 3, 30),
-      dificuldade,
-      tema,
-      tempo: this.clamp(tempo, 5, 180)
-    };
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("liora-modal-open");
 
-    this.STATE.timer.enabled = timerMode === "on";
-    this.persistConfig();
-    this.toast("Configurações salvas.");
+  // ✅ garantia extra
+  modal.style.display = "none";
 
-    this.closeConfig();
-    this.renderIdle();
-  },
+  window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
+},
+
+saveConfig() {
+  const banca = this.getValue("sim-banca") || "FGV";
+  const qtd = Number(this.getValue("sim-qtd") || 5);
+  const dificuldade = this.getValue("sim-dificuldade") || "misturado";
+  const tema = (this.getValue("sim-tema") || "").trim();
+  const tempo = Number(this.getValue("sim-tempo") || 20);
+
+  // ✅ id correto do timer
+  const timerMode = this.getValue("sim-timer-mode") || "on";
+
+  this.STATE.config = {
+    banca,
+    qtd: this.clamp(qtd, 3, 30),
+    dificuldade,
+    tema,
+    tempo: this.clamp(tempo, 5, 180)
+  };
+
+  this.STATE.timer.enabled = timerMode === "on";
+
+  this.persistConfig();
+  this.toast("Configurações salvas.");
+  this.closeConfig();
+  this.renderIdle();
+},
+
 
   // -----------------------------
   // START / FLOW (API)
@@ -500,24 +515,24 @@ export const simulados = {
     this.renderHeaderState({ mode: "idle" });
   },
 
-  renderRunning() {
-    this.setHTML(
-      "sim-body",
-      `
+renderRunning() {
+  this.setHTML(
+    "sim-body",
+    `
       <div class="sim-topbar">
         <div class="sim-progress">
           <div class="muted" id="sim-progress-text">Carregando...</div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="sim-progress-bar" style="width:0%"></div>
+          <div class="sim-bar">
+            <div class="sim-bar-fill" id="sim-progress-bar" style="width:0%"></div>
           </div>
         </div>
 
-        <div class="sim-timer ${this.STATE.timer.enabled ? "" : "hidden"}" id="sim-timer">
+        <div class="${this.STATE.timer.enabled ? "sim-timer-pill" : "hidden"}" id="sim-timer">
           <span id="sim-timer-text">--:--</span>
         </div>
       </div>
 
-      <div class="card sim-question">
+      <div class="sim-card sim-question">
         <div class="sim-q-head">
           <div class="sim-q-label" id="sim-q-label"></div>
           <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
@@ -541,13 +556,14 @@ export const simulados = {
         Selecione uma alternativa para liberar a próxima questão.
       </div>
     `
-    );
+  );
 
-    this.renderHeaderState({ mode: "running" });
-    this.renderProgress();
-    this.renderTimer();
-    this.renderButtonsState();
-  },
+  this.renderHeaderState({ mode: "running" });
+  this.renderProgress();
+  this.renderTimer();
+  this.renderButtonsState();
+},
+
 
   renderQuestion() {
     const q = this.STATE.questoes[this.STATE.atual];
@@ -602,11 +618,12 @@ export const simulados = {
     const total = this.STATE.questoes.length || 1;
     const answered = this.STATE.respostas.length;
     const pct = Math.round((answered / total) * 100);
-
+  
     this.setText("sim-progress-text", `Respondidas: ${answered} / ${total}`);
     const fill = document.getElementById("sim-progress-bar");
     if (fill) fill.style.width = `${pct}%`;
   },
+
 
   renderTimer() {
     if (!this.STATE.timer.enabled) return;
