@@ -1,16 +1,18 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.2-PRODUCT (Clean UI)
+// Versão: v2.3-PRODUCT (Liora UI)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração
 // ✔ Start direto (botão principal)
-// ✔ Configurar no FAB/btn secundário
+// ✔ Configurar como botão padrão (sem ⚙️ dentro do simulado)
 // ✔ Timer + progresso + resultado
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
 // ✔ Eventos canônicos (liora:*)
 // ✔ Salvamento em localStorage
 // ✔ Revisão com explicação (quando disponível)
+// ✔ Controles Anterior/Próxima/Finalizar (padrão Liora)
+// ✔ Alternativa selecionada com highlight elegante
 // =============================================================
 
 export const simulados = {
@@ -44,7 +46,7 @@ export const simulados = {
     this.bindUI();
     this.restoreIfAny();
 
-    console.log("📝 simulados.js v2.2 — Clean UI iniciado");
+    console.log("📝 simulados.js v2.3 — Liora UI iniciado");
   },
 
   // -----------------------------
@@ -67,9 +69,13 @@ export const simulados = {
       if (action === "openConfig") this.openConfig();
       if (action === "closeConfig") this.closeConfig();
       if (action === "saveConfig") this.saveConfig();
+
       if (action === "startSimulado") this.start();
       if (action === "cancelSimulado") this.cancel();
+
+      if (action === "prevQuestao") this.prev();
       if (action === "nextQuestao") this.next();
+
       if (action === "finishSimulado") this.finish();
       if (action === "restartSimulado") this.restart();
       if (action === "reviewToggle") this.toggleReview();
@@ -150,7 +156,6 @@ export const simulados = {
     this.STATE.timer.enabled = timerMode === "on";
     this.persistConfig();
 
-    // Sem emoji, sem excesso
     this.toast("Configurações salvas.");
 
     this.closeConfig();
@@ -224,6 +229,20 @@ export const simulados = {
     this.persistRun();
     this.renderProgress();
     this.renderButtonsState();
+
+    // Atualiza destaque visual da alternativa selecionada
+    this.applySelectedAltUI();
+  },
+
+  prev() {
+    if (!this.STATE.running) return;
+
+    if (this.STATE.atual > 0) {
+      this.STATE.atual -= 1;
+      this.persistRun();
+      this.renderQuestion();
+      this.renderButtonsState();
+    }
   },
 
   next() {
@@ -369,10 +388,9 @@ export const simulados = {
         <div class="sim-alts" id="sim-alts"></div>
 
         <div class="sim-actions">
-          <button class="btn-ghost" data-action="openConfig" title="Configurar">⚙️</button>
-          <div class="spacer"></div>
-            <button class="btn-outline" data-action="nextQuestao" id="btn-next">Próxima</button>
-            <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
+          <button class="btn-outline" data-action="prevQuestao" id="btn-prev">← Anterior</button>
+          <button class="btn-outline" data-action="nextQuestao" id="btn-next">Próxima →</button>
+          <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
         </div>
       </div>
 
@@ -400,9 +418,10 @@ export const simulados = {
     const html = q.alternativas
       .map((alt, i) => {
         const checked = chosen === i ? "checked" : "";
+        const selected = chosen === i ? "selected" : "";
         const letter = String.fromCharCode(65 + i);
         return `
-          <label class="sim-alt">
+          <label class="sim-alt ${selected}">
             <input type="radio" name="alt" value="${i}" ${checked} />
             <div class="sim-alt-body">
               <div class="sim-alt-letter">${letter}</div>
@@ -417,6 +436,17 @@ export const simulados = {
 
     this.renderProgress();
     this.renderButtonsState();
+    this.applySelectedAltUI();
+  },
+
+  applySelectedAltUI() {
+    const chosen = this.STATE.respostas.find((r) => r.idx === this.STATE.atual)?.escolha;
+    const labels = document.querySelectorAll("#screen-simulados .sim-alt");
+    labels.forEach((lb) => lb.classList.remove("selected"));
+    if (typeof chosen === "number") {
+      const target = document.querySelector(`#screen-simulados input[name="alt"][value="${chosen}"]`)?.closest(".sim-alt");
+      target?.classList.add("selected");
+    }
   },
 
   renderButtonsState() {
@@ -425,8 +455,14 @@ export const simulados = {
 
     const answered = this.STATE.respostas.some((r) => r.idx === idx);
 
+    const btnPrev = document.getElementById("btn-prev");
     const btnNext = document.getElementById("btn-next");
     const btnFinish = document.getElementById("btn-finish");
+
+    if (btnPrev) {
+      btnPrev.disabled = idx <= 0;
+      btnPrev.classList.toggle("disabled", btnPrev.disabled);
+    }
 
     if (btnNext) {
       btnNext.disabled = !answered || idx >= total - 1;
@@ -476,9 +512,9 @@ export const simulados = {
         </div>
 
         <div class="sim-cta">
-         <button class="btn-primary" data-action="startSimulado">Refazer</button>
-        <button class="btn-outline" data-action="restartSimulado">Zerar</button>
-        <button class="btn-outline" data-action="reviewToggle">Revisão</button>
+          <button class="btn-primary" data-action="startSimulado">Refazer</button>
+          <button class="btn-outline" data-action="restartSimulado">Zerar</button>
+          <button class="btn-outline" data-action="reviewToggle">Revisão</button>
         </div>
       </div>
 
@@ -509,7 +545,6 @@ export const simulados = {
       const sua = r.escolha;
       const correta = r.corretaIndex;
       const letter = (n) => String.fromCharCode(65 + n);
-
       const explicacao = (r.explicacao || "").trim();
 
       return `
