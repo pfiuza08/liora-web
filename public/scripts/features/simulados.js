@@ -581,11 +581,16 @@ export const simulados = {
   renderHeaderState({ mode }) {
     const badge = document.getElementById("sim-mode");
     if (!badge) return;
-
-    if (mode === "idle") badge.textContent = "Pronto";
-    if (mode === "running") badge.textContent = "Em andamento";
-    if (mode === "result") badge.textContent = "Concluído";
-  },
+  
+    const map = {
+      idle: "Pronto",
+      running: "Em andamento",
+      result: "Concluído"
+    };
+  
+    badge.textContent = map[mode] || "Pronto";
+    badge.setAttribute("data-mode", mode || "idle");
+  }
 
   // -----------------------------
   // API
