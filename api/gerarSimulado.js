@@ -3,8 +3,20 @@
 // LIORA — API GERAR SIMULADO (SEM SDK openai)
 // - Chama OpenAI via fetch direto
 // - Retorna SEMPRE JSON
-// - Mix: MCQ (4 alts) + C/E (2 alts) + Discursivas (se solicitado)
-// - Perfil por banca (heurística prática)
+//
+// Mistura:
+// - MCQ  (tipo="mcq"): enunciado + alternativas(4) + corretaIndex + explicacao
+// - CE   (tipo="ce"):  enunciado(assertiva) + alternativas(2) + corretaIndex + explicacao
+// - Disc (separado):   enunciado + respostaModelo + criterios[]
+//
+// Saída:
+// {
+//   ok: true,
+//   questoes: [ {tipo:"mcq"| "ce", ...} ],   // qtdTotal itens
+//   ce: [ {tipo:"ce", ...} ],               // redundante (facilita UI futura)
+//   discursivas: [ { ... } ],
+//   meta: { ... }
+// }
 // ==========================================================
 
 function clamp(n, min, max) {
@@ -40,7 +52,7 @@ function bancaProfile(bancaRaw) {
       id: "CEBRASPE",
       nome: "CESPE/CEBRASPE",
       estilo:
-        "Enunciados com assertivas, foco em precisão conceitual, pegadinhas semânticas e exceções. Linguagem técnica e direta. Evite humor. Distratores muito plausíveis."
+        "Estilo de prova: assertivas, precisão conceitual, exceções e detalhes. Linguagem técnica, direta. Pegadinhas semânticas. Para CE (Certo/Errado), use assertivas objetivas e plausíveis."
     };
   }
   if (b.includes("FCC")) {
@@ -56,7 +68,7 @@ function bancaProfile(bancaRaw) {
       id: "VUNESP",
       nome: "VUNESP",
       estilo:
-        "Objetiva e escolar, comandos claros. Alternativas bem separadas, sem excesso de armadilhas. Contexto prático quando útil."
+        "Objetiva e escolar, comandos claros. Alternativas bem separadas. Contexto prático quando útil. Evite armadilhas excessivas."
     };
   }
   if (b.includes("IBFC")) {
@@ -84,98 +96,53 @@ function bancaProfile(bancaRaw) {
   };
 }
 
-// Fallback offline (mix)
-function buildMock(config) {
-  const qtdTotal = clamp(config.qtd ?? 5, 3, 30);
-  const qtdCE = clamp(config.qtdCE ?? 0, 0, Math.min(10, qtdTotal));
-  const qtdDisc = clamp(config.qtdDiscursivas ?? 0, 0, 10);
+// Helpers de saneamento por tipo
+function normalizeTipo(t) {
+  const v = String(t || "").toLowerCase().trim();
+  if (v === "ce" || v === "certoerrado" || v === "certo/errado") return "ce";
+  return "mcq";
+}
 
-  const banca = config.banca || "FGV";
-  const tema = config.tema || "Geral";
+function ensureArray(x) {
+  return Array.isArray(x) ? x : [];
+}
 
-  const mcqBase = [
-    {
-      tipo: "mcq",
-      enunciado: `(${banca}) Em ${tema}, qual alternativa descreve melhor o objetivo de uma revisão periódica?`,
-      alternativas: [
-        "Aumentar complexidade sem necessidade",
-        "Identificar falhas e corrigir inconsistências",
-        "Evitar documentação",
-        "Substituir testes por opinião"
-      ],
-      corretaIndex: 1,
-      explicacao: "Revisões periódicas servem para encontrar problemas e melhorar consistência e qualidade."
-    },
-    {
-      tipo: "mcq",
-      enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
-      alternativas: [
-        "Ignorar teoria",
-        "Treinar padrão de prova e consolidar conteúdo",
-        "Garantir acerto sem revisão",
-        "Evitar feedback"
-      ],
-      corretaIndex: 1,
-      explicacao: "Simulados consolidam conteúdo e ajustam estratégia de prova."
-    }
-  ];
+function toStr(x) {
+  return String(x ?? "").trim();
+}
 
-  const ceBase = [
-    {
-      tipo: "ce",
-      enunciado: `(${banca}) A normalização em bancos de dados visa reduzir redundância e anomalias.`,
-      alternativas: ["Certo", "Errado"],
-      corretaIndex: 0,
-      explicacao: "Normalização busca reduzir redundância e evitar anomalias de inserção/atualização/remoção."
-    },
-    {
-      tipo: "ce",
-      enunciado: `(${banca}) Chave primária pode aceitar valores nulos em um modelo relacional padrão.`,
-      alternativas: ["Certo", "Errado"],
-      corretaIndex: 1,
-      explicacao: "Chave primária identifica unicamente a tupla, logo não deve ser nula."
-    }
-  ];
+function defaultCEAlternativas() {
+  return ["Certo", "Errado"];
+}
 
-  const discBase = [
-    {
-      enunciado: `(${banca}) Explique a diferença entre esquema e instância de um banco de dados e dê um exemplo.`,
-      respostaModelo:
-        "Esquema descreve a estrutura (tabelas, atributos, relacionamentos e restrições) e muda pouco.\nInstância é o conjunto de dados em um momento específico e muda com frequência.\nEx.: esquema define tabela ALUNO(id, nome); instância são os registros atuais dessa tabela.",
-      criterios: [
-        "Definir corretamente esquema",
-        "Definir corretamente instância",
-        "Apresentar exemplo coerente",
-        "Clareza e objetividade"
-      ]
-    }
-  ];
+// Mock simples (fallback) para completar “buracos”
+function buildMockMCQ({ banca, tema }) {
+  const t = tema || "Geral";
+  const b = banca || "FGV";
+  return {
+    tipo: "mcq",
+    enunciado: `(${b}) Em ${t}, qual alternativa está correta?`,
+    alternativas: [
+      "Afirmação correta e consistente com o conceito",
+      "Afirmação que confunde definição com exemplo",
+      "Afirmação que usa um termo de forma indevida",
+      "Afirmação que ignora uma exceção importante"
+    ],
+    corretaIndex: 0,
+    explicacao: "A alternativa correta mantém o conceito e não viola as restrições do tema."
+  };
+}
 
-  // Monta o mix
-  const outQuest = [];
-  const mcqNeed = Math.max(0, qtdTotal - qtdCE);
-
-  for (let i = 0; i < mcqNeed; i++) {
-    const it = mcqBase[i % mcqBase.length];
-    outQuest.push({ ...it });
-  }
-  for (let i = 0; i < qtdCE; i++) {
-    const it = ceBase[i % ceBase.length];
-    outQuest.push({ ...it });
-  }
-
-  // embaralha levemente (mantém o mix)
-  for (let i = outQuest.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [outQuest[i], outQuest[j]] = [outQuest[j], outQuest[i]];
-  }
-
-  const outDisc = [];
-  for (let i = 0; i < qtdDisc; i++) {
-    outDisc.push({ ...discBase[i % discBase.length] });
-  }
-
-  return { questoes: outQuest.slice(0, qtdTotal), discursivas: outDisc.slice(0, qtdDisc) };
+function buildMockCE({ banca, tema }) {
+  const t = tema || "Geral";
+  const b = banca || "CEBRASPE";
+  return {
+    tipo: "ce",
+    enunciado: `(${b}) No contexto de ${t}, é correto afirmar que uma definição sempre independe do contexto de aplicação.`,
+    alternativas: defaultCEAlternativas(),
+    corretaIndex: 1,
+    explicacao: "Em muitos domínios, definições e propriedades variam conforme hipóteses e contexto."
+  };
 }
 
 export default async function handler(req, res) {
@@ -184,19 +151,23 @@ export default async function handler(req, res) {
       return res.status(405).json({ ok: false, error: "Use POST" });
     }
 
+    // Parâmetros esperados do front/console
+    // qtd = total de questões objetivas (MCQ+CE) dentro de questoes
+    // qtdCE = quantas dessas serão CE (2 alternativas)
+    // qtdDiscursivas = quantas discursivas (separadas)
     const {
       banca,
       qtd,
       dificuldade,
       tema,
-      // ✅ novos:
-      qtdCE, // certo/errado
+      qtdCE,
       qtdDiscursivas
     } = req.body || {};
 
     const QTD_TOTAL = clamp(qtd ?? 5, 3, 30);
-    const QTD_CE = clamp(qtdCE ?? 0, 0, Math.min(10, QTD_TOTAL));
-    const QTD_DISC = clamp(qtdDiscursivas ?? 0, 0, 10);
+    const QTD_CE = clamp(qtdCE ?? 0, 0, QTD_TOTAL);        // CE dentro de questoes
+    const QTD_MCQ = clamp(QTD_TOTAL - QTD_CE, 0, QTD_TOTAL);
+    const QTD_DISC = clamp(qtdDiscursivas ?? 0, 0, 10);    // discursivas separadas
 
     const BANCA = String(banca || "FGV");
     const DIFICULDADE = String(dificuldade || "misturado");
@@ -212,7 +183,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // Prompt: mix em um único array `questoes`, com `tipo`
+    // ----------------------------------------------------------
+    // PROMPT: pede JSON rigoroso + mistura de formatos
+    // ----------------------------------------------------------
     const prompt = `
 Você é um gerador de questões de simulado com estilo de banca.
 
@@ -223,69 +196,60 @@ ${profile.estilo}
 DIFICULDADE: ${DIFICULDADE}
 TEMA: ${TEMA ? `"${TEMA}"` : "Livre (tema geral da área)"}
 
-SAÍDA:
-- Gere exatamente ${QTD_TOTAL} questões no array "questoes", misturando:
-  - MCQ (tipo="mcq") com 4 alternativas
-  - C/E (tipo="ce") com 2 alternativas ("Certo","Errado")
-- Dentro de "questoes": gere exatamente ${QTD_CE} do tipo "ce".
-- As demais (QTD_TOTAL - ${QTD_CE}) devem ser "mcq".
-- Gere exatamente ${QTD_DISC} questões discursivas no array "discursivas" (se QTD_DISC=0, retorne array vazio).
+OBJETIVO:
+- Gerar exatamente ${QTD_TOTAL} questões OBJETIVAS no array "questoes"
+  - Destas, ${QTD_MCQ} devem ser MCQ (tipo="mcq") com 4 alternativas
+  - E ${QTD_CE} devem ser CE (tipo="ce") com 2 alternativas (Certo/Errado)
+- Gerar exatamente ${QTD_DISC} questões DISCURSIVAS no array "discursivas"
 
 REGRAS IMPORTANTES:
 - NÃO use markdown.
 - NÃO inclua letras A/B/C/D nas alternativas (o front faz isso).
 - Evite emojis.
-- Para MCQ:
-  - tipo: "mcq"
-  - enunciado: string
-  - alternativas: array de 4 strings
-  - corretaIndex: 0..3
-  - explicacao: 1 a 2 frases objetivas
-- Para C/E:
-  - tipo: "ce"
-  - enunciado: string (uma afirmação)
-  - alternativas: ["Certo","Errado"]
-  - corretaIndex: 0 (Certo) ou 1 (Errado)
-  - explicacao: 1 a 2 frases objetivas
-- Para discursivas:
-  - enunciado: string
-  - respostaModelo: string (4 a 8 linhas)
-  - criterios: array (3 a 6 itens)
+- Use linguagem compatível com a banca e com a dificuldade solicitada.
+- Distratores devem ser plausíveis e coerentes, mas incorretos por detalhe/nuance.
 
-FORMATO: responda SOMENTE em JSON válido, exatamente assim:
+SCHEMA (responda SOMENTE JSON válido, exatamente neste formato):
 
 {
   "questoes": [
     {
-      "tipo":"mcq",
-      "enunciado":"...",
-      "alternativas":["...","...","...","..."],
-      "corretaIndex":0,
-      "explicacao":"..."
+      "tipo": "mcq",
+      "enunciado": "...",
+      "alternativas": ["...", "...", "...", "..."],
+      "corretaIndex": 0,
+      "explicacao": "..."
     },
     {
-      "tipo":"ce",
-      "enunciado":"...",
-      "alternativas":["Certo","Errado"],
-      "corretaIndex":1,
-      "explicacao":"..."
+      "tipo": "ce",
+      "enunciado": "... (uma assertiva clara para julgar)",
+      "alternativas": ["Certo","Errado"],
+      "corretaIndex": 0,
+      "explicacao": "..."
     }
   ],
   "discursivas": [
     {
-      "enunciado":"...",
-      "respostaModelo":"...",
-      "criterios":["...","...","..."]
+      "enunciado": "...",
+      "respostaModelo": "...",
+      "criterios": ["...", "...", "..."]
     }
   ]
 }
 
-DICA DE QUALIDADE:
-- Distratores devem ser plausíveis e coerentes, mas errados por detalhe.
-- Varie comandos ("assinale", "é correto afirmar", "considere", etc.) conforme o perfil da banca.
-- Para C/E, use afirmações com nuance (exceções, termos absolutos), no estilo da banca.
+NOTAS:
+- Em CE (tipo="ce"): o enunciado deve ser uma assertiva ou pergunta curta que se julga como Certo/Errado.
+- Em CE: alternativas devem ser SEMPRE exatamente ["Certo","Errado"].
+- corretaIndex: 0 significa "Certo", 1 significa "Errado".
+- explicacao: 1 a 2 frases, objetiva, sem floreio.
+
+DICA DE VARIAÇÃO:
+- Varie comandos ("assinale", "é correto afirmar", "considere", "julgue o item", etc.) conforme o perfil da banca.
 `.trim();
 
+    // ----------------------------------------------------------
+    // CHAMADA OPENAI
+    // ----------------------------------------------------------
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -295,7 +259,7 @@ DICA DE QUALIDADE:
       body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0.35,
-        max_tokens: 2200,
+        max_tokens: 2400,
         messages: [
           {
             role: "system",
@@ -323,11 +287,17 @@ DICA DE QUALIDADE:
       });
     }
 
-    // Resposta da OpenAI é JSON de chat.completions
-    const data = JSON.parse(rawText);
-    const content = data?.choices?.[0]?.message?.content || "";
+    // ----------------------------------------------------------
+    // PARSE DO JSON
+    // ----------------------------------------------------------
+    let content = "";
+    try {
+      const data = JSON.parse(rawText);
+      content = data?.choices?.[0]?.message?.content || "";
+    } catch {
+      content = "";
+    }
 
-    // parse do JSON das questões
     let parsed = null;
     try {
       if (String(content).trim().startsWith("{")) {
@@ -338,145 +308,159 @@ DICA DE QUALIDADE:
     if (!parsed) parsed = extractJsonObject(content);
 
     if (!parsed || !Array.isArray(parsed.questoes)) {
-      // fallback offline (para não quebrar)
-      const mock = buildMock({ banca: BANCA, qtd: QTD_TOTAL, dificuldade: DIFICULDADE, tema: TEMA, qtdCE: QTD_CE, qtdDiscursivas: QTD_DISC });
       return res.status(200).json({
-        ok: true,
-        questoes: mock.questoes,
-        discursivas: mock.discursivas,
-        meta: {
-          banca: BANCA,
-          perfilBanca: profile.id,
-          dificuldade: DIFICULDADE,
-          tema: TEMA,
-          qtdTotal: QTD_TOTAL,
-          qtdCE: QTD_CE,
-          qtdDiscursivas: QTD_DISC,
-          fallback: "mock_parse_fail"
-        }
+        ok: false,
+        error: "Modelo não retornou JSON no formato esperado",
+        rawPreview: String(content).slice(0, 300)
       });
     }
 
-    // saneamento: separa MCQ e CE a partir do tipo
-    const rawQuest = parsed.questoes.slice(0, QTD_TOTAL);
+    // ----------------------------------------------------------
+    // SANEAMENTO: QUESTOES (MIX)
+    // ----------------------------------------------------------
+    const rawQuestoes = ensureArray(parsed.questoes);
 
-    const saneMCQ = rawQuest
-      .filter(
-        (q) =>
-          q &&
-          (q.tipo === "mcq" || (Array.isArray(q.alternativas) && q.alternativas.length >= 4)) &&
-          typeof q.enunciado === "string" &&
-          Array.isArray(q.alternativas) &&
-          q.alternativas.length >= 4
-      )
-      .map((q) => ({
-        tipo: "mcq",
-        enunciado: String(q.enunciado).trim(),
-        alternativas: q.alternativas.slice(0, 4).map((a) => String(a).trim()),
-        corretaIndex: clamp(q.corretaIndex ?? 0, 0, 3),
-        explicacao: String(q.explicacao || "").trim()
-      }));
-
-    const saneCE = rawQuest
-      .filter(
-        (q) =>
-          q &&
-          (q.tipo === "ce" || (Array.isArray(q.alternativas) && q.alternativas.length === 2)) &&
-          typeof q.enunciado === "string"
-      )
+    // Normaliza cada item para {tipo, enunciado, alternativas, corretaIndex, explicacao}
+    const normalized = rawQuestoes
       .map((q) => {
-        const corr = clamp(q.corretaIndex ?? 0, 0, 1);
+        const tipo = normalizeTipo(q?.tipo);
+        const enunciado = toStr(q?.enunciado);
+        const explicacao = toStr(q?.explicacao);
+
+        if (!enunciado) return null;
+
+        if (tipo === "ce") {
+          // CE: 2 alternativas fixas
+          const alternativas = defaultCEAlternativas();
+          const corretaIndex = clamp(q?.corretaIndex ?? 0, 0, 1);
+
+          return {
+            tipo: "ce",
+            enunciado,
+            alternativas,
+            corretaIndex,
+            explicacao
+          };
+        }
+
+        // MCQ: 4 alternativas
+        const alts = ensureArray(q?.alternativas).map((a) => toStr(a)).filter(Boolean);
+        if (alts.length < 4) return null;
+
         return {
-          tipo: "ce",
-          enunciado: String(q.enunciado).trim(),
-          alternativas: ["Certo", "Errado"], // força padrão
-          corretaIndex: corr,
-          explicacao: String(q.explicacao || "").trim()
+          tipo: "mcq",
+          enunciado,
+          alternativas: alts.slice(0, 4),
+          corretaIndex: clamp(q?.corretaIndex ?? 0, 0, 3),
+          explicacao
         };
-      });
+      })
+      .filter(Boolean);
 
-    // Garante contagens (CE exato, total exato)
-    // 1) corta CE no tamanho pedido
-    const ceFinal = saneCE.slice(0, QTD_CE);
+    // Se o modelo veio com contagens “estranhas”, nós reequilibramos:
+    // - Garantir até QTD_TOTAL no array final
+    // - Priorizar manter QTD_CE CE e QTD_MCQ MCQ (na medida do possível)
+    const ceItems = normalized.filter((q) => q.tipo === "ce");
+    const mcqItems = normalized.filter((q) => q.tipo === "mcq");
 
-    // 2) completa MCQ para bater total (QTD_TOTAL - QTD_CE)
-    const mcqNeed = Math.max(0, QTD_TOTAL - ceFinal.length);
-    const mcqFinal = saneMCQ.slice(0, mcqNeed);
+    // Seleciona o que precisa
+    const pickedCE = ceItems.slice(0, QTD_CE);
+    const pickedMCQ = mcqItems.slice(0, QTD_MCQ);
 
-    // 3) se ainda faltar (modelo veio curto), completa com mock
-    const missing = QTD_TOTAL - (mcqFinal.length + ceFinal.length);
-    let finalQuest = [...mcqFinal, ...ceFinal];
+    let saneQuestoes = [...pickedMCQ, ...pickedCE];
 
-    if (missing > 0) {
-      const mock = buildMock({
-        banca: BANCA,
-        qtd: QTD_TOTAL,
-        dificuldade: DIFICULDADE,
-        tema: TEMA,
-        qtdCE: QTD_CE,
-        qtdDiscursivas: QTD_DISC
-      });
+    // Se faltou, completa com mocks do tipo que estiver faltando
+    const need = QTD_TOTAL - saneQuestoes.length;
+    if (need > 0) {
+      // tenta completar primeiro MCQ, depois CE (ou vice-versa)
+      for (let i = 0; i < need; i++) {
+        // decide o tipo pelo “saldo”
+        const haveCE = saneQuestoes.filter((x) => x.tipo === "ce").length;
+        const haveMCQ = saneQuestoes.filter((x) => x.tipo === "mcq").length;
 
-      // pega só o que falta e do tipo que está faltando
-      const needCE = Math.max(0, QTD_CE - ceFinal.length);
-      const needMCQ = Math.max(0, (QTD_TOTAL - QTD_CE) - mcqFinal.length);
-
-      const addMCQ = mock.questoes.filter((x) => x.tipo === "mcq").slice(0, needMCQ);
-      const addCE = mock.questoes.filter((x) => x.tipo === "ce").slice(0, needCE);
-
-      finalQuest = [...mcqFinal, ...addMCQ, ...ceFinal, ...addCE].slice(0, QTD_TOTAL);
+        if (haveMCQ < QTD_MCQ) {
+          saneQuestoes.push(buildMockMCQ({ banca: BANCA, tema: TEMA }));
+        } else if (haveCE < QTD_CE) {
+          saneQuestoes.push(buildMockCE({ banca: profile.nome, tema: TEMA }));
+        } else {
+          // se já bateu as metas, completa com MCQ
+          saneQuestoes.push(buildMockMCQ({ banca: BANCA, tema: TEMA }));
+        }
+      }
     }
 
-    // Discursivas
-    const parsedDisc = Array.isArray(parsed.discursivas) ? parsed.discursivas : [];
-    const saneDisc = parsedDisc
-      .filter(
-        (d) =>
-          d &&
-          typeof d.enunciado === "string" &&
-          typeof d.respostaModelo === "string" &&
-          Array.isArray(d.criterios) &&
-          d.criterios.length >= 2
-      )
-      .slice(0, QTD_DISC)
-      .map((d) => ({
-        enunciado: String(d.enunciado).trim(),
-        respostaModelo: String(d.respostaModelo).trim(),
-        criterios: d.criterios.slice(0, 8).map((c) => String(c).trim())
-      }));
+    // Se veio demais, corta
+    saneQuestoes = saneQuestoes.slice(0, QTD_TOTAL);
 
-    // Se discursivas vierem vazias mas foram pedidas, completa com mock
-    let discFinal = saneDisc;
-    if (QTD_DISC > 0 && discFinal.length < QTD_DISC) {
-      const mock = buildMock({
-        banca: BANCA,
-        qtd: QTD_TOTAL,
-        dificuldade: DIFICULDADE,
-        tema: TEMA,
-        qtdCE: QTD_CE,
-        qtdDiscursivas: QTD_DISC
+    // ----------------------------------------------------------
+    // DISCUSSIVAS (OPCIONAIS, SEPARADAS)
+    // ----------------------------------------------------------
+    const rawDisc = Array.isArray(parsed.discursivas) ? parsed.discursivas : [];
+    const saneDisc = rawDisc
+      .map((d) => {
+        const enunciado = toStr(d?.enunciado);
+        const respostaModelo = toStr(d?.respostaModelo);
+        const criterios = ensureArray(d?.criterios).map((c) => toStr(c)).filter(Boolean);
+
+        if (!enunciado || !respostaModelo || criterios.length < 2) return null;
+
+        return {
+          enunciado,
+          respostaModelo,
+          criterios: criterios.slice(0, 8)
+        };
+      })
+      .filter(Boolean)
+      .slice(0, QTD_DISC);
+
+    // Se pediu discursivas e veio menos, completa com placeholders “seguros”
+    if (QTD_DISC > saneDisc.length) {
+      const miss = QTD_DISC - saneDisc.length;
+      for (let i = 0; i < miss; i++) {
+        saneDisc.push({
+          enunciado: `(${profile.nome}) Explique, de forma objetiva, um conceito central de ${TEMA || "um tema relevante da área"} e indique implicações práticas.`,
+          respostaModelo:
+            "Resposta esperada: definição clara do conceito, delimitação do escopo e um exemplo de aplicação. Deve apontar pelo menos uma implicação prática e uma limitação/condição.",
+          criterios: [
+            "Define corretamente o conceito",
+            "Delimita escopo/condições",
+            "Apresenta exemplo coerente",
+            "Indica implicação prática",
+            "Aponta limitação ou exceção"
+          ]
+        });
+      }
+    }
+
+    // ----------------------------------------------------------
+    // CE SEPARADO (redundante): útil para UI futura
+    // ----------------------------------------------------------
+    const saneCE = saneQuestoes.filter((q) => q.tipo === "ce").slice(0, QTD_CE);
+
+    // ----------------------------------------------------------
+    // VALIDAÇÃO FINAL
+    // ----------------------------------------------------------
+    if (!saneQuestoes.length) {
+      return res.status(200).json({
+        ok: false,
+        error: "Questões inválidas após validação",
+        rawPreview: String(content).slice(0, 300)
       });
-      const add = mock.discursivas.slice(0, QTD_DISC - discFinal.length);
-      discFinal = [...discFinal, ...add].slice(0, QTD_DISC);
     }
 
-    // Embaralha as questões (mantém o mix)
-    for (let i = finalQuest.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [finalQuest[i], finalQuest[j]] = [finalQuest[j], finalQuest[i]];
-    }
-
+    // Meta útil para debug + analytics
     return res.status(200).json({
       ok: true,
-      questoes: finalQuest,
-      ce: ceFinal, // opcional (diagnóstico / debug)
-      discursivas: discFinal, // para UI futura
+      questoes: saneQuestoes,     // ✅ mix mcq + ce (qtdTotal)
+      ce: saneCE,                 // ✅ redundante
+      discursivas: saneDisc,      // ✅ separado (UI futura)
       meta: {
         banca: BANCA,
         perfilBanca: profile.id,
         dificuldade: DIFICULDADE,
         tema: TEMA,
         qtdTotal: QTD_TOTAL,
+        qtdMCQ: QTD_MCQ,
         qtdCE: QTD_CE,
         qtdDiscursivas: QTD_DISC
       }
