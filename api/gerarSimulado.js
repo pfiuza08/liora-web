@@ -278,23 +278,48 @@ DICA DE QUALIDADE:
     }
 
     // -------------------------
-    // SANITIZA MCQ
+    // SANITIZA MCQ (mais tolerante)
     // -------------------------
-    const saneMCQ = parsed.questoes
-      .filter(
-        (q) =>
-          q &&
-          typeof q.enunciado === "string" &&
-          Array.isArray(q.alternativas) &&
-          q.alternativas.length >= 4
-      )
-      .slice(0, QTD_MCQ)
-      .map((q) => ({
-        enunciado: String(q.enunciado).trim(),
-        alternativas: q.alternativas.slice(0, 4).map((a) => String(a).trim()),
-        corretaIndex: clamp(q.corretaIndex ?? 0, 0, 3),
-        explicacao: String(q.explicacao || "").trim()
-      }));
+    const stripABCD = (s) =>
+      String(s || "")
+        .trim()
+        .replace(/^\s*([A-D])[\)\.\:\-]\s*/i, "") // "A) ", "B. ", etc
+        .replace(/^\s*alternativa\s*[A-D]\s*[\)\.\:\-]\s*/i, "")
+        .trim();
+
+    const toArray = (x) => (Array.isArray(x) ? x : []);
+
+    const isCertoErradoPair = (alts) => {
+      const a0 = String(alts?.[0] || "").toLowerCase();
+      const a1 = String(alts?.[1] || "").toLowerCase();
+      const ok0 = a0.includes("certo") || a0.includes("verdade");
+      const ok1 = a1.includes("errado") || a1.includes("falso");
+      const ok0b = a1.includes("certo") || a1.includes("verdade");
+      const ok1b = a0.includes("errado") || a0.includes("falso");
+      return (ok0 && ok1) || (ok0b && ok1b);
+    };
+
+    const saneMCQ = toArray(parsed.questoes)
+      .filter((q) => q && typeof q.enunciado === "string" && Array.isArray(q.alternativas))
+      .map((q) => {
+        const altsRaw = toArray(q.alternativas).map(stripABCD).filter(Boolean);
+
+        // Se o modelo mandou algo tipo certo/errado por engano aqui, deixa o MCQ inválido (vai ser suprido via CE)
+        if (altsRaw.length === 2 && isCertoErradoPair(altsRaw)) return null;
+
+        // precisa de pelo menos 4 para MCQ
+        if (altsRaw.length < 4) return null;
+
+        return {
+          tipo: "mcq",
+          enunciado: String(q.enunciado).trim(),
+          alternativas: altsRaw.slice(0, 4),
+          corretaIndex: clamp(q.corretaIndex ?? 0, 0, 3),
+          explicacao: String(q.explicacao || "").trim()
+        };
+      })
+      .filter(Boolean)
+      .slice(0, QTD_MCQ);
 
     // -------------------------
     // SANITIZA CE
@@ -304,6 +329,7 @@ DICA DE QUALIDADE:
       .filter((c) => c && typeof c.enunciado === "string")
       .slice(0, QTD_CE)
       .map((c) => ({
+        tipo: "ce",
         enunciado: String(c.enunciado).trim(),
         alternativas: ["Certo", "Errado"],
         corretaIndex: clamp(c.corretaIndex ?? 0, 0, 1),
@@ -330,41 +356,63 @@ DICA DE QUALIDADE:
         criterios: d.criterios.slice(0, 8).map((c) => String(c).trim())
       }));
 
-    // Se MCQ veio vazio mas CE veio ok, ainda é útil (especialmente CEBRASPE).
-    // Mas para não quebrar front atual (que espera questoes), garantimos ao menos 1 MCQ.
-    if (!saneMCQ.length) {
-      // fallback mínimo: cria 1 MCQ simples a partir do tema
-      const temaFallback = TEMA || "conceitos gerais";
+    // -------------------------
+    // ✅ COMPATIBILIDADE: sempre devolve `questoes` com QTD_TOTAL
+    // - Front atual usa apenas `questoes`
+    // - Então "embute" CE dentro de questoes também (como 2 alternativas)
+    // -------------------------
+    const ceAsQuestao = saneCE.map((c) => ({
+      tipo: "ce",
+      enunciado: c.enunciado,
+      alternativas: ["Certo", "Errado"],
+      corretaIndex: c.corretaIndex,
+      explicacao: c.explicacao
+    }));
+
+    // interleave simples: 1 CE a cada 4 MCQ (quando existir)
+    const questoesFinal = [];
+    let iM = 0, iC = 0;
+
+    while (questoesFinal.length < QTD_TOTAL && (iM < saneMCQ.length || iC < ceAsQuestao.length)) {
+      for (let k = 0; k < 4 && questoesFinal.length < QTD_TOTAL && iM < saneMCQ.length; k++) {
+        questoesFinal.push(saneMCQ[iM++]);
+      }
+      if (questoesFinal.length < QTD_TOTAL && iC < ceAsQuestao.length) {
+        questoesFinal.push(ceAsQuestao[iC++]);
+      }
+    }
+
+    // Se ainda faltar (modelo veio curto), completa repetindo MCQ/CE disponíveis (melhor que cair pra 1 questão)
+    while (questoesFinal.length < QTD_TOTAL) {
+      if (iM < saneMCQ.length) questoesFinal.push(saneMCQ[iM++]);
+      else if (iC < ceAsQuestao.length) questoesFinal.push(ceAsQuestao[iC++]);
+      else break;
+    }
+
+    if (!questoesFinal.length) {
       return res.status(200).json({
-        ok: true,
-        questoes: [
-          {
-            enunciado: `(${profile.nome}) Sobre ${temaFallback}, assinale a alternativa correta.`,
-            alternativas: [
-              "Afirmação genérica correta.",
-              "Afirmação plausível, mas incorreta por detalhe.",
-              "Afirmação incorreta.",
-              "Afirmação incorreta."
-            ],
-            corretaIndex: 0,
-            explicacao: "A alternativa correta é a que mantém a definição/condição exata sem exceções indevidas."
-          }
-        ],
-        ce: saneCE,
-        discursivas: saneDisc,
-        meta: {
-          banca: BANCA,
-          perfilBanca: profile.id,
-          dificuldade: DIFICULDADE,
-          tema: TEMA,
-          qtdTotal: QTD_TOTAL,
-          qtdMCQ: 1,
-          qtdCE: saneCE.length,
-          qtdDiscursivas: saneDisc.length,
-          note: "Fallback: MCQ mínimo gerado pois o modelo não retornou MCQ válido."
-        }
+        ok: false,
+        error: "Questões inválidas após validação",
+        rawPreview: String(content).slice(0, 300)
       });
     }
+
+    return res.status(200).json({
+      ok: true,
+      questoes: questoesFinal, // ✅ front atual recebe QTD_TOTAL aqui
+      ce: saneCE,              // ✅ guardado para UI futura
+      discursivas: saneDisc,   // ✅ guardado para UI futura
+      meta: {
+        banca: BANCA,
+        perfilBanca: profile.id,
+        dificuldade: DIFICULDADE,
+        tema: TEMA,
+        qtdTotal: QTD_TOTAL,
+        qtdMCQ: saneMCQ.length,
+        qtdCE: saneCE.length,
+        qtdDiscursivas: saneDisc.length
+      }
+    });
 
     return res.status(200).json({
       ok: true,
