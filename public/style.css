@@ -1460,482 +1460,73 @@ html.light .checkpoint-box .cq-input {
     max-width: 100%;
   }
 }
-/* ================================
-   SIMULADOS — UI (mínimo bonito)
-================================ */
-.badge {
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.12);
-  opacity: .9;
-}
-
-.card {
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.03);
-  border-radius: 18px;
-  padding: 16px;
-}
-
-.card-title {
-  font-weight: 700;
-  font-size: 16px;
-  margin-bottom: 10px;
-}
-
-.sim-cta {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-  flex-wrap: wrap;
-}
-
-.sim-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0,1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.pill {
-  display: inline-block;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.12);
-  margin-right: 8px;
-}
-.pill.ok { border-color: rgba(0,255,160,.35); }
-.pill.bad { border-color: rgba(255,70,70,.35); }
-
-.sim-topbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.sim-progress { flex: 1; }
-.bar {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.08);
-  overflow: hidden;
-}
-.bar-fill {
-  height: 100%;
-  background: rgba(196,75,4,.95);
-  width: 0%;
-  transition: width .25s ease;
-}
-
-.sim-timer {
-  font-weight: 700;
-  border: 1px solid rgba(255,255,255,.12);
-  padding: 8px 10px;
-  border-radius: 12px;
-  white-space: nowrap;
-}
-.hidden { display: none !important; }
-
-.sim-question .sim-q-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.sim-enunciado {
-  font-size: 14px;
-  line-height: 1.4;
-  margin-bottom: 14px;
-}
-
-.sim-alts {
-  display: grid;
-  gap: 10px;
-}
-
-.sim-alt {
-  display: block;
-  cursor: pointer;
-}
-.sim-alt input { display: none; }
-
-.sim-alt-body {
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 12px;
-  align-items: start;
-  padding: 12px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.02);
-  transition: transform .12s ease, border-color .12s ease;
-}
-
-.sim-alt:hover .sim-alt-body {
-  transform: translateY(-1px);
-  border-color: rgba(196,75,4,.45);
-}
-
-.sim-alt input:checked + .sim-alt-body {
-  border-color: rgba(196,75,4,.9);
-  box-shadow: 0 0 0 3px rgba(196,75,4,.12);
-}
-
-.sim-alt-letter {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  background: rgba(196,75,4,.16);
-  border: 1px solid rgba(196,75,4,.35);
-}
-
-.sim-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 14px;
-}
-
-.spacer { flex: 1; }
-.small { font-size: 12px; }
-
-.score-main {
-  font-size: 46px;
-  font-weight: 900;
-  line-height: 1;
-  margin: 10px 0 6px;
-}
-
-.sim-review-item {
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.02);
-  margin-top: 10px;
-}
-.sim-review-item.ok { border-color: rgba(0,255,160,.25); }
-.sim-review-item.bad { border-color: rgba(255,70,70,.25); }
-
-.sim-review-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.sim-review-q { font-weight: 800; }
-.sim-review-badge { font-weight: 700; font-size: 12px; opacity: .9; }
-
-.sim-review-enun {
-  font-size: 13px;
-  line-height: 1.35;
-  margin-bottom: 10px;
-  opacity: .95;
-}
-.sim-review-ans {
-  font-size: 12px;
-  opacity: .9;
-  display: grid;
-  gap: 6px;
-}
-
-/* Modal (se você ainda não tem) */
-.modal {
-  position: fixed;
-  inset: 0;
-  display: none;
-  z-index: 999;
-}
-.modal.open { display: block; }
-
-.modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.55);
-}
-
-.modal-card {
-  position: relative;
-  max-width: 720px;
-  margin: 8vh auto;
-  background: rgba(20,20,20,.95);
-  border: 1px solid rgba(255,255,255,.10);
-  border-radius: 18px;
-  padding: 14px;
-}
-
-.modal-head, .modal-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.modal-title { font-weight: 800; }
-
-.modal-body {
-  margin: 12px 0 14px;
-  display: grid;
-  gap: 12px;
-}
-
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0,1fr));
-  gap: 12px;
-}
-
-.field .label {
-  display: block;
-  font-size: 12px;
-  opacity: .85;
-  margin-bottom: 6px;
-}
-
-.input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.04);
-  color: inherit;
-  outline: none;
-}
-/* Simulados — explicação no review */
-.sim-review-exp{
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(196,75,4,.35);
-  background: rgba(196,75,4,.08);
-  font-size: 12.5px;
-  line-height: 1.35;
-  opacity: .95;
-}
 /* =========================================================
-   LIORA — SIMULADOS (UI ALINHADA AO PADRÃO)
-   Cola no final do style.css
+   LIORA — SIMULADOS (UI alinhada ao padrão do app)
+   - escopado em #screen-simulados e #sim-config
+   - não quebra .pill do menu (card-btn)
+   - botões com radius padrão (tipo "Entrar")
 ========================================================= */
 
-:root{
-  --liora-radius-xl: 22px;
-  --liora-radius-pill: 999px;
-  --liora-border: rgba(255,255,255,.10);
-  --liora-border-2: rgba(255,255,255,.14);
-  --liora-surface: rgba(255,255,255,.04);
-  --liora-surface-2: rgba(255,255,255,.06);
+/* ---------- Tokens locais (não altera o app inteiro) ---------- */
+#screen-simulados{
+  --sim-radius: 14px;         /* igual vibe do botão Entrar */
+  --sim-radius-lg: 18px;      /* cards/alternativas */
+  --sim-border: var(--border, rgba(255,255,255,.10));
+  --sim-surface: rgba(255,255,255,.03);
+  --sim-surface-2: rgba(255,255,255,.05);
+  --sim-accent: var(--brand, #c44b04);
 }
 
-/* Card geral do simulados com cara de flashcard */
-#screen-simulados .card{
-  border-radius: var(--liora-radius-xl);
-  border: 1px solid var(--liora-border);
-  background: rgba(255,255,255,.03);
-  box-shadow: 0 12px 40px rgba(0,0,0,.35);
-}
-
-/* Barra / topo mais “Liora” */
-#screen-simulados .sim-topbar{
-  gap: 14px;
-}
-#screen-simulados .bar{
-  border-radius: var(--liora-radius-pill);
-  background: rgba(255,255,255,.06);
-  overflow: hidden;
-}
-#screen-simulados .bar .bar-fill{
-  border-radius: var(--liora-radius-pill);
-}
-
-/* Timer como pill discreta */
-#screen-simulados .sim-timer{
-  border-radius: var(--liora-radius-pill);
-  border: 1px solid var(--liora-border);
-  background: rgba(255,255,255,.03);
-  padding: 8px 12px;
-  min-width: 86px;
-  text-align: center;
-}
-
-/* -------- BOTÕES PADRÃO Liora -------- */
-
-/* Primary (laranja, pill) */
-#screen-simulados .btn-primary{
-  border-radius: var(--liora-radius-pill);
-  padding: 12px 16px;
-  font-weight: 700;
-}
-
-/* Botão outline (igual “Limpar plano”, “Anterior/Próxima”) */
-#screen-simulados .btn-outline{
-  border-radius: var(--liora-radius-pill);
-  padding: 12px 16px;
-  font-weight: 700;
-  background: transparent;
-  border: 1px solid var(--liora-border-2);
-  color: rgba(255,255,255,.92);
-}
-
-#screen-simulados .btn-outline:hover{
-  border-color: rgba(255,255,255,.22);
-  background: rgba(255,255,255,.04);
-}
-
-/* Botão “ghost” (se existir no CSS antigo, padroniza) */
-#screen-simulados .btn-ghost{
-  border-radius: var(--liora-radius-pill);
-  padding: 12px 16px;
-  font-weight: 700;
-  background: rgba(255,255,255,.03);
-  border: 1px solid var(--liora-border);
-  color: rgba(255,255,255,.92);
-}
-#screen-simulados .btn-ghost:hover{
-  background: rgba(255,255,255,.05);
-  border-color: rgba(255,255,255,.18);
-}
-
-/* Alternativas estilo flashcard */
-#screen-simulados .sim-alt{
-  border-radius: 18px;
-  border: 1px solid var(--liora-border);
-  background: rgba(255,255,255,.03);
-  padding: 10px 12px;
-}
-#screen-simulados .sim-alt:hover{
-  background: rgba(255,255,255,.04);
-  border-color: rgba(196,75,4,.35);
-}
-
-/* Letra (A/B/C/D) com badge suave */
-#screen-simulados .sim-alt-letter{
-  border-radius: 14px;
-  border: 1px solid rgba(196,75,4,.35);
-  background: rgba(196,75,4,.10);
-  font-weight: 800;
-}
-
-/* Revisão mais elegante */
-#screen-simulados .sim-review-item{
-  border-radius: 18px;
-  border: 1px solid var(--liora-border);
-  background: rgba(255,255,255,.03);
-}
-#screen-simulados .sim-review-exp{
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(196,75,4,.30);
-  background: rgba(196,75,4,.08);
-}
-/* =========================================================
-   PATCH SEGURO — SIMULADOS + PILLS + BOTÕES (padrão Liora)
-   Objetivo: alinhar Simulados ao botão "Entrar" e evitar
-   conflitos de .pill/.card sem quebrar o que já funciona.
-========================================================= */
-
-/* ---------------------------------------------------------
-   1) "PILL" sem conflito:
-   - No card do menu (home), a pill precisa ser "badge no canto"
-   - No restante do app (ex.: simulados meta), pill é inline
---------------------------------------------------------- */
-
-/* torna a pill "inline" por padrão (serve para meta/chips) */
-.pill{
-  position: static;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  margin-right: 8px;
-}
-
-/* mas no HOME (card-btn), mantém pill no canto superior direito */
-.card-btn .pill{
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  margin-right: 0;
-  display: inline-flex;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  background: transparent;
-}
-
-/* ---------------------------------------------------------
-   2) Botões do Simulados no padrão do "Entrar"
-   - retangular/quadrado com cantos arredondados (não pílula)
---------------------------------------------------------- */
-
-/* garante que o simulados não herde “pílula 999px” de nenhum lugar */
-#screen-simulados .btn-primary,
-#screen-simulados .btn-secondary,
-#screen-simulados .btn-outline,
-#screen-simulados .btn-ghost{
-  border-radius: 14px; /* padrão Liora atual */
-}
-
-/* cria btn-outline/btn-ghost (se não existirem) no mesmo estilo */
-.btn-outline{
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 12px;
-  cursor: pointer;
-  font-weight: 700;
-  border-radius: 14px;
-}
-.btn-outline:hover{
-  opacity: .96;
-  border-color: rgba(255,255,255,.18);
-}
-
-.btn-ghost{
-  background: rgba(255,255,255,.03);
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 12px;
-  cursor: pointer;
-  font-weight: 700;
-  border-radius: 14px;
-}
-.btn-ghost:hover{
-  background: rgba(255,255,255,.05);
-  border-color: rgba(255,255,255,.18);
-}
-
-/* light: mantém contraste elegante */
-:root.light .btn-outline:hover{
-  border-color: rgba(0,0,0,.18);
-}
-:root.light .btn-ghost{
-  background: rgba(0,0,0,.03);
-}
-
-/* ---------------------------------------------------------
-   3) Simulados: card / progresso / timer com acabamento Liora
---------------------------------------------------------- */
-
-#screen-simulados .card{
-  border: 1px solid var(--border);
+/* ---------- Card base (só dentro de simulados) ---------- */
+#screen-simulados .sim-card{
+  border: 1px solid var(--sim-border);
   background: var(--card);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  padding: 16px;
 }
 
-/* topbar */
+#screen-simulados .sim-card-title{
+  font-weight: 800;
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+/* ---------- CTA / Meta ---------- */
+#screen-simulados .sim-cta{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+
+#screen-simulados .sim-meta{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:10px;
+  margin-top:14px;
+}
+@media (max-width: 520px){
+  #screen-simulados .sim-meta{ grid-template-columns: 1fr; }
+}
+
+/* ---------- Pills do Simulados (não usa .pill global) ---------- */
+#screen-simulados .sim-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:11px;
+  padding:4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sim-border);
+  color: var(--muted);
+  background: transparent;
+  margin-right: 8px;
+}
+#screen-simulados .sim-pill.ok{ border-color: rgba(0,200,120,.35); }
+#screen-simulados .sim-pill.bad{ border-color: rgba(255,70,70,.35); }
+
+/* ---------- Topbar / progresso / timer ---------- */
 #screen-simulados .sim-topbar{
   display:flex;
   gap:12px;
@@ -1943,43 +1534,59 @@ html.light .checkpoint-box .cq-input {
   justify-content:space-between;
   margin-bottom:12px;
 }
-#screen-simulados .bar{
-  height: 10px;
+
+#screen-simulados .sim-progress{ flex:1; }
+
+#screen-simulados .sim-bar{
+  height:10px;
   border-radius: 999px;
-  background: rgba(255,255,255,.08);
-  overflow: hidden;
+  overflow:hidden;
   border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.06);
 }
-:root.light #screen-simulados .bar{
-  background: rgba(0,0,0,.06);
+:root.light #screen-simulados .sim-bar{
   border-color: rgba(0,0,0,.08);
+  background: rgba(0,0,0,.06);
 }
-#screen-simulados .bar-fill{
+
+#screen-simulados .sim-bar-fill{
   height:100%;
   width:0%;
-  border-radius:999px;
+  border-radius: 999px;
   background: rgba(196,75,4,.95);
   transition: width .25s ease;
 }
 
-/* timer: mesmo “chip” elegante, sem virar botão */
-#screen-simulados .sim-timer{
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,.03);
+#screen-simulados .sim-timer-pill{
+  font-weight: 900;
+  border: 1px solid var(--sim-border);
+  background: var(--sim-surface);
   padding: 8px 10px;
-  border-radius: 14px;
-  font-weight: 800;
+  border-radius: var(--sim-radius);
+  white-space: nowrap;
   min-width: 86px;
   text-align: center;
 }
-:root.light #screen-simulados .sim-timer{
+:root.light #screen-simulados .sim-timer-pill{
   background: rgba(0,0,0,.03);
 }
 
-/* ---------------------------------------------------------
-   4) Alternativas: estilo flashcard elegante (igual checkpoint)
---------------------------------------------------------- */
+/* ---------- Questão / head ---------- */
+#screen-simulados .sim-q-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  margin-bottom:10px;
+}
 
+#screen-simulados .sim-enunciado{
+  font-size:14px;
+  line-height:1.45;
+  margin-bottom:14px;
+}
+
+/* ---------- Alternativas (flashcard elegante) ---------- */
 #screen-simulados .sim-alts{
   display:grid;
   gap:10px;
@@ -1991,14 +1598,13 @@ html.light .checkpoint-box .cq-input {
 }
 #screen-simulados .sim-alt input{ display:none; }
 
-/* corpo da alternativa: retângulo arredondado, borda suave */
 #screen-simulados .sim-alt-body{
   display:grid;
   grid-template-columns: 34px 1fr;
   gap:12px;
   align-items:flex-start;
-  padding:12px 12px;
-  border-radius: 18px;
+  padding: 12px 12px;
+  border-radius: var(--sim-radius-lg);
   border: 1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.03);
   transition: transform .12s ease, border-color .12s ease, background .12s ease;
@@ -2014,19 +1620,17 @@ html.light .checkpoint-box .cq-input {
   background: rgba(196,75,4,.06);
 }
 
-/* selecionada: destaque Liora (borda + “halo” leve) */
-#screen-simulados .sim-alt.selected .sim-alt-body,
+/* selecionada (via input checked) */
 #screen-simulados .sim-alt input:checked + .sim-alt-body{
   border-color: rgba(196,75,4,.65);
   box-shadow: 0 0 0 3px rgba(196,75,4,.14);
   background: rgba(196,75,4,.08);
 }
 
-/* letra A/B/C/D: badge consistente com o app */
 #screen-simulados .sim-alt-letter{
-  width: 34px;
-  height: 34px;
-  border-radius: 14px;
+  width:34px;
+  height:34px;
+  border-radius: var(--sim-radius);
   display:grid;
   place-items:center;
   font-weight: 900;
@@ -2034,10 +1638,7 @@ html.light .checkpoint-box .cq-input {
   border: 1px solid rgba(196,75,4,.35);
 }
 
-/* ---------------------------------------------------------
-   5) Barra de ações: alinhamento elegante
---------------------------------------------------------- */
-
+/* ---------- Ações ---------- */
 #screen-simulados .sim-actions{
   display:flex;
   gap:10px;
@@ -2046,42 +1647,77 @@ html.light .checkpoint-box .cq-input {
   margin-top:14px;
   flex-wrap: wrap;
 }
-
 @media (max-width: 520px){
-  #screen-simulados .sim-actions{
-    justify-content: stretch;
-  }
-  #screen-simulados .sim-actions > button{
-    flex: 1;
-  }
+  #screen-simulados .sim-actions > button{ flex:1; }
 }
-#screen-simulados .btn-icon{
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 14px;
-}
-#screen-simulados .btn-icon span{
-  font-size: 14px;
-  opacity: .9;
-}
+
+/* ---------- Disabled ---------- */
 #screen-simulados button:disabled{
   opacity: .45;
   cursor: not-allowed;
-  transform: none !important;
 }
-#screen-simulados .btn-outline:disabled,
-#screen-simulados .btn-ghost:disabled{
-  background: transparent;
+
+/* ---------- Revisão ---------- */
+#screen-simulados .sim-review-item{
+  padding: 12px;
+  border-radius: var(--sim-radius-lg);
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.02);
+  margin-top: 10px;
 }
+#screen-simulados .sim-review-item.ok{ border-color: rgba(0,200,120,.25); }
+#screen-simulados .sim-review-item.bad{ border-color: rgba(255,70,70,.25); }
+
+#screen-simulados .sim-review-exp{
+  margin-top:10px;
+  padding: 10px 12px;
+  border-radius: var(--sim-radius-lg);
+  border: 1px solid rgba(196,75,4,.30);
+  background: rgba(196,75,4,.08);
+  font-size: 12.5px;
+  line-height: 1.4;
+  opacity: .96;
+}
+
+/* ---------- Badge de status (sim-mode) ---------- */
+#sim-mode{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+  font-weight: 900;
+  padding: 6px 10px;
+  border-radius: var(--sim-radius);
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03);
+  color: rgba(255,255,255,.88);
+}
+:root.light #sim-mode{
+  border-color: rgba(0,0,0,.12);
+  background: rgba(0,0,0,.03);
+  color: rgba(0,0,0,.80);
+}
+#sim-mode[data-mode="running"]{
+  border-color: rgba(196,75,4,.35);
+  background: rgba(196,75,4,.10);
+}
+#sim-mode[data-mode="result"]{
+  border-color: rgba(0,200,120,.35);
+  background: rgba(0,200,120,.10);
+}
+
 /* =========================================================
-   PATCH — MODAL SIMULADOS (padrão Liora)
-   Cola no final do style.css
+   MODAL CONFIG — padrão Liora (escopo no #sim-config)
 ========================================================= */
 
-#sim-config.modal { z-index: 9999; }
+#sim-config.modal{ z-index: 9999; }
+
+#sim-config .modal-backdrop{
+  background: rgba(0,0,0,.55);
+}
+:root.light #sim-config .modal-backdrop{
+  background: rgba(0,0,0,.35);
+}
 
 #sim-config .modal-card{
   max-width: 720px;
@@ -2093,15 +1729,6 @@ html.light .checkpoint-box .cq-input {
   box-shadow: var(--shadow);
 }
 
-#sim-config .modal-backdrop{
-  background: rgba(0,0,0,.55);
-}
-
-:root.light #sim-config .modal-backdrop{
-  background: rgba(0,0,0,.35);
-}
-
-/* header */
 #sim-config .modal-head{
   display:flex;
   align-items:center;
@@ -2120,24 +1747,21 @@ html.light .checkpoint-box .cq-input {
   letter-spacing: -0.2px;
 }
 
-/* body */
 #sim-config .modal-body{
   margin: 12px 0 14px;
-  display: grid;
-  gap: 12px;
+  display:grid;
+  gap:12px;
 }
 
 #sim-config .grid-2{
   display:grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:12px;
 }
-
 @media (max-width: 700px){
   #sim-config .grid-2{ grid-template-columns: 1fr; }
 }
 
-/* inputs iguais ao app */
 #sim-config .input{
   width: 100%;
   padding: 10px 12px;
@@ -2145,12 +1769,11 @@ html.light .checkpoint-box .cq-input {
   border: 1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.04);
   color: var(--text);
-  outline: none;
+  outline:none;
 }
 :root.light #sim-config .input{
   border: 1px solid rgba(0,0,0,.10);
   background: rgba(0,0,0,.02);
-  color: var(--text);
 }
 
 #sim-config .input:focus{
@@ -2158,20 +1781,19 @@ html.light .checkpoint-box .cq-input {
   box-shadow: 0 0 0 3px rgba(196, 75, 4, 0.22);
 }
 
-/* footer com botões padrão Liora (não pílula) */
 #sim-config .modal-foot{
   display:flex;
   align-items:center;
   justify-content:flex-end;
-  gap: 10px;
-  padding-top: 10px;
+  gap:10px;
+  padding-top:10px;
   border-top: 1px solid rgba(255,255,255,.06);
 }
 :root.light #sim-config .modal-foot{
   border-top: 1px solid rgba(0,0,0,.06);
 }
 
-/* garante cantos e padding iguais ao botão "Entrar" */
+/* força botões do modal com radius padrão */
 #sim-config .btn-primary,
 #sim-config .btn-secondary,
 #sim-config .btn-outline,
@@ -2179,61 +1801,3 @@ html.light .checkpoint-box .cq-input {
   border-radius: 14px;
   padding: 10px 12px;
 }
-
-/* se ainda existir btn-ghost no modal, deixa com cara de secundário */
-#sim-config .btn-ghost{
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-#sim-config .btn-ghost:hover{
-  background: rgba(255,255,255,.04);
-}
-
-:root.light #sim-config .btn-ghost:hover{
-  background: rgba(0,0,0,.03);
-}
-/* =========================================================
-   ✅ SIMULADOS — Badge de status (Pronto / Em andamento / Concluído)
-   Padrão Liora: retangular com cantos arredondados (tipo "Entrar")
-========================================================= */
-#sim-mode{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 800;
-  padding: 6px 10px;
-  border-radius: 14px; /* igual vibe do botão Entrar */
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.03);
-  color: rgba(255,255,255,.88);
-}
-
-html.light #sim-mode{
-  border: 1px solid rgba(0,0,0,.12);
-  background: rgba(0,0,0,.03);
-  color: rgba(0,0,0,.80);
-}
-
-/* variações por estado */
-#sim-mode[data-mode="idle"]{
-  border-color: rgba(255,255,255,.12);
-}
-
-#sim-mode[data-mode="running"]{
-  border-color: rgba(196,75,4,.35);
-  background: rgba(196,75,4,.10);
-  color: rgba(255,255,255,.92);
-}
-
-html.light #sim-mode[data-mode="running"]{
-  color: rgba(0,0,0,.85);
-}
-
-#sim-mode[data-mode="result"]{
-  border-color: rgba(0,200,120,.35);
-  background: rgba(0,200,120,.10);
-}
-
-
