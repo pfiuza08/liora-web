@@ -565,37 +565,51 @@ renderRunning() {
 },
 
 
-  renderQuestion() {
-    const q = this.STATE.questoes[this.STATE.atual];
-    if (!q) return;
+ renderQuestion() {
+  const q = this.STATE.questoes[this.STATE.atual];
+  if (!q) return;
 
-    this.setText("sim-q-label", `Questão ${this.STATE.atual + 1} de ${this.STATE.questoes.length}`);
-    this.setText("sim-enunciado", q.enunciado);
+  this.setText("sim-q-label", `Questão ${this.STATE.atual + 1} de ${this.STATE.questoes.length}`);
+  this.setText("sim-enunciado", q.enunciado);
 
-    const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
-    const chosen = saved?.escolha ?? null;
+  const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
+  const chosen = saved?.escolha ?? null;
 
-    const html = q.alternativas
-      .map((alt, i) => {
-        const checked = chosen === i ? "checked" : "";
-        const letter = String.fromCharCode(65 + i);
-        return `
-          <label class="sim-alt">
-            <input type="radio" name="alt" value="${i}" ${checked} />
-            <div class="sim-alt-body">
-              <div class="sim-alt-letter">${letter}</div>
-              <div class="sim-alt-text">${this.escape(alt)}</div>
-            </div>
-          </label>
-        `;
-      })
-      .join("");
+  const isCE = (q.tipo === "ce") || ((q.alternativas?.length || 0) === 2);
 
-    this.setHTML("sim-alts", html);
+  const html = (q.alternativas || [])
+    .map((alt, i) => {
+      const checked = chosen === i ? "checked" : "";
+      const selected = chosen === i ? "selected" : "";
 
-    this.renderProgress();
-    this.renderButtonsState();
-  },
+      // MCQ: A/B/C/D | CE: C/E
+      const letter = isCE
+        ? (i === 0 ? "C" : "E")
+        : String.fromCharCode(65 + i);
+
+      // Para CE, se o backend mandar textos genéricos, você pode “forçar” rótulos
+      const text = isCE
+        ? (i === 0 ? "Certo" : "Errado")
+        : this.escape(alt);
+
+      return `
+        <label class="sim-alt ${selected}">
+          <input type="radio" name="alt" value="${i}" ${checked} />
+          <div class="sim-alt-body">
+            <div class="sim-alt-letter">${letter}</div>
+            <div class="sim-alt-text">${text}</div>
+          </div>
+        </label>
+      `;
+    })
+    .join("");
+
+  this.setHTML("sim-alts", html);
+
+  this.renderProgress();
+  this.renderButtonsState();
+  this.applySelectedAltUI?.();
+},
 
   renderButtonsState() {
     const total = this.STATE.questoes.length;
@@ -749,13 +763,26 @@ renderRunning() {
     const questoes = data?.questoes || [];
 
     return questoes
-      .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 4)
-      .map((q) => ({
-        enunciado: String(q.enunciado).trim(),
-        alternativas: q.alternativas.slice(0, 4).map((a) => String(a).trim()),
-        corretaIndex: Number.isInteger(q.corretaIndex) ? q.corretaIndex : 0,
-        explicacao: q.explicacao ? String(q.explicacao).trim() : ""
-      }));
+      .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
+      .map((q) => {
+        const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
+        const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
+    
+        // CE: 2 alternativas (Certo/Errado); MCQ: 4 alternativas
+        const isCE = tipo === "ce" || alts.length === 2;
+        const maxIdx = isCE ? 1 : 3;
+    
+        return {
+          tipo,
+          enunciado: String(q.enunciado).trim(),
+          alternativas: isCE ? alts.slice(0, 2) : alts.slice(0, 4),
+          corretaIndex: Number.isInteger(q.corretaIndex)
+            ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
+            : 0,
+          explicacao: q.explicacao ? String(q.explicacao).trim() : ""
+        };
+      });
+
   },
 
   // -----------------------------
