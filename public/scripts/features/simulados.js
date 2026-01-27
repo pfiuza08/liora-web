@@ -59,27 +59,28 @@ export const simulados = {
       return;
     }
 
-    root.addEventListener("click", (ev) => {
+      root.addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-action]");
       if (!btn) return;
-
+    
       const action = btn.getAttribute("data-action");
       if (!action) return;
-
+    
       if (action === "openConfig") this.openConfig();
       if (action === "closeConfig") this.closeConfig();
       if (action === "saveConfig") this.saveConfig();
-
+    
       if (action === "startSimulado") this.start();
       if (action === "cancelSimulado") this.cancel();
-
+    
       if (action === "prevQuestao") this.prev();
       if (action === "nextQuestao") this.next();
-
+    
       if (action === "finishSimulado") this.finish();
       if (action === "restartSimulado") this.restart();
       if (action === "reviewToggle") this.toggleReview();
     });
+
 
     root.addEventListener("change", (ev) => {
       const inp = ev.target;
@@ -383,19 +384,18 @@ export const simulados = {
     <div class="card sim-question">
       <div class="sim-q-head">
         <div class="sim-q-label" id="sim-q-label"></div>
-
-        <div class="sim-q-actions">
-          <button class="btn-secondary" data-action="openConfig">Configurar</button>
-          <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
-        </div>
+        <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
       </div>
 
       <div class="sim-enunciado" id="sim-enunciado"></div>
       <div class="sim-alts" id="sim-alts"></div>
 
       <div class="sim-actions">
-        <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
+        <button class="btn-secondary" data-action="openConfig">Configurar</button>
+
         <div class="spacer"></div>
+
+        <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
         <button class="btn-secondary" data-action="nextQuestao" id="btn-next">Próxima</button>
         <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
       </div>
@@ -410,6 +410,7 @@ export const simulados = {
   this.renderHeaderState({ mode: "running" });
   this.renderProgress();
   this.renderTimer();
+  this.renderButtonsState();
 },
 
 
