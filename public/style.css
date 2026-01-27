@@ -2055,5 +2055,26 @@ html.light .checkpoint-box .cq-input {
     flex: 1;
   }
 }
+#screen-simulados .btn-icon{
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 14px;
+}
+#screen-simulados .btn-icon span{
+  font-size: 14px;
+  opacity: .9;
+}
+#screen-simulados button:disabled{
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none !important;
+}
+#screen-simulados .btn-outline:disabled,
+#screen-simulados .btn-ghost:disabled{
+  background: transparent;
+}
 
 
