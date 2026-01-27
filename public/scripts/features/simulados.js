@@ -59,27 +59,32 @@ export const simulados = {
       return;
     }
 
-      root.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("[data-action]");
-      if (!btn) return;
-    
-      const action = btn.getAttribute("data-action");
-      if (!action) return;
-    
-      if (action === "openConfig") this.openConfig();
-      if (action === "closeConfig") this.closeConfig();
-      if (action === "saveConfig") this.saveConfig();
-    
-      if (action === "startSimulado") this.start();
-      if (action === "cancelSimulado") this.cancel();
-    
-      if (action === "prevQuestao") this.prev();
-      if (action === "nextQuestao") this.next();
-    
-      if (action === "finishSimulado") this.finish();
-      if (action === "restartSimulado") this.restart();
-      if (action === "reviewToggle") this.toggleReview();
-    });
+   root.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("[data-action]");
+  if (!btn) return;
+
+  const action = btn.getAttribute("data-action");
+  if (!action) return;
+
+  switch (action) {
+    case "openConfig": return this.openConfig();
+    case "closeConfig": return this.closeConfig();
+    case "saveConfig": return this.saveConfig();
+
+    case "startSimulado": return this.start();
+    case "resumeSimulado": return this.resume();     // ✅ novo
+    case "discardRun": return this.discardRun();     // ✅ novo
+
+    case "cancelSimulado": return this.cancel();
+
+    case "prevQuestao": return this.prev();
+    case "nextQuestao": return this.next();
+
+    case "finishSimulado": return this.finish();
+    case "restartSimulado": return this.restart();
+    case "reviewToggle": return this.toggleReview();
+  }
+});
 
 
     root.addEventListener("change", (ev) => {
@@ -334,35 +339,50 @@ export const simulados = {
   // -----------------------------
   // RENDERING
   // -----------------------------
-  renderIdle() {
-    this.setHTML(
-      "sim-body",
-      `
-      <div class="card">
-        <div class="card-title">Simulado</div>
-        <div class="muted">
-          Configure banca, quantidade e tema (opcional).<br>
-          Depois clique em <b>Iniciar</b>.
-        </div>
-
-        <div class="sim-cta">
-          <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
-          <button class="btn-outline" data-action="openConfig">Configurar</button>
-        </div>
-
-        <div class="sim-meta">
-          <div><span class="pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
-          <div><span class="pill">Questões</span> ${this.STATE.config.qtd}</div>
-          <div><span class="pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
-          <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
-          <div><span class="pill">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
-        </div>
-      </div>
+  renderIdle({ hasResume = false } = {}) {
+  this.setHTML(
+    "sim-body",
     `
-    );
+    <div class="card">
+      <div class="card-title">Simulado</div>
+      <div class="muted">
+        Configure banca, quantidade e tema (opcional).<br>
+        Depois clique em <b>Iniciar</b>.
+      </div>
 
-    this.renderHeaderState({ mode: "idle" });
-  },
+      ${
+        hasResume
+          ? `
+            <div class="muted small" style="margin-top:10px">
+              Há um simulado em andamento salvo neste navegador.
+            </div>
+            <div class="sim-cta">
+              <button class="btn-primary" data-action="resumeSimulado">Continuar</button>
+              <button class="btn-outline" data-action="discardRun">Descartar</button>
+              <button class="btn-outline" data-action="openConfig">Configurar</button>
+            </div>
+          `
+          : `
+            <div class="sim-cta">
+              <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
+              <button class="btn-outline" data-action="openConfig">Configurar</button>
+            </div>
+          `
+      }
+
+      <div class="sim-meta">
+        <div><span class="pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
+        <div><span class="pill">Questões</span> ${this.STATE.config.qtd}</div>
+        <div><span class="pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
+        <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
+        <div><span class="pill">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
+      </div>
+    </div>
+  `
+  );
+
+  this.renderHeaderState({ mode: "idle" });
+},
 
  renderRunning() {
   this.setHTML(
@@ -591,6 +611,46 @@ export const simulados = {
     badge.textContent = map[mode] || "Pronto";
     badge.setAttribute("data-mode", mode || "idle");
   },
+    
+    resume() {
+      try {
+        const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
+        if (!(run?.running && run?.questoes?.length)) {
+          this.renderIdle({ hasResume: false });
+          return;
+        }
+    
+        this.STATE.running = true;
+        this.STATE.config = run.config || this.STATE.config;
+        this.STATE.questoes = run.questoes || [];
+        this.STATE.atual = run.atual || 0;
+        this.STATE.respostas = run.respostas || [];
+    
+        this.STATE.timer.enabled = run.timer?.enabled ?? this.STATE.timer.enabled;
+        this.STATE.timer.totalSec = run.timer?.totalSec || 0;
+        this.STATE.timer.leftSec = run.timer?.leftSec || 0;
+    
+        this.renderRunning();
+        this.renderQuestion();
+    
+        if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) {
+          this.startTimer();
+        }
+      } catch {
+        this.renderIdle({ hasResume: false });
+      }
+    },
+    
+    discardRun() {
+      this.stopTimer();
+      this.STATE.running = false;
+      this.STATE.questoes = [];
+      this.STATE.atual = 0;
+      this.STATE.respostas = [];
+      this.clearRun();
+      this.renderIdle({ hasResume: false });
+      this.toast("Simulado descartado.");
+    },
 
   // -----------------------------
   // API
@@ -736,56 +796,45 @@ export const simulados = {
   },
 
   restoreIfAny() {
+    // 1) config
     try {
       const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
       if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
     } catch {}
-
+  
+    // 2) timer flag
     try {
       const t = JSON.parse(localStorage.getItem("liora_sim_timer") || "null");
       if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
     } catch {}
-
+  
+    // 3) run salvo (NÃO auto-retoma)
+    // Se existir, apenas marca que há "continuação" disponível.
+    let hasResume = false;
     try {
       const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
-      if (run?.running && run?.questoes?.length) {
-        this.STATE.running = true;
-        this.STATE.config = run.config || this.STATE.config;
-        this.STATE.questoes = run.questoes || [];
-        this.STATE.atual = run.atual || 0;
-        this.STATE.respostas = run.respostas || [];
-        this.STATE.timer.enabled = run.timer?.enabled ?? this.STATE.timer.enabled;
-        this.STATE.timer.totalSec = run.timer?.totalSec || 0;
-        this.STATE.timer.leftSec = run.timer?.leftSec || 0;
-
-        this.renderRunning();
-        this.renderQuestion();
-
-        if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) {
-          this.startTimer();
-        }
-        return;
-      }
+      hasResume = !!(run?.running && Array.isArray(run?.questoes) && run.questoes.length);
     } catch {}
-
-    this.renderIdle();
+  
+    // Renderiza tela inicial (com ou sem aviso de continuação)
+    this.renderIdle({ hasResume });
   },
-
-  // -----------------------------
-  // HELPERS
-  // -----------------------------
-  clamp(n, min, max) {
-    const x = Number(n);
-    if (Number.isNaN(x)) return min;
-    return Math.max(min, Math.min(max, x));
-  },
-
-  getValue(id) {
-    const el = document.getElementById(id);
-    if (!el) return "";
-    if (el.type === "checkbox") return el.checked ? "on" : "off";
-    return el.value;
-  },
+  
+    // -----------------------------
+    // HELPERS
+    // -----------------------------
+    clamp(n, min, max) {
+      const x = Number(n);
+      if (Number.isNaN(x)) return min;
+      return Math.max(min, Math.min(max, x));
+    },
+  
+    getValue(id) {
+      const el = document.getElementById(id);
+      if (!el) return "";
+      if (el.type === "checkbox") return el.checked ? "on" : "off";
+      return el.value;
+    },
 
   setValue(id, value) {
     const el = document.getElementById(id);
