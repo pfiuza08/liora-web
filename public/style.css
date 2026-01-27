@@ -1834,5 +1834,226 @@ html.light .checkpoint-box .cq-input {
   border: 1px solid rgba(196,75,4,.30);
   background: rgba(196,75,4,.08);
 }
+/* =========================================================
+   PATCH SEGURO — SIMULADOS + PILLS + BOTÕES (padrão Liora)
+   Objetivo: alinhar Simulados ao botão "Entrar" e evitar
+   conflitos de .pill/.card sem quebrar o que já funciona.
+========================================================= */
+
+/* ---------------------------------------------------------
+   1) "PILL" sem conflito:
+   - No card do menu (home), a pill precisa ser "badge no canto"
+   - No restante do app (ex.: simulados meta), pill é inline
+--------------------------------------------------------- */
+
+/* torna a pill "inline" por padrão (serve para meta/chips) */
+.pill{
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  margin-right: 8px;
+}
+
+/* mas no HOME (card-btn), mantém pill no canto superior direito */
+.card-btn .pill{
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  margin-right: 0;
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: transparent;
+}
+
+/* ---------------------------------------------------------
+   2) Botões do Simulados no padrão do "Entrar"
+   - retangular/quadrado com cantos arredondados (não pílula)
+--------------------------------------------------------- */
+
+/* garante que o simulados não herde “pílula 999px” de nenhum lugar */
+#screen-simulados .btn-primary,
+#screen-simulados .btn-secondary,
+#screen-simulados .btn-outline,
+#screen-simulados .btn-ghost{
+  border-radius: 14px; /* padrão Liora atual */
+}
+
+/* cria btn-outline/btn-ghost (se não existirem) no mesmo estilo */
+.btn-outline{
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 700;
+  border-radius: 14px;
+}
+.btn-outline:hover{
+  opacity: .96;
+  border-color: rgba(255,255,255,.18);
+}
+
+.btn-ghost{
+  background: rgba(255,255,255,.03);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 700;
+  border-radius: 14px;
+}
+.btn-ghost:hover{
+  background: rgba(255,255,255,.05);
+  border-color: rgba(255,255,255,.18);
+}
+
+/* light: mantém contraste elegante */
+:root.light .btn-outline:hover{
+  border-color: rgba(0,0,0,.18);
+}
+:root.light .btn-ghost{
+  background: rgba(0,0,0,.03);
+}
+
+/* ---------------------------------------------------------
+   3) Simulados: card / progresso / timer com acabamento Liora
+--------------------------------------------------------- */
+
+#screen-simulados .card{
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* topbar */
+#screen-simulados .sim-topbar{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:12px;
+}
+#screen-simulados .bar{
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+}
+:root.light #screen-simulados .bar{
+  background: rgba(0,0,0,.06);
+  border-color: rgba(0,0,0,.08);
+}
+#screen-simulados .bar-fill{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background: rgba(196,75,4,.95);
+  transition: width .25s ease;
+}
+
+/* timer: mesmo “chip” elegante, sem virar botão */
+#screen-simulados .sim-timer{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+  padding: 8px 10px;
+  border-radius: 14px;
+  font-weight: 800;
+  min-width: 86px;
+  text-align: center;
+}
+:root.light #screen-simulados .sim-timer{
+  background: rgba(0,0,0,.03);
+}
+
+/* ---------------------------------------------------------
+   4) Alternativas: estilo flashcard elegante (igual checkpoint)
+--------------------------------------------------------- */
+
+#screen-simulados .sim-alts{
+  display:grid;
+  gap:10px;
+}
+
+#screen-simulados .sim-alt{
+  display:block;
+  cursor:pointer;
+}
+#screen-simulados .sim-alt input{ display:none; }
+
+/* corpo da alternativa: retângulo arredondado, borda suave */
+#screen-simulados .sim-alt-body{
+  display:grid;
+  grid-template-columns: 34px 1fr;
+  gap:12px;
+  align-items:flex-start;
+  padding:12px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03);
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+:root.light #screen-simulados .sim-alt-body{
+  border-color: rgba(0,0,0,.10);
+  background: rgba(0,0,0,.02);
+}
+
+#screen-simulados .sim-alt:hover .sim-alt-body{
+  transform: translateY(-1px);
+  border-color: rgba(196,75,4,.35);
+  background: rgba(196,75,4,.06);
+}
+
+/* selecionada: destaque Liora (borda + “halo” leve) */
+#screen-simulados .sim-alt.selected .sim-alt-body,
+#screen-simulados .sim-alt input:checked + .sim-alt-body{
+  border-color: rgba(196,75,4,.65);
+  box-shadow: 0 0 0 3px rgba(196,75,4,.14);
+  background: rgba(196,75,4,.08);
+}
+
+/* letra A/B/C/D: badge consistente com o app */
+#screen-simulados .sim-alt-letter{
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  display:grid;
+  place-items:center;
+  font-weight: 900;
+  background: rgba(196,75,4,.12);
+  border: 1px solid rgba(196,75,4,.35);
+}
+
+/* ---------------------------------------------------------
+   5) Barra de ações: alinhamento elegante
+--------------------------------------------------------- */
+
+#screen-simulados .sim-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:flex-end;
+  margin-top:14px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 520px){
+  #screen-simulados .sim-actions{
+    justify-content: stretch;
+  }
+  #screen-simulados .sim-actions > button{
+    flex: 1;
+  }
+}
 
 
