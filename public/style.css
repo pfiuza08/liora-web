@@ -1814,3 +1814,46 @@ html.light .checkpoint-box .cq-input {
 #screen-simulados .sim-cta button{
   min-height: 40px;
 }
+/* =========================================================
+   LIORA — PATCH MINIMO (Simulados)
+   - btn-outline compatível (alias do secondary)
+   - modal básico garantido
+========================================================= */
+
+/* 1) Compat: alguns módulos usam btn-outline */
+.btn-outline{
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 2) Modal base (caso algum modal venha sem CSS completo) */
+.modal{
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+.modal.open{ display: block; }
+
+.modal-backdrop{
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+}
+
+.modal-card{
+  position: relative;
+  width: min(720px, 92vw);
+  margin: 8vh auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
