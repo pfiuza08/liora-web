@@ -3,7 +3,8 @@
 // LIORA — API GERAR SIMULADO (SEM SDK openai)
 // - Chama OpenAI via fetch direto
 // - Retorna SEMPRE JSON
-// - Questões: enunciado + alternativas + corretaIndex + explicacao
+// - MCQ: enunciado + alternativas(4) + corretaIndex + explicacao
+// - Discursivas (opcional): enunciado + respostaModelo + criterios[]
 // ==========================================================
 
 function clamp(n, min, max) {
@@ -30,18 +31,84 @@ function extractJsonObject(text) {
   }
 }
 
+// Perfil de estilo por banca (heurística prática)
+function bancaProfile(bancaRaw) {
+  const b = String(bancaRaw || "").toUpperCase();
+
+  // Normaliza nomes comuns
+  if (b.includes("CEBRASPE") || b.includes("CESPE")) {
+    return {
+      id: "CEBRASPE",
+      nome: "CESPE/CEBRASPE",
+      estilo:
+        "Enunciados com assertivas, foco em precisão conceitual, pegadinhas semânticas e exceções. Linguagem técnica e direta. Evite humor. Alternativas plausíveis e próximas."
+    };
+  }
+  if (b.includes("FCC")) {
+    return {
+      id: "FCC",
+      nome: "FCC",
+      estilo:
+        "Enunciado um pouco mais descritivo, cobra definição + aplicação. Distratores com termos parecidos. Linguagem formal."
+    };
+  }
+  if (b.includes("VUNESP")) {
+    return {
+      id: "VUNESP",
+      nome: "VUNESP",
+      estilo:
+        "Objetiva e escolar, comandos claros. Alternativas bem separadas, sem excesso de armadilhas. Contexto prático quando útil."
+    };
+  }
+  if (b.includes("IBFC")) {
+    return {
+      id: "IBFC",
+      nome: "IBFC",
+      estilo:
+        "Direta, foco no essencial. Cobrança literal de conceitos e procedimentos. Alternativas curtas."
+    };
+  }
+  if (b.includes("AOCP")) {
+    return {
+      id: "AOCP",
+      nome: "AOCP",
+      estilo:
+        "Intermediária: enunciado claro, cobra aplicação. Alternativas plausíveis. Evite textos longos."
+    };
+  }
+
+  // default FGV
+  return {
+    id: "FGV",
+    nome: "FGV",
+    estilo:
+      "Alternativas muito plausíveis e próximas, cobra interpretação e aplicação. Pegadinhas sutis (termos absolutos, exceções, nuances). Enunciado direto, mas exige atenção."
+  };
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
       return res.status(405).json({ ok: false, error: "Use POST" });
     }
 
-    const { banca, qtd, dificuldade, tema } = req.body || {};
+    const {
+      banca,
+      qtd,
+      dificuldade,
+      tema,
+      // ✅ novo (opcional): número de discursivas
+      qtdDiscursivas
+    } = req.body || {};
 
     const QTD = clamp(qtd ?? 5, 3, 30);
+    const QTD_DISC = clamp(qtdDiscursivas ?? 0, 0, 10);
+
     const BANCA = String(banca || "FGV");
     const DIFICULDADE = String(dificuldade || "misturado");
     const TEMA = String(tema || "").trim();
+
+    const profile = bancaProfile(BANCA);
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -51,21 +118,38 @@ export default async function handler(req, res) {
       });
     }
 
-    const prompt = `
-Você é um gerador de questões de simulado.
-Gere exatamente ${QTD} questões estilo banca ${BANCA}.
-Dificuldade: ${DIFICULDADE}.
-Tema: ${TEMA ? `"${TEMA}"` : "Livre (tema geral da área)"}
+    // Observação: o front atual espera `questoes`.
+    // Vamos manter `questoes` como MCQ e adicionar `discursivas` sem quebrar nada.
 
-Regras:
-- Cada questão deve ter:
-  - enunciado (curto e claro)
-  - alternativas: array com 4 opções (A-D)
+    const prompt = `
+Você é um gerador de questões de simulado com estilo de banca.
+
+BANCA: ${profile.nome}
+PERFIL DA BANCA (aplique rigorosamente):
+${profile.estilo}
+
+DIFICULDADE: ${DIFICULDADE}
+TEMA: ${TEMA ? `"${TEMA}"` : "Livre (tema geral da área)"}
+
+SAÍDA:
+- Gere exatamente ${QTD} questões de MÚLTIPLA ESCOLHA (MCQ), 4 alternativas.
+- Gere exatamente ${QTD_DISC} questões DISCURSIVAS (se QTD_DISC=0, retorne array vazio).
+
+REGRAS IMPORTANTES:
+- NÃO use markdown.
+- NÃO inclua letras A/B/C/D nas alternativas (o front faz isso).
+- Evite emojis.
+- Cada questão MCQ deve ter:
+  - enunciado: string (curto e claro)
+  - alternativas: array de 4 strings
   - corretaIndex: inteiro 0..3
-  - explicacao: 1 a 2 frases explicando a correta
-- Não use markdown.
-- Não numere alternativas com letras; o front faz isso.
-- Responda SOMENTE em JSON válido no formato:
+  - explicacao: 1 a 2 frases explicando por que é a correta (objetivo, sem floreio)
+- Cada questão discursiva deve ter:
+  - enunciado: string (pergunta)
+  - respostaModelo: string curta (4 a 8 linhas no máximo)
+  - criterios: array com 3 a 6 itens curtos (o que avaliar)
+
+FORMATO: responda SOMENTE em JSON válido, exatamente assim:
 
 {
   "questoes": [
@@ -75,8 +159,19 @@ Regras:
       "corretaIndex": 0,
       "explicacao": "..."
     }
+  ],
+  "discursivas": [
+    {
+      "enunciado": "...",
+      "respostaModelo": "...",
+      "criterios": ["...", "..."]
+    }
   ]
 }
+
+DICA DE QUALIDADE:
+- Distratores devem ser plausíveis e coerentes com o tema, mas incorretos por um detalhe.
+- Varie comandos ("assinale", "é correto afirmar", "considere", etc.) conforme o perfil da banca.
 `.trim();
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -87,9 +182,14 @@ Regras:
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.4,
+        temperature: 0.35,
+        max_tokens: 2000,
         messages: [
-          { role: "system", content: "Você gera questões de múltipla escolha em JSON rigoroso." },
+          {
+            role: "system",
+            content:
+              "Você gera simulado em JSON rigoroso. Responda apenas JSON válido conforme o schema pedido."
+          },
           { role: "user", content: prompt }
         ]
       })
@@ -98,7 +198,6 @@ Regras:
     const rawText = await resp.text();
 
     if (!resp.ok) {
-      // aqui a OpenAI pode devolver JSON de erro, ou texto
       let errJson = null;
       try {
         errJson = JSON.parse(rawText);
@@ -134,7 +233,7 @@ Regras:
       });
     }
 
-    const sane = parsed.questoes
+    const saneMCQ = parsed.questoes
       .filter(
         (q) =>
           q &&
@@ -150,7 +249,25 @@ Regras:
         explicacao: String(q.explicacao || "").trim()
       }));
 
-    if (!sane.length) {
+    // Discursivas: opcional, não quebra front
+    const parsedDisc = Array.isArray(parsed.discursivas) ? parsed.discursivas : [];
+    const saneDisc = parsedDisc
+      .filter(
+        (d) =>
+          d &&
+          typeof d.enunciado === "string" &&
+          typeof d.respostaModelo === "string" &&
+          Array.isArray(d.criterios) &&
+          d.criterios.length >= 2
+      )
+      .slice(0, QTD_DISC)
+      .map((d) => ({
+        enunciado: String(d.enunciado).trim(),
+        respostaModelo: String(d.respostaModelo).trim(),
+        criterios: d.criterios.slice(0, 8).map((c) => String(c).trim())
+      }));
+
+    if (!saneMCQ.length) {
       return res.status(200).json({
         ok: false,
         error: "Questões inválidas após validação",
@@ -160,8 +277,16 @@ Regras:
 
     return res.status(200).json({
       ok: true,
-      questoes: sane,
-      meta: { banca: BANCA, dificuldade: DIFICULDADE, tema: TEMA, qtd: QTD }
+      questoes: saneMCQ, // ✅ mantém compatível com o front atual
+      discursivas: saneDisc, // ✅ novo (para UI futura)
+      meta: {
+        banca: BANCA,
+        perfilBanca: profile.id,
+        dificuldade: DIFICULDADE,
+        tema: TEMA,
+        qtd: QTD,
+        qtdDiscursivas: QTD_DISC
+      }
     });
   } catch (err) {
     console.error("❌ gerarSimulado error:", err);
