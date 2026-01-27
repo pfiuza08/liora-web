@@ -590,7 +590,7 @@ export const simulados = {
   
     badge.textContent = map[mode] || "Pronto";
     badge.setAttribute("data-mode", mode || "idle");
-  }
+  },
 
   // -----------------------------
   // API
