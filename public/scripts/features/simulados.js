@@ -402,7 +402,7 @@ renderIdle() {
   );
 
   this.renderHeaderState({ mode: "idle" });
-}
+},
 
 
 renderRunning() {
