@@ -1801,3 +1801,16 @@ html.light .checkpoint-box .cq-input {
   border-radius: 14px;
   padding: 10px 12px;
 }
+/* ✅ PATCH FINAL — garante botões do Simulados com cara do app */
+#screen-simulados .btn-primary,
+#screen-simulados .btn-outline,
+#screen-simulados .btn-secondary,
+#screen-simulados .btn-ghost{
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
+#screen-simulados .sim-cta button{
+  min-height: 40px;
+}
