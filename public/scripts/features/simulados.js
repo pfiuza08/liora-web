@@ -59,7 +59,7 @@ export const simulados = {
       return;
     }
 
-   root.addEventListener("click", (ev) => {
+root.addEventListener("click", (ev) => {
   const btn = ev.target.closest("[data-action]");
   if (!btn) return;
 
@@ -67,24 +67,28 @@ export const simulados = {
   if (!action) return;
 
   switch (action) {
-    case "openConfig": return this.openConfig();
-    case "closeConfig": return this.closeConfig();
-    case "saveConfig": return this.saveConfig();
+    case "openConfig":      return this.openConfig();
+    case "closeConfig":     return this.closeConfig();
+    case "saveConfig":      return this.saveConfig();
 
-    case "startSimulado": return this.start();
-    case "resumeSimulado": return this.resume();     // ✅ novo
-    case "discardRun": return this.discardRun();     // ✅ novo
+    case "startSimulado":   return this.start();
+    case "resumeSimulado":  return this.resumeSimulado(); // ✅ corrigido
+    case "discardRun":      return this.discardRun();
 
-    case "cancelSimulado": return this.cancel();
+    case "cancelSimulado":  return this.cancel();
 
-    case "prevQuestao": return this.prev();
-    case "nextQuestao": return this.next();
+    case "prevQuestao":     return this.prev();
+    case "nextQuestao":     return this.next();
 
-    case "finishSimulado": return this.finish();
+    case "finishSimulado":  return this.finish();
     case "restartSimulado": return this.restart();
-    case "reviewToggle": return this.toggleReview();
+    case "reviewToggle":    return this.toggleReview();
+
+    default:
+      return; // ação desconhecida: ignora
   }
 });
+
 
 
     root.addEventListener("change", (ev) => {
@@ -339,10 +343,36 @@ export const simulados = {
   // -----------------------------
   // RENDERING
   // -----------------------------
-  renderIdle({ hasResume = false } = {}) {
-  this.setHTML(
-    "sim-body",
-    `
+ renderIdle() {
+  const hasRun = !!this.STATE._savedRun;
+
+  const runMeta = (() => {
+    if (!hasRun) return "";
+    const r = this.STATE._savedRun;
+    const total = r.questoes?.length || 0;
+    const answered = r.respostas?.length || 0;
+    const banca = r.config?.banca || this.STATE.config.banca;
+    const tema = r.config?.tema || this.STATE.config.tema || "Livre";
+
+    return `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">Simulado em andamento</div>
+        <div class="muted">
+          Banca: <b>${this.escape(banca)}</b> · Tema: <b>${this.escape(tema)}</b><br>
+          Progresso: <b>${answered}</b> / <b>${total}</b>
+        </div>
+
+        <div class="sim-cta">
+          <button class="btn-primary" data-action="resumeSimulado">Continuar</button>
+          <button class="btn-outline" data-action="discardRun">Descartar</button>
+        </div>
+      </div>
+    `;
+  })();
+
+  this.setHTML("sim-body", `
+    ${runMeta}
+
     <div class="card">
       <div class="card-title">Simulado</div>
       <div class="muted">
@@ -350,25 +380,12 @@ export const simulados = {
         Depois clique em <b>Iniciar</b>.
       </div>
 
-      ${
-        hasResume
-          ? `
-            <div class="muted small" style="margin-top:10px">
-              Há um simulado em andamento salvo neste navegador.
-            </div>
-            <div class="sim-cta">
-              <button class="btn-primary" data-action="resumeSimulado">Continuar</button>
-              <button class="btn-outline" data-action="discardRun">Descartar</button>
-              <button class="btn-outline" data-action="openConfig">Configurar</button>
-            </div>
-          `
-          : `
-            <div class="sim-cta">
-              <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
-              <button class="btn-outline" data-action="openConfig">Configurar</button>
-            </div>
-          `
-      }
+      <div class="sim-cta">
+        <!-- Configurar como padrão (outline) -->
+        <button class="btn-outline" data-action="openConfig">Configurar</button>
+        <!-- Iniciar como primário -->
+        <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
+      </div>
 
       <div class="sim-meta">
         <div><span class="pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
@@ -378,11 +395,11 @@ export const simulados = {
         <div><span class="pill">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
       </div>
     </div>
-  `
-  );
+  `);
 
   this.renderHeaderState({ mode: "idle" });
 },
+
 
  renderRunning() {
   this.setHTML(
@@ -478,31 +495,31 @@ export const simulados = {
     }
   },
 
-  renderButtonsState() {
-    const total = this.STATE.questoes.length;
-    const idx = this.STATE.atual;
+ renderButtonsState() {
+  const total = this.STATE.questoes.length;
+  const idx = this.STATE.atual;
 
-    const answered = this.STATE.respostas.some((r) => r.idx === idx);
+  const answered = this.STATE.respostas.some((r) => r.idx === idx);
 
-    const btnPrev = document.getElementById("btn-prev");
-    const btnNext = document.getElementById("btn-next");
-    const btnFinish = document.getElementById("btn-finish");
+  const btnPrev = document.getElementById("btn-prev");
+  const btnNext = document.getElementById("btn-next");
+  const btnFinish = document.getElementById("btn-finish");
 
-    if (btnPrev) {
-      btnPrev.disabled = idx <= 0;
-      btnPrev.classList.toggle("disabled", btnPrev.disabled);
-    }
+  if (btnPrev) {
+    btnPrev.disabled = idx <= 0;
+    btnPrev.classList.toggle("disabled", btnPrev.disabled);
+  }
 
-    if (btnNext) {
-      btnNext.disabled = !answered || idx >= total - 1;
-      btnNext.classList.toggle("disabled", btnNext.disabled);
-    }
+  if (btnNext) {
+    btnNext.disabled = !answered || idx >= total - 1;
+    btnNext.classList.toggle("disabled", btnNext.disabled);
+  }
 
-    if (btnFinish) {
-      btnFinish.disabled = this.STATE.respostas.length === 0;
-      btnFinish.classList.toggle("disabled", btnFinish.disabled);
-    }
-  },
+  if (btnFinish) {
+    btnFinish.disabled = this.STATE.respostas.length === 0;
+    btnFinish.classList.toggle("disabled", btnFinish.disabled);
+  }
+},
 
   renderProgress() {
     const total = this.STATE.questoes.length || 1;
@@ -652,6 +669,60 @@ export const simulados = {
       this.toast("Simulado descartado.");
     },
 
+  resumeSimulado() {
+  const run = this.STATE._savedRun || null;
+  if (!run?.questoes?.length) {
+    this.toast("Não há simulado para continuar.");
+    this.STATE._savedRun = null;
+    this.clearRun();
+    this.renderIdle();
+    return;
+  }
+
+  // carrega estado salvo
+  this.STATE.running = true;
+  this.STATE.config = run.config || this.STATE.config;
+  this.STATE.questoes = run.questoes || [];
+  this.STATE.atual = run.atual || 0;
+  this.STATE.respostas = run.respostas || [];
+
+  this.STATE.timer.enabled = run.timer?.enabled ?? this.STATE.timer.enabled;
+  this.STATE.timer.totalSec = run.timer?.totalSec || 0;
+  this.STATE.timer.leftSec = run.timer?.leftSec || 0;
+
+  this.STATE._savedRun = null;
+
+  this.renderRunning();
+  this.renderQuestion();
+
+  // volta o timer
+  if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) {
+    this.startTimer();
+  } else {
+    this.stopTimer();
+  }
+
+  this.renderButtonsState();
+},
+
+discardRun() {
+  this.stopTimer();
+  this.clearRun();
+  this.STATE._savedRun = null;
+
+  // reseta runtime (mas mantém config)
+  this.STATE.running = false;
+  this.STATE.questoes = [];
+  this.STATE.atual = 0;
+  this.STATE.respostas = [];
+  this.STATE.timer.totalSec = 0;
+  this.STATE.timer.leftSec = 0;
+
+  this.renderIdle();
+  this.toast("Simulado descartado.");
+},
+
+
   // -----------------------------
   // API
   // -----------------------------
@@ -795,31 +866,34 @@ export const simulados = {
     localStorage.removeItem("liora_sim_run");
   },
 
-  restoreIfAny() {
-    // 1) config
-    try {
-      const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
-      if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
-    } catch {}
-  
-    // 2) timer flag
-    try {
-      const t = JSON.parse(localStorage.getItem("liora_sim_timer") || "null");
-      if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
-    } catch {}
-  
-    // 3) run salvo (NÃO auto-retoma)
-    // Se existir, apenas marca que há "continuação" disponível.
-    let hasResume = false;
-    try {
-      const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
-      hasResume = !!(run?.running && Array.isArray(run?.questoes) && run.questoes.length);
-    } catch {}
-  
-    // Renderiza tela inicial (com ou sem aviso de continuação)
-    this.renderIdle({ hasResume });
-  },
-  
+restoreIfAny() {
+  // restore config
+  try {
+    const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
+    if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
+  } catch {}
+
+  try {
+    const t = JSON.parse(localStorage.getItem("liora_sim_timer") || "null");
+    if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
+  } catch {}
+
+  // ✅ run salvo (NÃO auto-inicia)
+  try {
+    const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
+    if (run?.questoes?.length) {
+      this.STATE._savedRun = run;   // guarda para o "Continuar"
+      this.STATE.running = false;   // importante: não entra em andamento sozinho
+      this.renderIdle();
+      return;
+    }
+  } catch {}
+
+  // padrão
+  this.STATE._savedRun = null;
+  this.renderIdle();
+},
+
     // -----------------------------
     // HELPERS
     // -----------------------------
