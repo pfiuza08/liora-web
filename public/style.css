@@ -2076,5 +2076,122 @@ html.light .checkpoint-box .cq-input {
 #screen-simulados .btn-ghost:disabled{
   background: transparent;
 }
+/* =========================================================
+   PATCH — MODAL SIMULADOS (padrão Liora)
+   Cola no final do style.css
+========================================================= */
+
+#sim-config.modal { z-index: 9999; }
+
+#sim-config .modal-card{
+  max-width: 720px;
+  margin: 8vh auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+
+#sim-config .modal-backdrop{
+  background: rgba(0,0,0,.55);
+}
+
+:root.light #sim-config .modal-backdrop{
+  background: rgba(0,0,0,.35);
+}
+
+/* header */
+#sim-config .modal-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+:root.light #sim-config .modal-head{
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+
+#sim-config .modal-title{
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.2px;
+}
+
+/* body */
+#sim-config .modal-body{
+  margin: 12px 0 14px;
+  display: grid;
+  gap: 12px;
+}
+
+#sim-config .grid-2{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 700px){
+  #sim-config .grid-2{ grid-template-columns: 1fr; }
+}
+
+/* inputs iguais ao app */
+#sim-config .input{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  outline: none;
+}
+:root.light #sim-config .input{
+  border: 1px solid rgba(0,0,0,.10);
+  background: rgba(0,0,0,.02);
+  color: var(--text);
+}
+
+#sim-config .input:focus{
+  border-color: rgba(196, 75, 4, 0.65);
+  box-shadow: 0 0 0 3px rgba(196, 75, 4, 0.22);
+}
+
+/* footer com botões padrão Liora (não pílula) */
+#sim-config .modal-foot{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+:root.light #sim-config .modal-foot{
+  border-top: 1px solid rgba(0,0,0,.06);
+}
+
+/* garante cantos e padding iguais ao botão "Entrar" */
+#sim-config .btn-primary,
+#sim-config .btn-secondary,
+#sim-config .btn-outline,
+#sim-config .btn-ghost{
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+/* se ainda existir btn-ghost no modal, deixa com cara de secundário */
+#sim-config .btn-ghost{
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+#sim-config .btn-ghost:hover{
+  background: rgba(255,255,255,.04);
+}
+
+:root.light #sim-config .btn-ghost:hover{
+  background: rgba(0,0,0,.03);
+}
 
 
