@@ -343,11 +343,12 @@ root.addEventListener("click", (ev) => {
   // -----------------------------
   // RENDERING
   // -----------------------------
- renderIdle() {
+renderIdle() {
   const hasRun = !!this.STATE._savedRun;
 
   const runMeta = (() => {
     if (!hasRun) return "";
+
     const r = this.STATE._savedRun;
     const total = r.questoes?.length || 0;
     const answered = r.respostas?.length || 0;
@@ -355,8 +356,8 @@ root.addEventListener("click", (ev) => {
     const tema = r.config?.tema || this.STATE.config.tema || "Livre";
 
     return `
-      <div class="card" style="margin-bottom:12px;">
-        <div class="card-title">Simulado em andamento</div>
+      <div class="sim-card" style="margin-bottom:12px;">
+        <div class="sim-card-title">Simulado em andamento</div>
         <div class="muted">
           Banca: <b>${this.escape(banca)}</b> · Tema: <b>${this.escape(tema)}</b><br>
           Progresso: <b>${answered}</b> / <b>${total}</b>
@@ -370,38 +371,41 @@ root.addEventListener("click", (ev) => {
     `;
   })();
 
-  this.setHTML("sim-body", `
+  this.setHTML(
+    "sim-body",
+    `
     ${runMeta}
 
-    <div class="card">
-      <div class="card-title">Simulado</div>
+    <div class="sim-card">
+      <div class="sim-card-title">Simulado</div>
       <div class="muted">
         Configure banca, quantidade e tema (opcional).<br>
         Depois clique em <b>Iniciar</b>.
       </div>
 
       <div class="sim-cta">
-        <!-- Configurar como padrão (outline) -->
         <button class="btn-outline" data-action="openConfig">Configurar</button>
-        <!-- Iniciar como primário -->
         <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
       </div>
 
       <div class="sim-meta">
-        <div><span class="pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
-        <div><span class="pill">Questões</span> ${this.STATE.config.qtd}</div>
-        <div><span class="pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
-        <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
-        <div><span class="pill">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
+        <div><span class="sim-pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
+        <div><span class="sim-pill">Questões</span> ${this.STATE.config.qtd}</div>
+        <div><span class="sim-pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
+        <div><span class="sim-pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
+        <div><span class="sim-pill">Tempo</span> ${
+          this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"
+        }</div>
       </div>
     </div>
-  `);
+  `
+  );
 
   this.renderHeaderState({ mode: "idle" });
-},
+}
 
 
- renderRunning() {
+renderRunning() {
   this.setHTML(
     "sim-body",
     `
@@ -418,7 +422,7 @@ root.addEventListener("click", (ev) => {
       </div>
     </div>
 
-    <div class="card sim-question">
+    <div class="sim-card sim-question">
       <div class="sim-q-head">
         <div class="sim-q-label" id="sim-q-label"></div>
         <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
@@ -428,12 +432,12 @@ root.addEventListener("click", (ev) => {
       <div class="sim-alts" id="sim-alts"></div>
 
       <div class="sim-actions">
-        <button class="btn-secondary" data-action="openConfig">Configurar</button>
+        <button class="btn-outline" data-action="openConfig">Configurar</button>
 
         <div class="spacer"></div>
 
-        <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
-        <button class="btn-secondary" data-action="nextQuestao" id="btn-next">Próxima</button>
+        <button class="btn-outline" data-action="prevQuestao" id="btn-prev">Anterior</button>
+        <button class="btn-outline" data-action="nextQuestao" id="btn-next">Próxima</button>
         <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
       </div>
     </div>
@@ -448,7 +452,7 @@ root.addEventListener("click", (ev) => {
   this.renderProgress();
   this.renderTimer();
   this.renderButtonsState();
-},
+}
 
 
   renderQuestion() {
@@ -536,51 +540,45 @@ root.addEventListener("click", (ev) => {
     this.setText("sim-timer-text", this.formatTime(this.STATE.timer.leftSec));
   },
 
-  renderResult(result) {
-    const { total, acertos, erros, pct } = result;
+ renderResult(result) {
+  const { total, acertos, erros, pct } = result;
 
-    this.setHTML(
-      "sim-body",
-      `
-      <div class="card">
-        <div class="card-title">Resultado</div>
-
-        <div class="sim-score">
-          <div class="score-main">${pct}%</div>
-          <div class="muted">Acertos: <b>${acertos}</b> de <b>${total}</b></div>
-        </div>
-
-        <div class="sim-meta">
-          <div><span class="pill ok">Acertos</span> ${acertos}</div>
-          <div><span class="pill bad">Erros</span> ${erros}</div>
-          <div><span class="pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
-          <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
-        </div>
-
-        <div class="sim-cta">
-          <button class="btn-primary" data-action="startSimulado">Refazer</button>
-          <button class="btn-outline" data-action="restartSimulado">Zerar</button>
-          <button class="btn-outline" data-action="reviewToggle">Revisão</button>
-        </div>
-      </div>
-
-      <div class="card hidden" id="sim-review">
-        <div class="card-title">Revisão</div>
-        <div class="muted small">Respostas e alternativa correta.</div>
-        <div class="sim-review-list" id="sim-review-list"></div>
-      </div>
+  this.setHTML(
+    "sim-body",
     `
-    );
+    <div class="sim-card">
+      <div class="sim-card-title">Resultado</div>
 
-    this.renderHeaderState({ mode: "result" });
-    this.renderReview(result);
-  },
+      <div class="sim-score">
+        <div class="score-main">${pct}%</div>
+        <div class="muted">Acertos: <b>${acertos}</b> de <b>${total}</b></div>
+      </div>
 
-  toggleReview() {
-    const el = document.getElementById("sim-review");
-    if (!el) return;
-    el.classList.toggle("hidden");
-  },
+      <div class="sim-meta">
+        <div><span class="sim-pill ok">Acertos</span> ${acertos}</div>
+        <div><span class="sim-pill bad">Erros</span> ${erros}</div>
+        <div><span class="sim-pill">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
+        <div><span class="sim-pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
+      </div>
+
+      <div class="sim-cta">
+        <button class="btn-primary" data-action="startSimulado">Refazer</button>
+        <button class="btn-outline" data-action="restartSimulado">Zerar</button>
+        <button class="btn-outline" data-action="reviewToggle">Revisão</button>
+      </div>
+    </div>
+
+    <div class="sim-card hidden" id="sim-review">
+      <div class="sim-card-title">Revisão</div>
+      <div class="muted small">Respostas e alternativa correta.</div>
+      <div class="sim-review-list" id="sim-review-list"></div>
+    </div>
+  `
+  );
+
+  this.renderHeaderState({ mode: "result" });
+  this.renderReview(result);
+}
 
   renderReview(result) {
     const list = document.getElementById("sim-review-list");
