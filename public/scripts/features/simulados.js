@@ -1,21 +1,19 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.4-PRODUCT (Liora UI)
+// Versão: v2.4-PRODUCT (UI alinhada ao padrão do Tema)
 // -------------------------------------------------------------
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração
 // ✔ Start direto (botão principal)
-// ✔ "Continuar / Descartar" quando existe run salvo (liora_sim_run)
+// ✔ Configurar como botão padrão (btn-secondary)
 // ✔ Timer + progresso + resultado
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
+// ✔ Eventos canônicos (liora:*)
 // ✔ Salvamento em localStorage
 // ✔ Revisão com explicação (quando disponível)
-// ✔ Próxima só libera após responder
+// ✔ Controles Anterior/Próxima/Finalizar (padrão Liora)
 // ✔ Alternativa selecionada com highlight
-//
-// ⚠️ IMPORTANTE (HTML do modal):
-//   - Troque o select do timer de id="sim-timer" para id="sim-timer-mode"
-//   - Mantém o div do topo do simulado como id="sim-timer"
+// ✔ "Continuar / Descartar" quando existe run salvo (sem auto-iniciar)
 // =============================================================
 
 export const simulados = {
@@ -23,6 +21,9 @@ export const simulados = {
 
   STATE: {
     running: false,
+
+    // run salvo detectado no restoreIfAny()
+    _savedRun: null,
 
     config: {
       banca: "FGV",
@@ -34,7 +35,6 @@ export const simulados = {
 
     questoes: [],
     atual: 0,
-
     respostas: [], // { idx, escolha, correta, enunciado, alternativas[], corretaIndex, explicacao? }
 
     timer: {
@@ -42,10 +42,7 @@ export const simulados = {
       totalSec: 0,
       leftSec: 0,
       tickId: null
-    },
-
-    // usado só para "Continuar/Descartar" (não auto inicia)
-    _savedRun: null
+    }
   },
 
   // -----------------------------
@@ -56,7 +53,7 @@ export const simulados = {
     this.bindUI();
     this.restoreIfAny();
 
-    console.log("📝 simulados.js v2.4 — Liora UI iniciado");
+    console.log("📝 simulados.js v2.4 — UI alinhada ao Tema iniciado");
   },
 
   // -----------------------------
@@ -69,7 +66,7 @@ export const simulados = {
       return;
     }
 
-    // Clicks por data-action
+    // Click delegator
     root.addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-action]");
       if (!btn) return;
@@ -112,7 +109,7 @@ export const simulados = {
       }
     });
 
-    // Alternativas
+    // Alternativas (radio)
     root.addEventListener("change", (ev) => {
       const inp = ev.target;
       if (!inp?.matches?.("input[name='alt']")) return;
@@ -123,7 +120,7 @@ export const simulados = {
     // Eventos canônicos
     window.addEventListener("liora:open-simulados", () => {
       this.showScreen();
-      // Não auto-inicia. O restoreIfAny decide se há "Continuar".
+      // não auto-inicia; renderIdle já decide se mostra continuar/descartar
       this.renderIdle();
     });
 
@@ -154,9 +151,7 @@ export const simulados = {
     this.setValue("sim-dificuldade", c.dificuldade);
     this.setValue("sim-tema", c.tema);
     this.setValue("sim-tempo", c.tempo);
-
-    // ⚠️ HTML: select deve ser id="sim-timer-mode"
-    this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
+    this.setValue("sim-timer", this.STATE.timer.enabled ? "on" : "off");
 
     modal.classList.add("open");
     document.body.classList.add("liora-modal-open");
@@ -180,9 +175,7 @@ export const simulados = {
     const dificuldade = this.getValue("sim-dificuldade") || "misturado";
     const tema = (this.getValue("sim-tema") || "").trim();
     const tempo = Number(this.getValue("sim-tempo") || 20);
-
-    // ⚠️ HTML: select deve ser id="sim-timer-mode"
-    const timerMode = this.getValue("sim-timer-mode") || "on";
+    const timerMode = this.getValue("sim-timer") || "on";
 
     this.STATE.config = {
       banca,
@@ -193,11 +186,19 @@ export const simulados = {
     };
 
     this.STATE.timer.enabled = timerMode === "on";
-
     this.persistConfig();
-    this.toast("Configurações salvas.");
 
+    this.toast("Configurações salvas.");
     this.closeConfig();
+
+    // se estiver rodando, só re-renderiza status/meta (não reinicia)
+    if (this.STATE.running) {
+      this.renderRunning();
+      this.renderQuestion();
+      this.renderButtonsState();
+      return;
+    }
+
     this.renderIdle();
   },
 
@@ -207,7 +208,7 @@ export const simulados = {
   async start() {
     if (this.STATE.running) return;
 
-    // ✅ garante que o modal não fique “grudado” ao iniciar
+    // fecha o modal se estiver aberto (evita sobreposição)
     this.closeConfig();
 
     window.dispatchEvent(
@@ -218,7 +219,7 @@ export const simulados = {
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
-    this.STATE._savedRun = null; // ao iniciar do zero, ignora qualquer run salvo
+    this.STATE._savedRun = null;
 
     if (this.STATE.timer.enabled) {
       this.STATE.timer.totalSec = this.STATE.config.tempo * 60;
@@ -247,6 +248,60 @@ export const simulados = {
 
     this.persistRun();
     this.renderQuestion();
+  },
+
+  resumeSimulado() {
+    const run = this.STATE._savedRun || null;
+    if (!run?.questoes?.length) {
+      this.toast("Não há simulado para continuar.");
+      this.STATE._savedRun = null;
+      this.clearRun();
+      this.renderIdle();
+      return;
+    }
+
+    // fecha modal se estiver aberto
+    this.closeConfig();
+
+    this.STATE.running = true;
+    this.STATE.config = run.config || this.STATE.config;
+    this.STATE.questoes = run.questoes || [];
+    this.STATE.atual = run.atual || 0;
+    this.STATE.respostas = run.respostas || [];
+
+    this.STATE.timer.enabled = run.timer?.enabled ?? this.STATE.timer.enabled;
+    this.STATE.timer.totalSec = run.timer?.totalSec || 0;
+    this.STATE.timer.leftSec = run.timer?.leftSec || 0;
+
+    this.STATE._savedRun = null;
+
+    this.renderRunning();
+    this.renderQuestion();
+
+    if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) {
+      this.startTimer();
+    } else {
+      this.stopTimer();
+    }
+
+    this.renderButtonsState();
+  },
+
+  discardRun() {
+    this.stopTimer();
+    this.clearRun();
+    this.STATE._savedRun = null;
+
+    // reseta runtime (mantém config)
+    this.STATE.running = false;
+    this.STATE.questoes = [];
+    this.STATE.atual = 0;
+    this.STATE.respostas = [];
+    this.STATE.timer.totalSec = 0;
+    this.STATE.timer.leftSec = 0;
+
+    this.renderIdle();
+    this.toast("Simulado descartado.");
   },
 
   pickAlternative(index) {
@@ -279,7 +334,6 @@ export const simulados = {
 
   prev() {
     if (!this.STATE.running) return;
-
     if (this.STATE.atual > 0) {
       this.STATE.atual -= 1;
       this.persistRun();
@@ -293,10 +347,6 @@ export const simulados = {
 
     const total = this.STATE.questoes.length;
     if (this.STATE.atual < total - 1) {
-      // segurança extra: não avança se não respondeu a atual
-      const answered = this.STATE.respostas.some((r) => r.idx === this.STATE.atual);
-      if (!answered) return;
-
       this.STATE.atual += 1;
       this.persistRun();
       this.renderQuestion();
@@ -319,6 +369,9 @@ export const simulados = {
   },
 
   cancel() {
+    // fecha modal se estiver aberto
+    this.closeConfig();
+
     if (!this.STATE.running) {
       this.renderIdle();
       return;
@@ -327,6 +380,7 @@ export const simulados = {
     this.STATE.running = false;
     this.stopTimer();
     this.clearRun();
+    this.STATE._savedRun = null;
 
     window.dispatchEvent(new Event("liora:simulado-cancel"));
 
@@ -335,15 +389,9 @@ export const simulados = {
   },
 
   restart() {
-    this.clearRun();
-    this.STATE._savedRun = null;
-
-    this.STATE.running = false;
-    this.stopTimer();
-
+    // zera run e volta para idle
+    this.discardRun();
     window.dispatchEvent(new Event("liora:simulado-restart"));
-
-    this.renderIdle();
   },
 
   // -----------------------------
@@ -404,13 +452,15 @@ export const simulados = {
 
           <div class="sim-cta">
             <button class="btn-primary" data-action="resumeSimulado">Continuar</button>
-            <button class="btn-outline" data-action="discardRun">Descartar</button>
+            <button class="btn-secondary" data-action="discardRun">Descartar</button>
           </div>
         </div>
       `;
     })();
 
-    this.setHTML("sim-body", `
+    this.setHTML(
+      "sim-body",
+      `
       ${runMeta}
 
       <div class="card">
@@ -421,7 +471,7 @@ export const simulados = {
         </div>
 
         <div class="sim-cta">
-          <button class="btn-outline" data-action="openConfig">Configurar</button>
+          <button class="btn-secondary" data-action="openConfig">Configurar</button>
           <button class="btn-primary" data-action="startSimulado">Iniciar simulado</button>
         </div>
 
@@ -430,16 +480,21 @@ export const simulados = {
           <div><span class="pill">Questões</span> ${this.STATE.config.qtd}</div>
           <div><span class="pill">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
           <div><span class="pill">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
-          <div><span class="pill">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
+          <div><span class="pill">Tempo</span> ${
+            this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"
+          }</div>
         </div>
       </div>
-    `);
+    `
+    );
 
     this.renderHeaderState({ mode: "idle" });
   },
 
   renderRunning() {
-    this.setHTML("sim-body", `
+    this.setHTML(
+      "sim-body",
+      `
       <div class="sim-topbar">
         <div class="sim-progress">
           <div class="muted" id="sim-progress-text">Carregando...</div>
@@ -463,12 +518,12 @@ export const simulados = {
         <div class="sim-alts" id="sim-alts"></div>
 
         <div class="sim-actions">
-          <button class="btn-outline" data-action="openConfig">Configurar</button>
+          <button class="btn-secondary" data-action="openConfig">Configurar</button>
 
           <div class="spacer"></div>
 
-          <button class="btn-outline" data-action="prevQuestao" id="btn-prev">Anterior</button>
-          <button class="btn-outline" data-action="nextQuestao" id="btn-next">Próxima</button>
+          <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
+          <button class="btn-secondary" data-action="nextQuestao" id="btn-next">Próxima</button>
           <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
         </div>
       </div>
@@ -476,7 +531,8 @@ export const simulados = {
       <div class="muted small" id="sim-hint">
         Selecione uma alternativa para liberar a próxima questão.
       </div>
-    `);
+    `
+    );
 
     this.renderHeaderState({ mode: "running" });
     this.renderProgress();
@@ -488,7 +544,10 @@ export const simulados = {
     const q = this.STATE.questoes[this.STATE.atual];
     if (!q) return;
 
-    this.setText("sim-q-label", `Questão ${this.STATE.atual + 1} de ${this.STATE.questoes.length}`);
+    this.setText(
+      "sim-q-label",
+      `Questão ${this.STATE.atual + 1} de ${this.STATE.questoes.length}`
+    );
     this.setText("sim-enunciado", q.enunciado);
 
     const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
@@ -522,6 +581,7 @@ export const simulados = {
     const chosen = this.STATE.respostas.find((r) => r.idx === this.STATE.atual)?.escolha;
     const labels = document.querySelectorAll("#screen-simulados .sim-alt");
     labels.forEach((lb) => lb.classList.remove("selected"));
+
     if (typeof chosen === "number") {
       const target = document
         .querySelector(`#screen-simulados input[name="alt"][value="${chosen}"]`)
@@ -540,20 +600,11 @@ export const simulados = {
     const btnNext = document.getElementById("btn-next");
     const btnFinish = document.getElementById("btn-finish");
 
-    if (btnPrev) {
-      btnPrev.disabled = idx <= 0;
-      btnPrev.classList.toggle("disabled", btnPrev.disabled);
-    }
+    if (btnPrev) btnPrev.disabled = idx <= 0;
 
-    if (btnNext) {
-      btnNext.disabled = !answered || idx >= total - 1;
-      btnNext.classList.toggle("disabled", btnNext.disabled);
-    }
+    if (btnNext) btnNext.disabled = !answered || idx >= total - 1;
 
-    if (btnFinish) {
-      btnFinish.disabled = this.STATE.respostas.length === 0;
-      btnFinish.classList.toggle("disabled", btnFinish.disabled);
-    }
+    if (btnFinish) btnFinish.disabled = this.STATE.respostas.length === 0;
   },
 
   renderProgress() {
@@ -574,7 +625,9 @@ export const simulados = {
   renderResult(result) {
     const { total, acertos, erros, pct } = result;
 
-    this.setHTML("sim-body", `
+    this.setHTML(
+      "sim-body",
+      `
       <div class="card">
         <div class="card-title">Resultado</div>
 
@@ -592,8 +645,8 @@ export const simulados = {
 
         <div class="sim-cta">
           <button class="btn-primary" data-action="startSimulado">Refazer</button>
-          <button class="btn-outline" data-action="restartSimulado">Zerar</button>
-          <button class="btn-outline" data-action="reviewToggle">Revisão</button>
+          <button class="btn-secondary" data-action="restartSimulado">Zerar</button>
+          <button class="btn-secondary" data-action="reviewToggle">Revisão</button>
         </div>
       </div>
 
@@ -602,7 +655,8 @@ export const simulados = {
         <div class="muted small">Respostas e alternativa correta.</div>
         <div class="sim-review-list" id="sim-review-list"></div>
       </div>
-    `);
+    `
+    );
 
     this.renderHeaderState({ mode: "result" });
     this.renderReview(result);
@@ -636,7 +690,9 @@ export const simulados = {
 
           <div class="sim-review-ans">
             <div><b>Sua:</b> ${
-              sua != null ? `${letter(sua)}. ${this.escape(r.alternativas[sua])}` : "—"
+              sua != null
+                ? `${letter(sua)}. ${this.escape(r.alternativas[sua])}`
+                : "—"
             }</div>
             <div><b>Correta:</b> ${letter(correta)}. ${this.escape(r.alternativas[correta])}</div>
           </div>
@@ -665,62 +721,6 @@ export const simulados = {
 
     badge.textContent = map[mode] || "Pronto";
     badge.setAttribute("data-mode", mode || "idle");
-  },
-
-  // -----------------------------
-  // CONTINUAR / DESCARTAR
-  // -----------------------------
-  resumeSimulado() {
-    const run = this.STATE._savedRun || null;
-
-    if (!run?.questoes?.length) {
-      this.toast("Não há simulado para continuar.");
-      this.STATE._savedRun = null;
-      this.clearRun();
-      this.renderIdle();
-      return;
-    }
-
-    this.STATE.running = true;
-    this.STATE.config = run.config || this.STATE.config;
-    this.STATE.questoes = run.questoes || [];
-    this.STATE.atual = run.atual || 0;
-    this.STATE.respostas = run.respostas || [];
-
-    this.STATE.timer.enabled = run.timer?.enabled ?? this.STATE.timer.enabled;
-    this.STATE.timer.totalSec = run.timer?.totalSec || 0;
-    this.STATE.timer.leftSec = run.timer?.leftSec || 0;
-
-    this.STATE._savedRun = null;
-
-    this.renderRunning();
-    this.renderQuestion();
-
-    if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) {
-      this.startTimer();
-    } else {
-      this.stopTimer();
-    }
-
-    this.renderButtonsState();
-  },
-
-  discardRun() {
-    this.stopTimer();
-    this.clearRun();
-
-    this.STATE._savedRun = null;
-
-    // reseta runtime (mantém config)
-    this.STATE.running = false;
-    this.STATE.questoes = [];
-    this.STATE.atual = 0;
-    this.STATE.respostas = [];
-    this.STATE.timer.totalSec = 0;
-    this.STATE.timer.leftSec = 0;
-
-    this.renderIdle();
-    this.toast("Simulado descartado.");
   },
 
   // -----------------------------
@@ -776,8 +776,7 @@ export const simulados = {
           "Substituir testes por opinião"
         ],
         corretaIndex: 1,
-        explicacao:
-          "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
+        explicacao: "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
       },
       {
         enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
@@ -868,19 +867,19 @@ export const simulados = {
   },
 
   restoreIfAny() {
-    // config
+    // restore config
     try {
       const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
       if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
     } catch {}
 
-    // timer enabled
+    // restore timer flag
     try {
       const t = JSON.parse(localStorage.getItem("liora_sim_timer") || "null");
       if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
     } catch {}
 
-    // ✅ run salvo: NÃO auto-inicia
+    // ✅ run salvo (NÃO auto-inicia)
     try {
       const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
       if (run?.questoes?.length) {
