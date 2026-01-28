@@ -1,15 +1,21 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.4-PRODUCT (fix UI + modal + resume/discard)
+// Versão: v2.5-PRODUCT (MCQ + CE + UI polish + QA hooks)
 //
 // ✔ SCREEN como runtime
-// ✔ MODAL apenas para configuração (força display via JS)
+// ✔ MODAL apenas para configuração (robusto por JS)
 // ✔ Idle mostra Continuar/Descartar quando existir run salvo
-// ✔ Próxima só habilita após responder
+// ✔ Próxima só habilita após responder (com hint contextual)
 // ✔ Botões no padrão do app (btn-primary / btn-secondary / btn-link)
 // ✔ Timer + progresso + resultado + revisão com explicação
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
+// ✔ Suporta MCQ (4 alts) + CE (Certo/Errado, 2 alts)
 // ✔ Salvamento em localStorage
+//
+// 🔧 3 sugestões aplicadas (das últimas):
+// 1) CE suportado no front (render + revisão + validação de corretaIndex)
+// 2) "Próxima" com gating + hint que muda automaticamente
+// 3) QA no console: window.lioraSimDebug() + logs leves em dev
 // =============================================================
 
 export const simulados = {
@@ -27,7 +33,7 @@ export const simulados = {
     },
     questoes: [],
     atual: 0,
-    respostas: [], // { idx, escolha, correta, enunciado, alternativas[], corretaIndex, explicacao? }
+    respostas: [], // { idx, escolha, correta, enunciado, alternativas[], corretaIndex, explicacao?, tipo? }
     timer: {
       enabled: true,
       totalSec: 0,
@@ -43,7 +49,25 @@ export const simulados = {
     this.ctx = ctx;
     this.bindUI();
     this.restoreIfAny();
-    console.log("📝 simulados.js v2.4 — iniciado");
+
+    // ✅ hook de QA no console (não quebra nada em produção)
+    window.lioraSimDebug = () => {
+      const s = this.STATE;
+      console.log("🧪 LIORA Simulados Debug");
+      console.log("running:", s.running, "idx:", s.atual, "/", s.questoes.length - 1);
+      console.log("config:", s.config);
+      console.log("timer:", s.timer);
+      console.log("questoes:", (s.questoes || []).map((q, i) => ({
+        i,
+        tipo: q.tipo,
+        alts: q.alternativas?.length,
+        corretaIndex: q.corretaIndex
+      })));
+      console.log("respostas:", s.respostas);
+      return JSON.parse(JSON.stringify(s));
+    };
+
+    console.log("📝 simulados.js v2.5 — iniciado");
   },
 
   // -----------------------------
@@ -114,94 +138,80 @@ export const simulados = {
   // -----------------------------
   // MODAL CONFIG (robusto mesmo sem CSS)
   // -----------------------------
-  _ensureModalDisplay(modal, open) {
+  openConfig() {
+    const modal = document.getElementById("sim-config");
     if (!modal) return;
 
-    // garante classe modal (se existir CSS)
-    if (!modal.classList.contains("modal")) modal.classList.add("modal");
+    const c = this.STATE.config;
 
-    // fallback: força comportamento básico via JS
+    this.setValue("sim-banca", c.banca);
+    this.setValue("sim-qtd", c.qtd);
+    this.setValue("sim-dificuldade", c.dificuldade);
+    this.setValue("sim-tema", c.tema);
+    this.setValue("sim-tempo", c.tempo);
+
+    // ✅ id correto do select do timer (no seu HTML)
+    this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("liora-modal-open");
+
+    // ✅ garantia extra caso seu CSS do modal seja parcial
+    modal.style.display = "block";
     modal.style.position = "fixed";
     modal.style.inset = "0";
     modal.style.zIndex = "9999";
-    modal.style.display = open ? "block" : "none";
 
-    // backdrop click fecha (se tiver .modal-backdrop)
+    // garante backdrop fechar
     const backdrop = modal.querySelector(".modal-backdrop");
     if (backdrop && !backdrop.__lioraBound) {
       backdrop.__lioraBound = true;
       backdrop.addEventListener("click", () => this.closeConfig());
     }
+
+    window.dispatchEvent(new CustomEvent("liora:modal-open", { detail: { id: "sim-config" } }));
   },
-openConfig() {
-  const modal = document.getElementById("sim-config");
-  if (!modal) return;
 
-  const c = this.STATE.config;
+  closeConfig() {
+    const modal = document.getElementById("sim-config");
+    if (!modal) return;
 
-  this.setValue("sim-banca", c.banca);
-  this.setValue("sim-qtd", c.qtd);
-  this.setValue("sim-dificuldade", c.dificuldade);
-  this.setValue("sim-tema", c.tema);
-  this.setValue("sim-tempo", c.tempo);
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("liora-modal-open");
 
-  // ✅ id correto do select do timer (no seu HTML)
-  this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
+    // ✅ garantia extra
+    modal.style.display = "none";
 
-  modal.classList.add("open");
-  modal.setAttribute("aria-hidden", "false");
-  document.body.classList.add("liora-modal-open");
+    window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
+  },
 
-  // ✅ garantia extra caso seu CSS do modal seja parcial
-  modal.style.display = "block";
-  modal.style.position = "fixed";
-  modal.style.inset = "0";
-  modal.style.zIndex = "9999";
+  saveConfig() {
+    const banca = this.getValue("sim-banca") || "FGV";
+    const qtd = Number(this.getValue("sim-qtd") || 5);
+    const dificuldade = this.getValue("sim-dificuldade") || "misturado";
+    const tema = (this.getValue("sim-tema") || "").trim();
+    const tempo = Number(this.getValue("sim-tempo") || 20);
 
-  window.dispatchEvent(new CustomEvent("liora:modal-open", { detail: { id: "sim-config" } }));
-},
+    // ✅ id correto do timer
+    const timerMode = this.getValue("sim-timer-mode") || "on";
 
+    this.STATE.config = {
+      banca,
+      qtd: this.clamp(qtd, 3, 30),
+      dificuldade,
+      tema,
+      tempo: this.clamp(tempo, 5, 180)
+    };
 
-closeConfig() {
-  const modal = document.getElementById("sim-config");
-  if (!modal) return;
+    this.STATE.timer.enabled = timerMode === "on";
 
-  modal.classList.remove("open");
-  modal.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("liora-modal-open");
-
-  // ✅ garantia extra
-  modal.style.display = "none";
-
-  window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
-},
-
-saveConfig() {
-  const banca = this.getValue("sim-banca") || "FGV";
-  const qtd = Number(this.getValue("sim-qtd") || 5);
-  const dificuldade = this.getValue("sim-dificuldade") || "misturado";
-  const tema = (this.getValue("sim-tema") || "").trim();
-  const tempo = Number(this.getValue("sim-tempo") || 20);
-
-  // ✅ id correto do timer
-  const timerMode = this.getValue("sim-timer-mode") || "on";
-
-  this.STATE.config = {
-    banca,
-    qtd: this.clamp(qtd, 3, 30),
-    dificuldade,
-    tema,
-    tempo: this.clamp(tempo, 5, 180)
-  };
-
-  this.STATE.timer.enabled = timerMode === "on";
-
-  this.persistConfig();
-  this.toast("Configurações salvas.");
-  this.closeConfig();
-  this.renderIdle();
-},
-
+    this.persistConfig();
+    this.toast("Configurações salvas.");
+    this.closeConfig();
+    this.renderIdle();
+  },
 
   // -----------------------------
   // START / FLOW (API)
@@ -233,6 +243,7 @@ saveConfig() {
     this.renderRunning();
     this.setText("sim-enunciado", "Gerando questões...");
     this.setHTML("sim-alts", `<div class="muted small">Isso pode levar alguns segundos.</div>`);
+    this.setHint("Carregando questões...");
     this.renderButtonsState();
 
     try {
@@ -328,6 +339,7 @@ saveConfig() {
     const existing = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
     const payload = {
       idx: this.STATE.atual,
+      tipo: q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq"),
       escolha: index,
       correta,
       enunciado: q.enunciado,
@@ -342,6 +354,9 @@ saveConfig() {
     this.persistRun();
     this.renderProgress();
     this.renderButtonsState();
+
+    // atualiza hint após responder
+    this.updateHintForCurrent();
   },
 
   prev() {
@@ -362,7 +377,8 @@ saveConfig() {
 
     const answered = this.STATE.respostas.some((r) => r.idx === idx);
     if (!answered) {
-      this.toast("Responda a questão para liberar a próxima.");
+      // ✅ sugestão: hint contextual no próprio layout
+      this.setHint("Selecione uma alternativa para liberar a próxima questão.");
       this.renderButtonsState();
       return;
     }
@@ -515,101 +531,99 @@ saveConfig() {
     this.renderHeaderState({ mode: "idle" });
   },
 
-renderRunning() {
-  this.setHTML(
-    "sim-body",
-    `
-      <div class="sim-topbar">
-        <div class="sim-progress">
-          <div class="muted" id="sim-progress-text">Carregando...</div>
-          <div class="sim-bar">
-            <div class="sim-bar-fill" id="sim-progress-bar" style="width:0%"></div>
+  renderRunning() {
+    this.setHTML(
+      "sim-body",
+      `
+        <div class="sim-topbar">
+          <div class="sim-progress">
+            <div class="muted" id="sim-progress-text">Carregando...</div>
+            <div class="sim-bar">
+              <div class="sim-bar-fill" id="sim-progress-bar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="${this.STATE.timer.enabled ? "sim-timer-pill" : "hidden"}" id="sim-timer">
+            <span id="sim-timer-text">--:--</span>
           </div>
         </div>
 
-        <div class="${this.STATE.timer.enabled ? "sim-timer-pill" : "hidden"}" id="sim-timer">
-          <span id="sim-timer-text">--:--</span>
-        </div>
-      </div>
-
-      <div class="sim-card sim-question">
-        <div class="sim-q-head">
-          <div class="sim-q-label" id="sim-q-label"></div>
-          <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
-        </div>
-
-        <div class="sim-enunciado" id="sim-enunciado"></div>
-        <div class="sim-alts" id="sim-alts"></div>
-
-        <div class="sim-actions">
-          <button class="btn-secondary" data-action="openConfig">Configurar</button>
-
-          <div class="spacer"></div>
-
-          <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
-          <button class="btn-secondary" data-action="nextQuestao" id="btn-next">Próxima</button>
-          <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
-        </div>
-      </div>
-
-      <div class="muted small" id="sim-hint">
-        Selecione uma alternativa para liberar a próxima questão.
-      </div>
-    `
-  );
-
-  this.renderHeaderState({ mode: "running" });
-  this.renderProgress();
-  this.renderTimer();
-  this.renderButtonsState();
-},
-
-
- renderQuestion() {
-  const q = this.STATE.questoes[this.STATE.atual];
-  if (!q) return;
-
-  this.setText("sim-q-label", `Questão ${this.STATE.atual + 1} de ${this.STATE.questoes.length}`);
-  this.setText("sim-enunciado", q.enunciado);
-
-  const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
-  const chosen = saved?.escolha ?? null;
-
-  const isCE = (q.tipo === "ce") || ((q.alternativas?.length || 0) === 2);
-
-  const html = (q.alternativas || [])
-    .map((alt, i) => {
-      const checked = chosen === i ? "checked" : "";
-      const selected = chosen === i ? "selected" : "";
-
-      // MCQ: A/B/C/D | CE: C/E
-      const letter = isCE
-        ? (i === 0 ? "C" : "E")
-        : String.fromCharCode(65 + i);
-
-      // Para CE, se o backend mandar textos genéricos, você pode “forçar” rótulos
-      const text = isCE
-        ? (i === 0 ? "Certo" : "Errado")
-        : this.escape(alt);
-
-      return `
-        <label class="sim-alt ${selected}">
-          <input type="radio" name="alt" value="${i}" ${checked} />
-          <div class="sim-alt-body">
-            <div class="sim-alt-letter">${letter}</div>
-            <div class="sim-alt-text">${text}</div>
+        <div class="sim-card sim-question">
+          <div class="sim-q-head">
+            <div class="sim-q-label" id="sim-q-label"></div>
+            <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
           </div>
-        </label>
-      `;
-    })
-    .join("");
 
-  this.setHTML("sim-alts", html);
+          <div class="sim-enunciado" id="sim-enunciado"></div>
+          <div class="sim-alts" id="sim-alts"></div>
 
-  this.renderProgress();
-  this.renderButtonsState();
-  this.applySelectedAltUI?.();
-},
+          <div class="sim-actions">
+            <button class="btn-secondary" data-action="openConfig">Configurar</button>
+
+            <div class="spacer"></div>
+
+            <button class="btn-secondary" data-action="prevQuestao" id="btn-prev">Anterior</button>
+            <button class="btn-secondary" data-action="nextQuestao" id="btn-next">Próxima</button>
+            <button class="btn-primary" data-action="finishSimulado" id="btn-finish">Finalizar</button>
+          </div>
+        </div>
+
+        <div class="muted small" id="sim-hint"></div>
+      `
+    );
+
+    this.renderHeaderState({ mode: "running" });
+    this.renderProgress();
+    this.renderTimer();
+    this.renderButtonsState();
+    this.updateHintForCurrent();
+  },
+
+  // ✅ MCQ + CE
+  renderQuestion() {
+    const q = this.STATE.questoes[this.STATE.atual];
+    if (!q) return;
+
+    this.setText("sim-q-label", `Questão ${this.STATE.atual + 1} de ${this.STATE.questoes.length}`);
+    this.setText("sim-enunciado", q.enunciado);
+
+    const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
+    const chosen = saved?.escolha ?? null;
+
+    const alts = Array.isArray(q.alternativas) ? q.alternativas : [];
+    const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
+    const isCE = tipo === "ce" || alts.length === 2;
+
+    const labelsCE = ["Certo", "Errado"];
+
+    const html = alts
+      .map((alt, i) => {
+        const checked = chosen === i ? "checked" : "";
+
+        // MCQ: A/B/C/D | CE: C/E
+        const letter = isCE ? (i === 0 ? "C" : "E") : String.fromCharCode(65 + i);
+
+        // CE: preferimos texto fixo para consistência visual
+        const text = isCE ? labelsCE[i] : this.escape(alt);
+
+        return `
+          <label class="sim-alt">
+            <input type="radio" name="alt" value="${i}" ${checked} />
+            <div class="sim-alt-body">
+              <div class="sim-alt-letter">${letter}</div>
+              <div class="sim-alt-text">${text}</div>
+            </div>
+          </label>
+        `;
+      })
+      .join("");
+
+    this.setHTML("sim-alts", html);
+
+    this.renderProgress();
+    this.renderButtonsState();
+    this.updateHintForCurrent();
+  },
 
   renderButtonsState() {
     const total = this.STATE.questoes.length;
@@ -622,9 +636,7 @@ renderRunning() {
     const btnFinish = document.getElementById("btn-finish");
 
     if (btnPrev) btnPrev.disabled = idx <= 0;
-
     if (btnNext) btnNext.disabled = !answered || idx >= total - 1;
-
     if (btnFinish) btnFinish.disabled = this.STATE.respostas.length === 0;
   },
 
@@ -632,12 +644,11 @@ renderRunning() {
     const total = this.STATE.questoes.length || 1;
     const answered = this.STATE.respostas.length;
     const pct = Math.round((answered / total) * 100);
-  
+
     this.setText("sim-progress-text", `Respondidas: ${answered} / ${total}`);
     const fill = document.getElementById("sim-progress-bar");
     if (fill) fill.style.width = `${pct}%`;
   },
-
 
   renderTimer() {
     if (!this.STATE.timer.enabled) return;
@@ -684,6 +695,7 @@ renderRunning() {
     this.renderReview(result);
   },
 
+  // ✅ revisão compatível com CE (C/E) e MCQ (A-D)
   renderReview(result) {
     const list = document.getElementById("sim-review-list");
     if (!list) return;
@@ -692,8 +704,20 @@ renderRunning() {
       const ok = r.correta;
       const sua = r.escolha;
       const correta = r.corretaIndex;
-      const letter = (n) => String.fromCharCode(65 + n);
+      const tipo = r.tipo || ((r.alternativas?.length || 0) === 2 ? "ce" : "mcq");
+      const isCE = tipo === "ce" || (r.alternativas?.length || 0) === 2;
       const explicacao = (r.explicacao || "").trim();
+
+      const letter = (n) => {
+        if (isCE) return n === 0 ? "C" : "E";
+        return String.fromCharCode(65 + n);
+      };
+
+      const labelText = (n) => {
+        if (n == null) return "—";
+        if (isCE) return n === 0 ? "Certo" : "Errado";
+        return this.escape(r.alternativas?.[n] ?? "");
+      };
 
       return `
         <div class="sim-review-item ${ok ? "ok" : "bad"}">
@@ -705,8 +729,8 @@ renderRunning() {
           <div class="sim-review-enun">${this.escape(r.enunciado)}</div>
 
           <div class="sim-review-ans">
-            <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${this.escape(r.alternativas[sua])}` : "—"}</div>
-            <div><b>Correta:</b> ${letter(correta)}. ${this.escape(r.alternativas[correta])}</div>
+            <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${labelText(sua)}` : "—"}</div>
+            <div><b>Correta:</b> ${letter(correta)}. ${labelText(correta)}</div>
           </div>
 
           ${explicacao ? `<div class="sim-review-exp"><b>Explicação:</b> ${this.escape(explicacao)}</div>` : ""}
@@ -738,6 +762,35 @@ renderRunning() {
   },
 
   // -----------------------------
+  // HINT (sugestão: UX melhor)
+  // -----------------------------
+  setHint(text) {
+    const el = document.getElementById("sim-hint");
+    if (!el) return;
+    el.textContent = text || "";
+  },
+
+  updateHintForCurrent() {
+    if (!this.STATE.running) return;
+
+    const idx = this.STATE.atual;
+    const total = this.STATE.questoes.length;
+    const answered = this.STATE.respostas.some((r) => r.idx === idx);
+
+    if (!answered) {
+      this.setHint("Selecione uma alternativa para liberar a próxima questão.");
+      return;
+    }
+
+    if (idx < total - 1) {
+      this.setHint("Boa! Você já pode seguir para a próxima questão.");
+      return;
+    }
+
+    this.setHint("Última questão. Quando quiser, clique em Finalizar.");
+  },
+
+  // -----------------------------
   // API
   // -----------------------------
   async fetchQuestoesAPI(config) {
@@ -746,6 +799,7 @@ renderRunning() {
       qtd: config.qtd,
       dificuldade: config.dificuldade,
       tema: config.tema || ""
+      // OBS: CE/DISC ficam no backend; se quiser controlar do front, você adiciona aqui.
     };
 
     const res = await fetch("/api/gerarSimulado", {
@@ -767,22 +821,23 @@ renderRunning() {
       .map((q) => {
         const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
         const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
-    
-        // CE: 2 alternativas (Certo/Errado); MCQ: 4 alternativas
+
+        // CE: 2 alternativas (C/E); MCQ: 4 alternativas
         const isCE = tipo === "ce" || alts.length === 2;
         const maxIdx = isCE ? 1 : 3;
-    
+
+        const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
+
         return {
-          tipo,
+          tipo: isCE ? "ce" : "mcq",
           enunciado: String(q.enunciado).trim(),
-          alternativas: isCE ? alts.slice(0, 2) : alts.slice(0, 4),
+          alternativas,
           corretaIndex: Number.isInteger(q.corretaIndex)
             ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
             : 0,
           explicacao: q.explicacao ? String(q.explicacao).trim() : ""
         };
       });
-
   },
 
   // -----------------------------
@@ -795,6 +850,7 @@ renderRunning() {
 
     const base = [
       {
+        tipo: "mcq",
         enunciado: `(${banca}) Em ${tema}, qual alternativa descreve melhor o objetivo de uma revisão periódica?`,
         alternativas: [
           "Aumentar complexidade sem necessidade",
@@ -806,6 +862,7 @@ renderRunning() {
         explicacao: "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
       },
       {
+        tipo: "mcq",
         enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
         alternativas: [
           "Ignorar teoria",
@@ -815,6 +872,13 @@ renderRunning() {
         ],
         corretaIndex: 1,
         explicacao: "Simulados ajudam a consolidar conteúdo e ajustar estratégia de prova."
+      },
+      {
+        tipo: "ce",
+        enunciado: `(${banca}) (C/E) Em ${tema}, é correto afirmar que revisar erros anteriores aumenta retenção e reduz reincidência.`,
+        alternativas: ["Certo", "Errado"],
+        corretaIndex: 0,
+        explicacao: "Revisar erros gera feedback e reforço de pontos fracos, reduzindo repetição do erro."
       }
     ];
 
@@ -822,6 +886,7 @@ renderRunning() {
     for (let i = 0; i < qtd; i++) {
       const item = base[i % base.length];
       out.push({
+        tipo: item.tipo || (item.alternativas.length === 2 ? "ce" : "mcq"),
         enunciado: item.enunciado,
         alternativas: [...item.alternativas],
         corretaIndex: item.corretaIndex,
@@ -844,6 +909,7 @@ renderRunning() {
 
       detalhes.push({
         idx: i,
+        tipo: q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq"),
         enunciado: q.enunciado,
         alternativas: q.alternativas,
         corretaIndex: q.corretaIndex,
@@ -978,3 +1044,5 @@ renderRunning() {
     console.log("🔔", msg);
   }
 };
+
+
