@@ -520,7 +520,7 @@ export default async function handler(req, res) {
 
     // Se ainda não tiver N total para questoes (MCQ+CE), tenta salvar com fallback mínimo
     const questoesMix = interleave(saneMCQ, saneCE);
-    const questoesFinal = questoesMix.slice(0, mix.mcq + mix.ce);
+    const questoesFinal = questoesMix.slice(0, mix.objetivas);
 
     if (!questoesFinal.length) {
       return res.status(200).json({
@@ -537,16 +537,17 @@ export default async function handler(req, res) {
       // ✅ extras úteis (debug / UI futura)
       ce: saneCE,
       discursivas: saneDisc,
-      meta: {
-        banca: BANCA,
-        perfilBanca: profile.id,
-        dificuldade: DIFIC,
-        tema: TEMA,
-        qtdTotal: mix.total,
-        qtdMCQ: mix.mcq,
-        qtdCE: mix.ce,
-        qtdDiscursivas: mix.disc
-      }
+   meta: {
+          banca: BANCA,
+          perfilBanca: profile.id,
+          dificuldade: DIFIC,
+          tema: TEMA,
+          qtd: mix.objetivas,          // ✅ o que aparece no simulado (MCQ+CE)
+          qtdMCQ: mix.mcq,
+          qtdCE: mix.ce,
+          qtdDiscursivas: mix.disc     // ✅ extras (fora de qtd)
+        }
+
     });
   } catch (err) {
     console.error("❌ gerarSimulado error:", err);
