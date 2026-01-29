@@ -73,59 +73,77 @@ export const simulados = {
   // -----------------------------
   // UI BINDINGS
   // -----------------------------
-  bindUI() {
-    const root = document.getElementById("screen-simulados");
-    if (!root) {
-      console.warn("⚠️ screen-simulados não encontrado no DOM.");
-      return;
+ bindUI() {
+  const root = document.getElementById("screen-simulados");
+  if (!root) {
+    console.warn("⚠️ screen-simulados não encontrado no DOM.");
+    return;
+  }
+
+  // -----------------------------
+  // CLICKs (botões / ações)
+  // -----------------------------
+  root.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-action]");
+    if (!btn) return;
+
+    const action = btn.getAttribute("data-action");
+    if (!action) return;
+
+    switch (action) {
+      case "openConfig":      return this.openConfig();
+      case "closeConfig":     return this.closeConfig();
+      case "saveConfig":      return this.saveConfig();
+
+      case "startSimulado":   return this.start();
+      case "resumeSimulado":  return this.resumeSimulado();
+      case "discardRun":      return this.discardRun();
+
+      case "cancelSimulado":  return this.cancel();
+
+      case "prevQuestao":     return this.prev();
+      case "nextQuestao":     return this.next();
+
+      case "finishSimulado":  return this.finish();
+      case "restartSimulado": return this.restart();
+      case "reviewToggle":    return this.toggleReview();
+
+      default:
+        return;
     }
+  });
 
-    root.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("[data-action]");
-      if (!btn) return;
+  // -----------------------------
+  // MCQ / CE (radio)
+  // -----------------------------
+  root.addEventListener("change", (ev) => {
+    const inp = ev.target;
+    if (!inp?.matches?.("input[name='alt']")) return;
+    const val = Number(inp.value);
+    this.pickAlternative(val);
+  });
 
-      const action = btn.getAttribute("data-action");
-      if (!action) return;
+  // -----------------------------
+  // ✅ DISC (textarea)
+  // -----------------------------
+  root.addEventListener("input", (ev) => {
+    const ta = ev.target;
+    if (!ta?.matches?.("#sim-disc-answer")) return;
+    this.saveDiscAnswer(ta.value);
+  });
 
-      switch (action) {
-        case "openConfig":      return this.openConfig();
-        case "closeConfig":     return this.closeConfig();
-        case "saveConfig":      return this.saveConfig();
+  // -----------------------------
+  // Eventos canônicos
+  // -----------------------------
+  window.addEventListener("liora:open-simulados", () => {
+    this.showScreen();
+  });
 
-        case "startSimulado":   return this.start();
-        case "resumeSimulado":  return this.resumeSimulado();
-        case "discardRun":      return this.discardRun();
-
-        case "cancelSimulado":  return this.cancel();
-
-        case "prevQuestao":     return this.prev();
-        case "nextQuestao":     return this.next();
-
-        case "finishSimulado":  return this.finish();
-        case "restartSimulado": return this.restart();
-        case "reviewToggle":    return this.toggleReview();
-
-        default:
-          return;
-      }
-    });
-
-    root.addEventListener("change", (ev) => {
-      const inp = ev.target;
-      if (!inp?.matches?.("input[name='alt']")) return;
-      const val = Number(inp.value);
-      this.pickAlternative(val);
-    });
-
-    window.addEventListener("liora:open-simulados", () => {
-      this.showScreen();
-    });
-
-    window.addEventListener("liora:start-simulado", () => {
-      this.showScreen();
-      this.start();
-    });
-  },
+  window.addEventListener("liora:start-simulado", () => {
+    this.showScreen();
+    this.start();
+  });
+},
 
   // -----------------------------
   // SCREEN CONTROL
