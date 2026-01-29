@@ -1,6 +1,6 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.5-PRODUCT (MCQ + CE + UI polish + QA hooks)
+// Versão: v2.5-PRODUCT (MCQ + CE + DISC + UI polish + QA hooks)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração (robusto por JS)
@@ -9,13 +9,16 @@
 // ✔ Botões no padrão do app (btn-primary / btn-secondary / btn-link)
 // ✔ Timer + progresso + resultado + revisão com explicação
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
-// ✔ Suporta MCQ (4 alts) + CE (Certo/Errado, 2 alts)
+// ✔ Suporta MCQ (4 alts) + CE (Certo/Errado, 2 alts) + DISC (textarea)
 // ✔ Salvamento em localStorage
 //
 // 🔧 3 sugestões aplicadas (das últimas):
 // 1) CE suportado no front (render + revisão + validação de corretaIndex)
 // 2) "Próxima" com gating + hint que muda automaticamente
-// 3) QA no console: window.lioraSimDebug() + logs leves em dev
+// 3) QA no console: window.lioraSimDebug() + logs leves
+//
+// ✅ Opção A aplicada: mescla discursivas (data.discursivas) dentro de questoes
+//    para o simulado ter qtdTotal “de verdade” na UI.
 // =============================================================
 
 export const simulados = {
@@ -33,7 +36,7 @@ export const simulados = {
     },
     questoes: [],
     atual: 0,
-    respostas: [], // { idx, escolha, correta, enunciado, alternativas[], corretaIndex, explicacao?, tipo? }
+    respostas: [], // { idx, tipo, escolha?, texto?, correta?, enunciado, alternativas?, corretaIndex?, explicacao?, respostaModelo?, criterios? }
     timer: {
       enabled: true,
       totalSec: 0,
@@ -50,20 +53,25 @@ export const simulados = {
     this.bindUI();
     this.restoreIfAny();
 
-    // ✅ hook de QA no console (não quebra nada em produção)
+    // ✅ hook de QA no console
     window.lioraSimDebug = () => {
       const s = this.STATE;
       console.log("🧪 LIORA Simulados Debug");
-      console.log("running:", s.running, "idx:", s.atual, "/", s.questoes.length - 1);
+      console.log("running:", s.running, "idx:", s.atual, "/", Math.max(0, s.questoes.length - 1));
       console.log("config:", s.config);
       console.log("timer:", s.timer);
-      console.log("questoes:", (s.questoes || []).map((q, i) => ({
-        i,
-        tipo: q.tipo,
-        alts: q.alternativas?.length,
-        corretaIndex: q.corretaIndex
-      })));
+      console.log(
+        "questoes:",
+        (s.questoes || []).map((q, i) => ({
+          i,
+          tipo: q.tipo,
+          alts: q.alternativas?.length,
+          corretaIndex: q.corretaIndex,
+          hasModelo: !!q.respostaModelo
+        }))
+      );
       console.log("respostas:", s.respostas);
+      console.log("answered:", s.respostas.length);
       return JSON.parse(JSON.stringify(s));
     };
 
@@ -73,77 +81,69 @@ export const simulados = {
   // -----------------------------
   // UI BINDINGS
   // -----------------------------
- bindUI() {
-  const root = document.getElementById("screen-simulados");
-  if (!root) {
-    console.warn("⚠️ screen-simulados não encontrado no DOM.");
-    return;
-  }
-
-  // -----------------------------
-  // CLICKs (botões / ações)
-  // -----------------------------
-  root.addEventListener("click", (ev) => {
-    const btn = ev.target.closest("[data-action]");
-    if (!btn) return;
-
-    const action = btn.getAttribute("data-action");
-    if (!action) return;
-
-    switch (action) {
-      case "openConfig":      return this.openConfig();
-      case "closeConfig":     return this.closeConfig();
-      case "saveConfig":      return this.saveConfig();
-
-      case "startSimulado":   return this.start();
-      case "resumeSimulado":  return this.resumeSimulado();
-      case "discardRun":      return this.discardRun();
-
-      case "cancelSimulado":  return this.cancel();
-
-      case "prevQuestao":     return this.prev();
-      case "nextQuestao":     return this.next();
-
-      case "finishSimulado":  return this.finish();
-      case "restartSimulado": return this.restart();
-      case "reviewToggle":    return this.toggleReview();
-
-      default:
-        return;
+  bindUI() {
+    const root = document.getElementById("screen-simulados");
+    if (!root) {
+      console.warn("⚠️ screen-simulados não encontrado no DOM.");
+      return;
     }
-  });
 
-  // -----------------------------
-  // MCQ / CE (radio)
-  // -----------------------------
-  root.addEventListener("change", (ev) => {
-    const inp = ev.target;
-    if (!inp?.matches?.("input[name='alt']")) return;
-    const val = Number(inp.value);
-    this.pickAlternative(val);
-  });
+    // CLICKs (botões / ações)
+    root.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-action]");
+      if (!btn) return;
 
-  // -----------------------------
-  // ✅ DISC (textarea)
-  // -----------------------------
-  root.addEventListener("input", (ev) => {
-    const ta = ev.target;
-    if (!ta?.matches?.("#sim-disc-answer")) return;
-    this.saveDiscAnswer(ta.value);
-  });
+      const action = btn.getAttribute("data-action");
+      if (!action) return;
 
-  // -----------------------------
-  // Eventos canônicos
-  // -----------------------------
-  window.addEventListener("liora:open-simulados", () => {
-    this.showScreen();
-  });
+      switch (action) {
+        case "openConfig":      return this.openConfig();
+        case "closeConfig":     return this.closeConfig();
+        case "saveConfig":      return this.saveConfig();
 
-  window.addEventListener("liora:start-simulado", () => {
-    this.showScreen();
-    this.start();
-  });
-},
+        case "startSimulado":   return this.start();
+        case "resumeSimulado":  return this.resumeSimulado();
+        case "discardRun":      return this.discardRun();
+
+        case "cancelSimulado":  return this.cancel();
+
+        case "prevQuestao":     return this.prev();
+        case "nextQuestao":     return this.next();
+
+        case "finishSimulado":  return this.finish();
+        case "restartSimulado": return this.restart();
+        case "reviewToggle":    return this.toggleReview();
+
+        default:
+          return;
+      }
+    });
+
+    // MCQ / CE (radio)
+    root.addEventListener("change", (ev) => {
+      const inp = ev.target;
+      if (!inp?.matches?.("input[name='alt']")) return;
+      const val = Number(inp.value);
+      this.pickAlternative(val);
+    });
+
+    // ✅ DISC (textarea)
+    root.addEventListener("input", (ev) => {
+      const ta = ev.target;
+      if (!ta?.matches?.("#sim-disc-answer")) return;
+      this.saveDiscAnswer(ta.value);
+    });
+
+    // Eventos canônicos
+    window.addEventListener("liora:open-simulados", () => {
+      this.showScreen();
+    });
+
+    window.addEventListener("liora:start-simulado", () => {
+      this.showScreen();
+      this.start();
+    });
+  },
 
   // -----------------------------
   // SCREEN CONTROL
@@ -154,7 +154,7 @@ export const simulados = {
   },
 
   // -----------------------------
-  // MODAL CONFIG (robusto mesmo sem CSS)
+  // MODAL CONFIG (robusto por JS)
   // -----------------------------
   openConfig() {
     const modal = document.getElementById("sim-config");
@@ -181,7 +181,7 @@ export const simulados = {
     modal.style.inset = "0";
     modal.style.zIndex = "9999";
 
-    // garante backdrop fechar
+    // backdrop fecha
     const backdrop = modal.querySelector(".modal-backdrop");
     if (backdrop && !backdrop.__lioraBound) {
       backdrop.__lioraBound = true;
@@ -237,7 +237,6 @@ export const simulados = {
   async start() {
     if (this.STATE.running) return;
 
-    // fecha modal se estiver aberto (evita "configuração junto")
     this.closeConfig();
 
     window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...this.STATE.config } }));
@@ -279,13 +278,10 @@ export const simulados = {
   },
 
   resumeSimulado() {
-    // fecha modal se estiver aberto
     this.closeConfig();
 
-    // prioridade: _savedRun (do restoreIfAny)
     let run = this.STATE._savedRun;
 
-    // fallback: storage direto
     if (!run) {
       try {
         run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
@@ -302,7 +298,6 @@ export const simulados = {
       return;
     }
 
-    // carrega estado salvo
     this.STATE.running = true;
     this.STATE.config = run.config || this.STATE.config;
     this.STATE.questoes = run.questoes || [];
@@ -318,12 +313,8 @@ export const simulados = {
     this.renderRunning();
     this.renderQuestion();
 
-    // volta o timer
-    if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) {
-      this.startTimer();
-    } else {
-      this.stopTimer();
-    }
+    if (this.STATE.timer.enabled && this.STATE.timer.leftSec > 0) this.startTimer();
+    else this.stopTimer();
 
     this.renderButtonsState();
   },
@@ -333,7 +324,6 @@ export const simulados = {
     this.clearRun();
     this.STATE._savedRun = null;
 
-    // reseta runtime (mantém config)
     this.STATE.running = false;
     this.STATE.questoes = [];
     this.STATE.atual = 0;
@@ -346,18 +336,24 @@ export const simulados = {
     this.toast("Simulado descartado.");
   },
 
+  // -----------------------------
+  // ANSWERS (MCQ/CE + DISC)
+  // -----------------------------
   pickAlternative(index) {
     if (!this.STATE.running) return;
 
     const q = this.STATE.questoes[this.STATE.atual];
     if (!q) return;
 
+    const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
+    if (tipo === "disc") return;
+
     const correta = index === q.corretaIndex;
 
     const existing = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
     const payload = {
       idx: this.STATE.atual,
-      tipo: q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq"),
+      tipo,
       escolha: index,
       correta,
       enunciado: q.enunciado,
@@ -372,9 +368,54 @@ export const simulados = {
     this.persistRun();
     this.renderProgress();
     this.renderButtonsState();
-
-    // atualiza hint após responder
     this.updateHintForCurrent();
+  },
+
+  saveDiscAnswer(texto) {
+    if (!this.STATE.running) return;
+
+    const q = this.STATE.questoes[this.STATE.atual];
+    if (!q) return;
+
+    const tipo = q.tipo || "disc";
+    if (tipo !== "disc") return;
+
+    const t = String(texto || "");
+    const existing = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
+
+    const payload = {
+      idx: this.STATE.atual,
+      tipo: "disc",
+      texto: t,
+      enunciado: q.enunciado,
+      respostaModelo: q.respostaModelo || "",
+      criterios: Array.isArray(q.criterios) ? q.criterios : []
+    };
+
+    if (existing) Object.assign(existing, payload);
+    else this.STATE.respostas.push(payload);
+
+    this.persistRun();
+    this.renderProgress();
+    this.renderButtonsState();
+    this.updateHintForCurrent();
+  },
+
+  isAnsweredIdx(idx) {
+    const q = this.STATE.questoes[idx];
+    if (!q) return false;
+
+    const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
+    const r = this.STATE.respostas.find((x) => x.idx === idx);
+
+    if (!r) return false;
+
+    if (tipo === "disc") {
+      const t = String(r.texto || "").trim();
+      return t.length >= 3;
+    }
+
+    return typeof r.escolha === "number";
   },
 
   prev() {
@@ -393,10 +434,9 @@ export const simulados = {
     const total = this.STATE.questoes.length;
     const idx = this.STATE.atual;
 
-    const answered = this.STATE.respostas.some((r) => r.idx === idx);
+    const answered = this.isAnsweredIdx(idx);
     if (!answered) {
-      // ✅ sugestão: hint contextual no próprio layout
-      this.setHint("Selecione uma alternativa para liberar a próxima questão.");
+      this.setHint("Responda a questão para liberar a próxima.");
       this.renderButtonsState();
       return;
     }
@@ -425,7 +465,6 @@ export const simulados = {
   },
 
   cancel() {
-    // cancelar fecha modal também
     this.closeConfig();
 
     if (!this.STATE.running) {
@@ -597,7 +636,7 @@ export const simulados = {
     this.updateHintForCurrent();
   },
 
-  // ✅ MCQ + CE
+  // ✅ MCQ + CE + DISC
   renderQuestion() {
     const q = this.STATE.questoes[this.STATE.atual];
     if (!q) return;
@@ -606,10 +645,48 @@ export const simulados = {
     this.setText("sim-enunciado", q.enunciado);
 
     const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
-    const chosen = saved?.escolha ?? null;
 
+    const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
+
+    // DISC
+    if (tipo === "disc") {
+      const texto = String(saved?.texto || "");
+      const criterios = Array.isArray(q.criterios) ? q.criterios : [];
+      const criteriosHtml = criterios.length
+        ? `<div class="muted small" style="margin-top:10px;">
+             <b>Critérios (o que avaliar):</b>
+             <ul style="margin:6px 0 0 18px;">
+               ${criterios.slice(0, 8).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+             </ul>
+           </div>`
+        : "";
+
+      this.setHTML(
+        "sim-alts",
+        `
+        <div class="card" style="padding:12px;">
+          <div class="muted small" style="margin-bottom:8px;">Resposta discursiva</div>
+          <textarea
+            id="sim-disc-answer"
+            class="input"
+            rows="7"
+            placeholder="Digite sua resposta (rascunho)."
+            style="width:100%; resize:vertical;"
+          >${this.escape(texto)}</textarea>
+          ${criteriosHtml}
+        </div>
+        `
+      );
+
+      this.renderProgress();
+      this.renderButtonsState();
+      this.updateHintForCurrent();
+      return;
+    }
+
+    // MCQ/CE
+    const chosen = saved?.escolha ?? null;
     const alts = Array.isArray(q.alternativas) ? q.alternativas : [];
-    const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
     const isCE = tipo === "ce" || alts.length === 2;
 
     const labelsCE = ["Certo", "Errado"];
@@ -621,7 +698,7 @@ export const simulados = {
         // MCQ: A/B/C/D | CE: C/E
         const letter = isCE ? (i === 0 ? "C" : "E") : String.fromCharCode(65 + i);
 
-        // CE: preferimos texto fixo para consistência visual
+        // CE: texto fixo para consistência
         const text = isCE ? labelsCE[i] : this.escape(alt);
 
         return `
@@ -647,7 +724,7 @@ export const simulados = {
     const total = this.STATE.questoes.length;
     const idx = this.STATE.atual;
 
-    const answered = this.STATE.respostas.some((r) => r.idx === idx);
+    const answered = this.isAnsweredIdx(idx);
 
     const btnPrev = document.getElementById("btn-prev");
     const btnNext = document.getElementById("btn-next");
@@ -674,7 +751,7 @@ export const simulados = {
   },
 
   renderResult(result) {
-    const { total, acertos, erros, pct } = result;
+    const { totalScored, acertos, erros, pct, total, discursivasCount } = result;
 
     this.setHTML(
       "sim-body",
@@ -684,10 +761,15 @@ export const simulados = {
 
         <div class="sim-score">
           <div class="score-main">${pct}%</div>
-          <div class="muted">Acertos: <b>${acertos}</b> de <b>${total}</b></div>
+          <div class="muted">
+            Acertos: <b>${acertos}</b> de <b>${totalScored}</b>
+            ${discursivasCount ? ` · Discursivas: <b>${discursivasCount}</b>` : ""}
+          </div>
         </div>
 
         <div class="sim-meta">
+          <div><span class="chip">Total</span> ${total}</div>
+          <div><span class="chip">Objetivas</span> ${totalScored}</div>
           <div><span class="chip">Acertos</span> ${acertos}</div>
           <div><span class="chip">Erros</span> ${erros}</div>
           <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
@@ -703,7 +785,7 @@ export const simulados = {
 
       <div class="card hidden" id="sim-review">
         <div class="card-title">Revisão</div>
-        <div class="muted small">Respostas e alternativa correta.</div>
+        <div class="muted small">Respostas, correta e feedback. Discursivas aparecem com modelo/critério.</div>
         <div class="sim-review-list" id="sim-review-list"></div>
       </div>
     `
@@ -713,16 +795,57 @@ export const simulados = {
     this.renderReview(result);
   },
 
-  // ✅ revisão compatível com CE (C/E) e MCQ (A-D)
+  // ✅ revisão compatível com CE/MCQ/DISC
   renderReview(result) {
     const list = document.getElementById("sim-review-list");
     if (!list) return;
 
     const rows = result.detalhes.map((r, i) => {
-      const ok = r.correta;
+      const tipo = r.tipo || ((r.alternativas?.length || 0) === 2 ? "ce" : "mcq");
+
+      // DISC
+      if (tipo === "disc") {
+        const texto = String(r.texto || "").trim();
+        const modelo = String(r.respostaModelo || "").trim();
+        const criterios = Array.isArray(r.criterios) ? r.criterios : [];
+
+        return `
+          <div class="sim-review-item">
+            <div class="sim-review-head">
+              <div class="sim-review-q">Q${i + 1}</div>
+              <div class="sim-review-badge">Discursiva</div>
+            </div>
+
+            <div class="sim-review-enun">${this.escape(r.enunciado)}</div>
+
+            <div class="sim-review-ans">
+              <div><b>Sua resposta:</b></div>
+              <div class="muted" style="white-space:pre-wrap;">${texto ? this.escape(texto) : "—"}</div>
+            </div>
+
+            ${modelo ? `
+              <div class="sim-review-exp" style="margin-top:10px;">
+                <b>Resposta modelo:</b>
+                <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
+              </div>
+            ` : ""}
+
+            ${criterios.length ? `
+              <div class="sim-review-exp" style="margin-top:10px;">
+                <b>Critérios:</b>
+                <ul style="margin:6px 0 0 18px;">
+                  ${criterios.slice(0, 10).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+                </ul>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }
+
+      // MCQ/CE
+      const ok = !!r.correta;
       const sua = r.escolha;
       const correta = r.corretaIndex;
-      const tipo = r.tipo || ((r.alternativas?.length || 0) === 2 ? "ce" : "mcq");
       const isCE = tipo === "ce" || (r.alternativas?.length || 0) === 2;
       const explicacao = (r.explicacao || "").trim();
 
@@ -769,18 +892,13 @@ export const simulados = {
     const badge = document.getElementById("sim-mode");
     if (!badge) return;
 
-    const map = {
-      idle: "Pronto",
-      running: "Em andamento",
-      result: "Concluído"
-    };
-
+    const map = { idle: "Pronto", running: "Em andamento", result: "Concluído" };
     badge.textContent = map[mode] || "Pronto";
     badge.setAttribute("data-mode", mode || "idle");
   },
 
   // -----------------------------
-  // HINT (sugestão: UX melhor)
+  // HINT
   // -----------------------------
   setHint(text) {
     const el = document.getElementById("sim-hint");
@@ -793,10 +911,13 @@ export const simulados = {
 
     const idx = this.STATE.atual;
     const total = this.STATE.questoes.length;
-    const answered = this.STATE.respostas.some((r) => r.idx === idx);
+
+    const answered = this.isAnsweredIdx(idx);
+    const q = this.STATE.questoes[idx];
+    const tipo = q?.tipo || ((q?.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
     if (!answered) {
-      this.setHint("Selecione uma alternativa para liberar a próxima questão.");
+      this.setHint(tipo === "disc" ? "Digite sua resposta para liberar a próxima questão." : "Selecione uma alternativa para liberar a próxima questão.");
       return;
     }
 
@@ -812,17 +933,18 @@ export const simulados = {
   // API
   // -----------------------------
   async fetchQuestoesAPI(config) {
-  const payload = {
-  banca: config.banca,
-  qtd: config.qtd,
-  dificuldade: config.dificuldade,
-  tema: config.tema || "",
+    const payload = {
+      banca: config.banca,
+      qtd: config.qtd,
+      dificuldade: config.dificuldade,
+      tema: config.tema || "",
 
-  // ✅ mix para sensação de banca
-  // Regra simples: ~35% C/E e 1 discursiva quando qtd >= 8
-  qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
-  qtdDiscursivas: config.qtd >= 8 ? 1 : 0
-};
+      // ✅ mix para sensação de banca
+      // Regra simples: ~35% C/E e 1 discursiva quando qtd >= 8
+      qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
+      qtdDiscursivas: config.qtd >= 8 ? 1 : 0
+    };
+
     const res = await fetch("/api/gerarSimulado", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -835,15 +957,13 @@ export const simulados = {
     }
 
     const data = await res.json();
-    const questoes = data?.questoes || [];
 
-    return questoes
+    const base = (data?.questoes || [])
       .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
       .map((q) => {
         const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
         const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
 
-        // CE: 2 alternativas (C/E); MCQ: 4 alternativas
         const isCE = tipo === "ce" || alts.length === 2;
         const maxIdx = isCE ? 1 : 3;
 
@@ -859,6 +979,34 @@ export const simulados = {
           explicacao: q.explicacao ? String(q.explicacao).trim() : ""
         };
       });
+
+    // ✅ Opção A: mesclar discursivas dentro da lista de questoes
+    const disc = Array.isArray(data?.discursivas) ? data.discursivas : [];
+    const discMapped = disc
+      .filter((d) => d && typeof d.enunciado === "string")
+      .map((d) => ({
+        tipo: "disc",
+        enunciado: String(d.enunciado || "").trim(),
+        respostaModelo: String(d.respostaModelo || "").trim(),
+        criterios: Array.isArray(d.criterios) ? d.criterios.map((c) => String(c).trim()).filter(Boolean) : []
+      }));
+
+    const merged = this.mergeDiscIntoQuestions(base, discMapped);
+    return merged;
+  },
+
+  mergeDiscIntoQuestions(base, discList) {
+    const out = Array.isArray(base) ? [...base] : [];
+    const disc = Array.isArray(discList) ? [...discList] : [];
+    if (!disc.length) return out;
+
+    // Insere cada discursiva perto do final (70% do caminho), para “cara de prova”
+    disc.forEach((dq) => {
+      const pos = Math.max(0, Math.min(out.length, Math.floor(out.length * 0.7)));
+      out.splice(pos, 0, dq);
+    });
+
+    return out;
   },
 
   // -----------------------------
@@ -900,6 +1048,12 @@ export const simulados = {
         alternativas: ["Certo", "Errado"],
         corretaIndex: 0,
         explicacao: "Revisar erros gera feedback e reforço de pontos fracos, reduzindo repetição do erro."
+      },
+      {
+        tipo: "disc",
+        enunciado: `(${banca}) (Discursiva) Em ${tema}, explique como você aplicaria os princípios-chave para reduzir risco e aumentar conformidade.`,
+        respostaModelo: "A resposta deve cobrir princípios, aplicação prática e justificativa. Deve mencionar medidas técnicas e organizacionais.",
+        criterios: ["Correção conceitual", "Aplicação prática", "Clareza e objetividade", "Exemplos pertinentes"]
       }
     ];
 
@@ -907,13 +1061,21 @@ export const simulados = {
     for (let i = 0; i < qtd; i++) {
       const item = base[i % base.length];
       out.push({
-        tipo: item.tipo || (item.alternativas.length === 2 ? "ce" : "mcq"),
+        tipo: item.tipo || (item.alternativas?.length === 2 ? "ce" : "mcq"),
         enunciado: item.enunciado,
-        alternativas: [...item.alternativas],
-        corretaIndex: item.corretaIndex,
-        explicacao: item.explicacao || ""
+        alternativas: item.alternativas ? [...item.alternativas] : undefined,
+        corretaIndex: typeof item.corretaIndex === "number" ? item.corretaIndex : undefined,
+        explicacao: item.explicacao || "",
+        respostaModelo: item.respostaModelo || "",
+        criterios: item.criterios ? [...item.criterios] : []
       });
     }
+
+    // Garante ao menos 1 discursiva se qtd >= 8 (para simular o mix)
+    if (qtd >= 8 && !out.some((q) => q.tipo === "disc")) {
+      out.splice(Math.floor(out.length * 0.7), 0, base.find((x) => x.tipo === "disc"));
+    }
+
     return out;
   },
 
@@ -926,11 +1088,24 @@ export const simulados = {
 
     for (let i = 0; i < total; i++) {
       const q = this.STATE.questoes[i];
+      const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
       const r = this.STATE.respostas.find((x) => x.idx === i);
+
+      if (tipo === "disc") {
+        detalhes.push({
+          idx: i,
+          tipo: "disc",
+          enunciado: q.enunciado,
+          texto: String(r?.texto || ""),
+          respostaModelo: q.respostaModelo || r?.respostaModelo || "",
+          criterios: Array.isArray(q.criterios) ? q.criterios : (Array.isArray(r?.criterios) ? r.criterios : [])
+        });
+        continue;
+      }
 
       detalhes.push({
         idx: i,
-        tipo: q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq"),
+        tipo,
         enunciado: q.enunciado,
         alternativas: q.alternativas,
         corretaIndex: q.corretaIndex,
@@ -940,11 +1115,24 @@ export const simulados = {
       });
     }
 
-    const acertos = detalhes.filter((d) => d.correta).length;
-    const erros = total - acertos;
-    const pct = total ? Math.round((acertos / total) * 100) : 0;
+    const scored = detalhes.filter((d) => d.tipo !== "disc");
+    const totalScored = scored.length;
+    const acertos = scored.filter((d) => d.correta).length;
+    const erros = totalScored - acertos;
+    const pct = totalScored ? Math.round((acertos / totalScored) * 100) : 0;
 
-    return { total, acertos, erros, pct, detalhes, config: { ...this.STATE.config } };
+    const discursivasCount = detalhes.filter((d) => d.tipo === "disc").length;
+
+    return {
+      total,
+      totalScored,
+      discursivasCount,
+      acertos,
+      erros,
+      pct,
+      detalhes,
+      config: { ...this.STATE.config }
+    };
   },
 
   // -----------------------------
@@ -992,7 +1180,7 @@ export const simulados = {
       if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
     } catch {}
 
-    // ✅ run salvo (NÃO auto-inicia)
+    // run salvo (não auto-inicia)
     try {
       const run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
       if (run?.questoes?.length) {
@@ -1066,4 +1254,8 @@ export const simulados = {
   }
 };
 
-
+/*
+✅ Fora do simulados.js: nada obrigatório.
+Opcional (se quiser mais bonito): criar estilos para textarea/input dentro de .sim-card,
+mas o inline style já deixa usável no MVP.
+*/
