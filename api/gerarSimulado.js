@@ -1,8 +1,11 @@
 // /api/gerarSimulado.js
 // ==========================================================
-// LIORA — API GERAR SIMULADO (sem SDK)
-// - Mistura MCQ + C/E e (opcional) Discursivas
+// LIORA — API GERAR SIMULADO (SEM SDK openai)
+// - OpenAI via fetch direto
 // - Retorna SEMPRE JSON
+// - MCQ: tipo="mcq" | alternativas(4) | corretaIndex 0..3 | explicacao
+// - CE : tipo="ce"  | alternativas(2) | corretaIndex 0..1 | explicacao
+// - DISC: tipo="disc" | sem alternativas | respostaModelo | criterios[]
 // ==========================================================
 
 function clamp(n, min, max) {
@@ -38,7 +41,7 @@ function bancaProfile(bancaRaw) {
       id: "CEBRASPE",
       nome: "CESPE/CEBRASPE",
       estilo:
-        "Estilo C/E com assertivas. Linguagem técnica, precisão conceitual, exceções e termos condicionais. Evite floreio. Para MCQ, alternativas muito plausíveis e próximas."
+        "Enunciados com assertivas e foco em precisão conceitual. Pegadinhas semânticas e exceções. Linguagem técnica e direta. Distratores plausíveis e muito próximos."
     };
   }
   if (b.includes("FCC")) {
@@ -46,7 +49,7 @@ function bancaProfile(bancaRaw) {
       id: "FCC",
       nome: "FCC",
       estilo:
-        "Enunciado descritivo moderado, cobra definição + aplicação. Distratores com termos parecidos. Linguagem formal."
+        "Enunciado mais descritivo, cobra definição + aplicação. Distratores com termos parecidos. Linguagem formal."
     };
   }
   if (b.includes("VUNESP")) {
@@ -82,14 +85,29 @@ function bancaProfile(bancaRaw) {
   };
 }
 
-function safeStr(x) {
-  return String(x ?? "").trim();
+// mistura MCQ e CE alternando para dar sensação de prova
+function interleave(mcq, ce) {
+  const out = [];
+  let i = 0, j = 0;
+  while (i < mcq.length || j < ce.length) {
+    if (i < mcq.length) out.push(mcq[i++]);
+    if (j < ce.length) out.push(ce[j++]);
+  }
+  return out;
 }
 
-function normalizeAlts(arr) {
-  return (Array.isArray(arr) ? arr : [])
-    .map((a) => safeStr(a))
-    .filter(Boolean);
+// coloca discursivas em posições “humanas” (no meio/final)
+function insertDisc(questoes, disc) {
+  if (!disc.length) return questoes;
+
+  const out = [...questoes];
+  for (let k = 0; k < disc.length; k++) {
+    // posição: 70% pra frente (pra parecer prova real)
+    const base = Math.floor(out.length * 0.7);
+    const pos = clamp(base + Math.floor(Math.random() * Math.max(1, out.length - base + 1)), 0, out.length);
+    out.splice(pos, 0, disc[k]);
+  }
+  return out;
 }
 
 export default async function handler(req, res) {
@@ -98,30 +116,21 @@ export default async function handler(req, res) {
       return res.status(405).json({ ok: false, error: "Use POST" });
     }
 
-    const {
-      banca,
-      qtd,
-      dificuldade,
-      tema,
-      qtdCE,
-      qtdDiscursivas
-    } = req.body || {};
+    const { banca, qtd, dificuldade, tema, qtdCE, qtdDiscursivas } = req.body || {};
 
     const QTD_TOTAL = clamp(qtd ?? 5, 3, 30);
 
-    // CE e Disc vêm do front (agora sim)
-    const QTD_CE_RAW = clamp(qtdCE ?? 0, 0, 20);
-    const QTD_DISC_RAW = clamp(qtdDiscursivas ?? 0, 0, 10);
+    // regra: preserve pelo menos 3 MCQ (para o “core” do simulado)
+    const DISC_RAW = clamp(qtdDiscursivas ?? 0, 0, 10);
+    const CE_RAW = clamp(qtdCE ?? 0, 0, 30);
 
-    // ✅ fecha a conta: MCQ = total - CE - Disc (com clamp)
-    const QTD_CE = clamp(QTD_CE_RAW, 0, Math.max(0, QTD_TOTAL - 1));
-    const QTD_DISC = clamp(QTD_DISC_RAW, 0, Math.max(0, QTD_TOTAL - QTD_CE));
+    const QTD_DISC = Math.min(DISC_RAW, Math.max(0, QTD_TOTAL - 3));
+    const QTD_CE = Math.min(CE_RAW, Math.max(0, QTD_TOTAL - 3 - QTD_DISC));
+    const QTD_MCQ = Math.max(3, QTD_TOTAL - QTD_CE - QTD_DISC);
 
-    const QTD_MCQ = Math.max(0, QTD_TOTAL - QTD_CE - QTD_DISC);
-
-    const BANCA = safeStr(banca || "FGV");
-    const DIFICULDADE = safeStr(dificuldade || "misturado");
-    const TEMA = safeStr(tema || "");
+    const BANCA = String(banca || "FGV");
+    const DIFICULDADE = String(dificuldade || "misturado");
+    const TEMA = String(tema || "").trim();
 
     const profile = bancaProfile(BANCA);
 
@@ -143,53 +152,41 @@ ${profile.estilo}
 DIFICULDADE: ${DIFICULDADE}
 TEMA: ${TEMA ? `"${TEMA}"` : "Livre (tema geral da área)"}
 
-OBJETIVO:
+SAÍDA:
 - Gere exatamente ${QTD_MCQ} questões MCQ (4 alternativas).
-- Gere exatamente ${QTD_CE} questões de CERTO/ERRADO (2 alternativas: "Certo" e "Errado").
+- Gere exatamente ${QTD_CE} questões de CERTO/ERRADO (2 alternativas: Certo/Errado).
 - Gere exatamente ${QTD_DISC} questões DISCURSIVAS.
 
 REGRAS IMPORTANTES:
 - NÃO use markdown.
-- NÃO use emojis.
-- Linguagem compatível com a banca.
-- Para MCQ:
-  - tipo: "mcq"
-  - enunciado: string
-  - alternativas: 4 strings (SEM A/B/C/D)
-  - corretaIndex: 0..3
-  - explicacao: 1 a 2 frases
-- Para C/E:
-  - tipo: "ce"
-  - enunciado: string (assertiva típica de prova)
-  - alternativas: ["Certo", "Errado"] (exatamente assim)
-  - corretaIndex: 0 ou 1
-  - explicacao: 1 a 2 frases
-- Para Discursiva:
-  - enunciado: string (pergunta)
-  - respostaModelo: 4 a 8 linhas no máximo
-  - criterios: 3 a 6 itens
+- NÃO inclua emojis.
+- Para MCQ: NÃO inclua letras A/B/C/D nas alternativas.
+- Para CE: alternativas devem ser exatamente ["Certo","Errado"].
+- Responda SOMENTE JSON válido.
 
-FORMATO: responda SOMENTE JSON válido, exatamente assim:
-
+SCHEMA EXATO:
 {
-  "questoes": [
+  "mcq": [
     {
       "tipo": "mcq",
       "enunciado": "...",
       "alternativas": ["...", "...", "...", "..."],
       "corretaIndex": 0,
       "explicacao": "..."
-    },
+    }
+  ],
+  "ce": [
     {
       "tipo": "ce",
       "enunciado": "...",
-      "alternativas": ["Certo", "Errado"],
+      "alternativas": ["Certo","Errado"],
       "corretaIndex": 0,
       "explicacao": "..."
     }
   ],
-  "discursivas": [
+  "disc": [
     {
+      "tipo": "disc",
       "enunciado": "...",
       "respostaModelo": "...",
       "criterios": ["...", "...", "..."]
@@ -197,9 +194,11 @@ FORMATO: responda SOMENTE JSON válido, exatamente assim:
   ]
 }
 
-DICA DE QUALIDADE:
-- Distratores plausíveis e coerentes.
-- Use termos típicos da banca (ex.: "assinale", "é correto afirmar", "considere", etc.).
+DICAS DE QUALIDADE (sensação de banca real):
+- Distratores plausíveis, errados por 1 detalhe.
+- Varie comandos (assinale, considere, é correto afirmar, etc).
+- Para C/E, use assertivas com nuance (não óbvias).
+- Explicação: 1–2 frases, objetiva, sem floreio.
 `.trim();
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -211,7 +210,7 @@ DICA DE QUALIDADE:
       body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0.35,
-        max_tokens: 2200,
+        max_tokens: 2400,
         messages: [
           {
             role: "system",
@@ -227,10 +226,7 @@ DICA DE QUALIDADE:
 
     if (!resp.ok) {
       let errJson = null;
-      try {
-        errJson = JSON.parse(rawText);
-      } catch {}
-
+      try { errJson = JSON.parse(rawText); } catch {}
       return res.status(500).json({
         ok: false,
         error: "OpenAI retornou erro",
@@ -244,72 +240,59 @@ DICA DE QUALIDADE:
 
     let parsed = null;
     try {
-      if (safeStr(content).startsWith("{")) parsed = JSON.parse(safeStr(content));
+      if (String(content).trim().startsWith("{")) {
+        parsed = JSON.parse(String(content).trim());
+      }
     } catch {}
-
     if (!parsed) parsed = extractJsonObject(content);
 
-    if (!parsed || !Array.isArray(parsed.questoes)) {
+    if (!parsed) {
       return res.status(200).json({
         ok: false,
-        error: "Modelo não retornou JSON no formato esperado",
-        rawPreview: safeStr(content).slice(0, 300)
+        error: "Modelo não retornou JSON válido",
+        rawPreview: String(content).slice(0, 300)
       });
     }
 
-    // --- saneamento: mistura MCQ + CE em "questoes"
-    const saneAll = parsed.questoes
-      .filter((q) => q && typeof q.enunciado === "string" && Array.isArray(q.alternativas))
-      .map((q) => {
-        const tipo = safeStr(q.tipo || "");
-        const enunciado = safeStr(q.enunciado);
-        const alts = normalizeAlts(q.alternativas);
+    const arrMCQ = Array.isArray(parsed.mcq) ? parsed.mcq : [];
+    const arrCE = Array.isArray(parsed.ce) ? parsed.ce : [];
+    const arrDISC = Array.isArray(parsed.disc) ? parsed.disc : [];
 
-        const isCE = tipo === "ce" || alts.length === 2;
-        const normTipo = isCE ? "ce" : "mcq";
+    const saneMCQ = arrMCQ
+      .filter(
+        (q) =>
+          q &&
+          typeof q.enunciado === "string" &&
+          Array.isArray(q.alternativas) &&
+          q.alternativas.length >= 4
+      )
+      .slice(0, QTD_MCQ)
+      .map((q) => ({
+        tipo: "mcq",
+        enunciado: String(q.enunciado).trim(),
+        alternativas: q.alternativas.slice(0, 4).map((a) => String(a).trim()),
+        corretaIndex: clamp(q.corretaIndex ?? 0, 0, 3),
+        explicacao: String(q.explicacao || "").trim()
+      }));
 
-        const alternativas = isCE
-          ? ["Certo", "Errado"]
-          : alts.slice(0, 4);
+    const saneCE = arrCE
+      .filter(
+        (q) =>
+          q &&
+          typeof q.enunciado === "string" &&
+          Array.isArray(q.alternativas) &&
+          q.alternativas.length >= 2
+      )
+      .slice(0, QTD_CE)
+      .map((q) => ({
+        tipo: "ce",
+        enunciado: String(q.enunciado).trim(),
+        alternativas: ["Certo", "Errado"],
+        corretaIndex: clamp(q.corretaIndex ?? 0, 0, 1),
+        explicacao: String(q.explicacao || "").trim()
+      }));
 
-        const maxIdx = isCE ? 1 : 3;
-        const corretaIndex = Number.isInteger(q.corretaIndex)
-          ? clamp(q.corretaIndex, 0, maxIdx)
-          : 0;
-
-        return {
-          tipo: normTipo,
-          enunciado,
-          alternativas,
-          corretaIndex,
-          explicacao: safeStr(q.explicacao || "")
-        };
-      });
-
-    const saneMCQ = saneAll.filter((q) => q.tipo === "mcq").slice(0, QTD_MCQ);
-    const saneCE = saneAll.filter((q) => q.tipo === "ce").slice(0, QTD_CE);
-
-    // Se o modelo veio com menos do que precisa, completa com mock CE/MCQ localmente (mínimo robusto)
-    const needMCQ = Math.max(0, QTD_MCQ - saneMCQ.length);
-    const needCE = Math.max(0, QTD_CE - saneCE.length);
-
-    const filler = buildFallbackMix({
-      banca: profile.nome,
-      tema: TEMA || "Geral",
-      dificuldade: DIFICULDADE,
-      needMCQ,
-      needCE
-    });
-
-    const finalMCQ = saneMCQ.concat(filler.mcq).slice(0, QTD_MCQ);
-    const finalCE = saneCE.concat(filler.ce).slice(0, QTD_CE);
-
-    // mistura para parecer prova (intercala de forma simples)
-    const questoes = interleave(finalMCQ, finalCE).slice(0, QTD_MCQ + QTD_CE);
-
-    // --- discursivas
-    const parsedDisc = Array.isArray(parsed.discursivas) ? parsed.discursivas : [];
-    const saneDisc = parsedDisc
+    const saneDISC = arrDISC
       .filter(
         (d) =>
           d &&
@@ -320,15 +303,34 @@ DICA DE QUALIDADE:
       )
       .slice(0, QTD_DISC)
       .map((d) => ({
-        enunciado: safeStr(d.enunciado),
-        respostaModelo: safeStr(d.respostaModelo),
-        criterios: (d.criterios || []).slice(0, 8).map((c) => safeStr(c)).filter(Boolean)
+        tipo: "disc",
+        enunciado: String(d.enunciado).trim(),
+        alternativas: [],           // ✅ vai dentro de questoes, mas sem alternativas
+        corretaIndex: null,         // ✅ não entra no score
+        explicacao: "",
+        respostaModelo: String(d.respostaModelo).trim(),
+        criterios: d.criterios.slice(0, 8).map((c) => String(c).trim())
       }));
+
+    // garante mínimo de MCQ (segurança)
+    if (saneMCQ.length < 3) {
+      return res.status(200).json({
+        ok: false,
+        error: "MCQ insuficientes após validação",
+        rawPreview: String(content).slice(0, 300)
+      });
+    }
+
+    // mistura “cara de prova”
+    let questoes = interleave(saneMCQ, saneCE);
+    questoes = insertDisc(questoes, saneDISC);
+
+    // corta para o total pedido (caso modelo tenha gerado extras)
+    questoes = questoes.slice(0, QTD_TOTAL);
 
     return res.status(200).json({
       ok: true,
-      questoes,         // ✅ MCQ + CE (misturado) para o front
-      discursivas: saneDisc, // ✅ fica pronto para UI futura
+      questoes, // ✅ tudo aqui (mcq + ce + disc)
       meta: {
         banca: BANCA,
         perfilBanca: profile.id,
@@ -348,47 +350,4 @@ DICA DE QUALIDADE:
       detail: String(err?.message || err)
     });
   }
-}
-
-// ----- helpers locais do backend -----
-function interleave(a, b) {
-  const out = [];
-  const n = Math.max(a.length, b.length);
-  for (let i = 0; i < n; i++) {
-    if (i < a.length) out.push(a[i]);
-    if (i < b.length) out.push(b[i]);
-  }
-  return out;
-}
-
-function buildFallbackMix({ banca, tema, needMCQ, needCE }) {
-  const mcq = [];
-  const ce = [];
-
-  for (let i = 0; i < needMCQ; i++) {
-    mcq.push({
-      tipo: "mcq",
-      enunciado: `(${banca}) Em ${tema}, assinale a alternativa correta.`,
-      alternativas: [
-        "Afirmação correta (modelo)",
-        "Distrator plausível 1",
-        "Distrator plausível 2",
-        "Distrator plausível 3"
-      ],
-      corretaIndex: 0,
-      explicacao: "A alternativa 1 é a correta por aderir ao conceito central cobrado."
-    });
-  }
-
-  for (let i = 0; i < needCE; i++) {
-    ce.push({
-      tipo: "ce",
-      enunciado: `(${banca}) ${tema}: A assertiva apresentada está correta sob a regra geral aplicável ao tema.`,
-      alternativas: ["Certo", "Errado"],
-      corretaIndex: 1,
-      explicacao: "A assertiva é incorreta por contrariar um requisito/condição essencial do tema."
-    });
-  }
-
-  return { mcq, ce };
 }
