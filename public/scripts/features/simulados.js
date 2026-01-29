@@ -794,14 +794,17 @@ export const simulados = {
   // API
   // -----------------------------
   async fetchQuestoesAPI(config) {
-    const payload = {
-      banca: config.banca,
-      qtd: config.qtd,
-      dificuldade: config.dificuldade,
-      tema: config.tema || ""
-      // OBS: CE/DISC ficam no backend; se quiser controlar do front, você adiciona aqui.
-    };
+  const payload = {
+  banca: config.banca,
+  qtd: config.qtd,
+  dificuldade: config.dificuldade,
+  tema: config.tema || "",
 
+  // ✅ mix para sensação de banca
+  // Regra simples: ~35% C/E e 1 discursiva quando qtd >= 8
+  qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
+  qtdDiscursivas: config.qtd >= 8 ? 1 : 0
+};
     const res = await fetch("/api/gerarSimulado", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
