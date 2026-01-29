@@ -147,38 +147,33 @@ function bancaProfile(bancaRaw) {
   };
 }
 
-// Distribuição padrão (qtd = TOTAL do simulado)
-function computeMixCounts(qtdTotal, qtdCE_raw, qtdDisc_raw, profileId) {
-  const Q = clamp(qtdTotal ?? 5, 3, 30);
+// Distribuição padrão
+// ✅ qtd = TOTAL DE QUESTÕES OBJETIVAS (MCQ + CE)
+// ✅ discursivas são extras (não entram em qtd)
+function computeMixCounts(qtdObjetivas, qtdCE_raw, qtdDisc_raw, profileId) {
+  const Q_OBJ = clamp(qtdObjetivas ?? 5, 3, 30);
+  const Q_DISC = clamp(qtdDisc_raw ?? 0, 0, 10);
 
-  // defaults
-  let disc = clamp(qtdDisc_raw ?? 0, 0, 10);
   let ce;
 
-  // Se o usuário mandou qtdCE, respeita
+  // Se o usuário mandou qtdCE, respeita (limitado ao total objetivo)
   if (typeof qtdCE_raw !== "undefined" && qtdCE_raw !== null && qtdCE_raw !== "") {
-    ce = clamp(qtdCE_raw, 0, Q);
+    ce = clamp(qtdCE_raw, 0, Q_OBJ);
   } else {
     // padrão por banca
-    // CEBRASPE geralmente combina MUITO com CE
-    if (profileId === "CEBRASPE") ce = Math.round(Q * 0.45);
-    else ce = Math.round(Q * 0.30);
+    if (profileId === "CEBRASPE") ce = Math.round(Q_OBJ * 0.45);
+    else ce = Math.round(Q_OBJ * 0.30);
   }
 
-  // Ajuste para não exceder
-  if (disc > Q) disc = Q;
-  if (ce > Q - disc) ce = Math.max(0, Q - disc);
+  const mcq = Math.max(0, Q_OBJ - ce);
 
-  const mcq = Math.max(0, Q - ce - disc);
-
-  // garante pelo menos 1 MCQ na maioria dos casos (exceto se o usuário explicitou)
-  const userForced = typeof qtdCE_raw !== "undefined" || typeof qtdDisc_raw !== "undefined";
-  if (!userForced && mcq === 0 && Q > 0) {
-    // tira 1 de CE se possível
-    if (ce > 0) return { total: Q, mcq: 1, ce: ce - 1, disc };
+  // (opcional) garante pelo menos 1 MCQ quando não for forçado
+  const userForced = typeof qtdCE_raw !== "undefined";
+  if (!userForced && mcq === 0 && Q_OBJ > 0 && ce > 0) {
+    return { objetivas: Q_OBJ, mcq: 1, ce: ce - 1, disc: Q_DISC };
   }
 
-  return { total: Q, mcq, ce, disc };
+  return { objetivas: Q_OBJ, mcq, ce, disc: Q_DISC };
 }
 
 function buildPrompt({ profile, dificuldade, tema, qtdMCQ, qtdCE, qtdDisc }) {
