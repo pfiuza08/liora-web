@@ -1,21 +1,17 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.6-PRODUCT (MCQ + CE + DISC + score real + revisão rica)
+// Versão: v2.6-PRODUCT (MCQ + CE + DISC MODE + QA hooks)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração (robusto por JS)
 // ✔ Idle mostra Continuar/Descartar quando existir run salvo
-// ✔ Próxima só habilita após responder (MCQ/CE ou DISC com texto mínimo)
-// ✔ Botões no padrão do app (btn-primary / btn-secondary / btn-link)
+// ✔ Próxima só habilita após responder (hint contextual)
 // ✔ Timer + progresso + resultado + revisão com explicação
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
-// ✔ Suporta MCQ (4) + CE (C/E) + DISC (textarea)
+// ✔ Suporta:
+//    - OBJ: MCQ (4) + CE (2)
+//    - DISC: Discursivas (textarea) em modo separado
 // ✔ Salvamento em localStorage
-//
-// ✅ Opção A: mescla discursivas (data.discursivas) dentro de questoes,
-//    para o simulado ter qtdTotal “de verdade” na UI.
-// ✅ Resultado “sensação de banca”: nota (%) só nas objetivas,
-//    discursivas aparecem separadas na revisão (modelo + critérios).
 // =============================================================
 
 export const simulados = {
@@ -23,16 +19,14 @@ export const simulados = {
 
   STATE: {
     running: false,
-    _savedRun: null, // usado só no Idle para "Continuar"
-   config: {
+    _savedRun: null,
+    config: {
       banca: "FGV",
       qtd: 5,
       dificuldade: "misturado",
       tema: "",
-      tempo: 20, // minutos
-    
-      // ✅ Discursivas: padrão OFF (MVP)
-      discEnabled: false
+      tempo: 20,     // minutos
+      mode: "obj"    // "obj" | "disc"
     },
     questoes: [],
     atual: 0,
@@ -56,15 +50,6 @@ export const simulados = {
     // ✅ hook de QA no console
     window.lioraSimDebug = () => {
       const s = this.STATE;
-      // ✅ Toggle de discursivas via console (sem mexer no modal HTML)
-      window.lioraSimSetDisc = (on) => {
-        this.STATE.config.discEnabled = !!on;
-        this.persistConfig();
-        console.log("✍️ Discursivas:", this.STATE.config.discEnabled ? "ON" : "OFF");
-        if (!this.STATE.running) this.renderIdle();
-        return this.STATE.config.discEnabled;
-      };
-     
       console.log("🧪 LIORA Simulados Debug");
       console.log("running:", s.running, "idx:", s.atual, "/", Math.max(0, s.questoes.length - 1));
       console.log("config:", s.config);
@@ -136,7 +121,7 @@ export const simulados = {
       }
     });
 
-    // MCQ / CE (radio)
+    // MCQ / CE (radio) — screen
     document.addEventListener("change", (ev) => {
       if (!isFromSim(ev.target)) return;
 
@@ -147,7 +132,7 @@ export const simulados = {
       this.pickAlternative(val);
     });
 
-    // ✅ DISC (textarea)
+    // DISC (textarea) — screen
     document.addEventListener("input", (ev) => {
       if (!isFromSim(ev.target)) return;
 
@@ -177,7 +162,7 @@ export const simulados = {
   },
 
   // -----------------------------
-  // MODAL CONFIG (robusto por JS)
+  // MODAL CONFIG
   // -----------------------------
   openConfig() {
     const modal = document.getElementById("sim-config");
@@ -191,20 +176,22 @@ export const simulados = {
     this.setValue("sim-tema", c.tema);
     this.setValue("sim-tempo", c.tempo);
 
-    // ✅ id correto do select do timer (no seu HTML)
+    // timer
     this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
+
+    // ✅ novo: modo
+    this.setValue("sim-mode", c.mode || "obj");
 
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("liora-modal-open");
 
-    // ✅ garantia extra caso seu CSS do modal seja parcial
+    // fallback caso CSS do modal seja parcial
     modal.style.display = "block";
     modal.style.position = "fixed";
     modal.style.inset = "0";
     modal.style.zIndex = "9999";
 
-    // backdrop fecha
     const backdrop = modal.querySelector(".modal-backdrop");
     if (backdrop && !backdrop.__lioraBound) {
       backdrop.__lioraBound = true;
@@ -222,7 +209,6 @@ export const simulados = {
     modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("liora-modal-open");
 
-    // ✅ garantia extra
     modal.style.display = "none";
 
     window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
@@ -235,15 +221,18 @@ export const simulados = {
     const tema = (this.getValue("sim-tema") || "").trim();
     const tempo = Number(this.getValue("sim-tempo") || 20);
 
-    // ✅ id correto do timer
     const timerMode = this.getValue("sim-timer-mode") || "on";
+
+    // ✅ modo: obj | disc
+    const mode = (this.getValue("sim-mode") || "obj").toLowerCase() === "disc" ? "disc" : "obj";
 
     this.STATE.config = {
       banca,
       qtd: this.clamp(qtd, 3, 30),
       dificuldade,
       tema,
-      tempo: this.clamp(tempo, 5, 180)
+      tempo: this.clamp(tempo, 5, 180),
+      mode
     };
 
     this.STATE.timer.enabled = timerMode === "on";
@@ -255,7 +244,7 @@ export const simulados = {
   },
 
   // -----------------------------
-  // START / FLOW (API)
+  // START / FLOW
   // -----------------------------
   async start() {
     if (this.STATE.running) return;
@@ -270,6 +259,7 @@ export const simulados = {
     this.STATE.respostas = [];
     this.STATE.questoes = [];
 
+    // timer
     if (this.STATE.timer.enabled) {
       this.STATE.timer.totalSec = this.STATE.config.tempo * 60;
       this.STATE.timer.leftSec = this.STATE.timer.totalSec;
@@ -296,6 +286,16 @@ export const simulados = {
       this.STATE.questoes = this.buildMockQuestions(this.STATE.config);
     }
 
+    // ✅ sanity: garante que contador bate com o que vamos exibir
+    if (this.STATE.questoes.length !== this.STATE.config.qtd) {
+      console.warn("⚠️ Quantidade exibida diferente do config.qtd", {
+        qtd: this.STATE.config.qtd,
+        got: this.STATE.questoes.length,
+        mode: this.STATE.config.mode
+      });
+      // Não força, mas dá um toque leve (evita poluição)
+    }
+
     this.persistRun();
     this.renderQuestion();
   },
@@ -304,7 +304,6 @@ export const simulados = {
     this.closeConfig();
 
     let run = this.STATE._savedRun;
-
     if (!run) {
       try {
         run = JSON.parse(localStorage.getItem("liora_sim_run") || "null");
@@ -360,7 +359,7 @@ export const simulados = {
   },
 
   // -----------------------------
-  // ANSWERS (MCQ/CE + DISC)
+  // ANSWERS
   // -----------------------------
   pickAlternative(index) {
     if (!this.STATE.running) return;
@@ -562,12 +561,16 @@ export const simulados = {
       const answered = r.respostas?.length || 0;
       const banca = r.config?.banca || this.STATE.config.banca;
       const tema = r.config?.tema || this.STATE.config.tema || "Livre";
+      const mode = r.config?.mode || this.STATE.config.mode || "obj";
+
+      const modeLabel = mode === "disc" ? "Discursivas" : "Objetivas";
 
       return `
         <div class="card" style="margin-bottom:12px;">
           <div class="card-title">Simulado em andamento</div>
           <div class="muted">
             Banca: <b>${this.escape(banca)}</b> · Tema: <b>${this.escape(tema)}</b><br>
+            Tipo: <b>${this.escape(modeLabel)}</b><br>
             Progresso: <b>${answered}</b> / <b>${total}</b>
           </div>
 
@@ -578,6 +581,8 @@ export const simulados = {
         </div>
       `;
     })();
+
+    const modeLabel = this.STATE.config.mode === "disc" ? "Discursivas" : "Objetivas";
 
     this.setHTML(
       "sim-body",
@@ -597,6 +602,7 @@ export const simulados = {
         </div>
 
         <div class="sim-meta">
+          <div><span class="chip">Tipo</span> ${this.escape(modeLabel)}</div>
           <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
           <div><span class="chip">Questões</span> ${this.STATE.config.qtd}</div>
           <div><span class="chip">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
@@ -658,7 +664,6 @@ export const simulados = {
     this.updateHintForCurrent();
   },
 
-  // ✅ MCQ + CE + DISC
   renderQuestion() {
     const q = this.STATE.questoes[this.STATE.atual];
     if (!q) return;
@@ -667,7 +672,6 @@ export const simulados = {
     this.setText("sim-enunciado", q.enunciado);
 
     const saved = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
-
     const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
     // DISC
@@ -678,8 +682,16 @@ export const simulados = {
         ? `<div class="muted small" style="margin-top:10px;">
              <b>Critérios (o que avaliar):</b>
              <ul style="margin:6px 0 0 18px;">
-               ${criterios.slice(0, 8).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+               ${criterios.slice(0, 10).map((c) => `<li>${this.escape(c)}</li>`).join("")}
              </ul>
+           </div>`
+        : "";
+
+      const modelo = String(q.respostaModelo || "").trim();
+      const modeloHtml = modelo
+        ? `<div class="muted small" style="margin-top:10px;">
+             <b>Resposta modelo (para comparar depois):</b>
+             <div style="white-space:pre-wrap; margin-top:6px;">${this.escape(modelo)}</div>
            </div>`
         : "";
 
@@ -688,6 +700,7 @@ export const simulados = {
         `
         <div class="card" style="padding:12px;">
           <div class="muted small" style="margin-bottom:8px;">Resposta discursiva</div>
+
           <textarea
             id="sim-disc-answer"
             class="input"
@@ -695,7 +708,9 @@ export const simulados = {
             placeholder="Digite sua resposta (rascunho)."
             style="width:100%; resize:vertical;"
           >${this.escape(texto)}</textarea>
+
           ${criteriosHtml}
+          ${modeloHtml}
         </div>
         `
       );
@@ -716,11 +731,7 @@ export const simulados = {
     const html = alts
       .map((alt, i) => {
         const checked = chosen === i ? "checked" : "";
-
-        // MCQ: A/B/C/D | CE: C/E
         const letter = isCE ? (i === 0 ? "C" : "E") : String.fromCharCode(65 + i);
-
-        // CE: texto fixo para consistência
         const text = isCE ? labelsCE[i] : this.escape(alt);
 
         return `
@@ -772,9 +783,8 @@ export const simulados = {
     this.setText("sim-timer-text", this.formatTime(this.STATE.timer.leftSec));
   },
 
-  // ✅ Resultado com “nota de prova”: só objetivas pontuam
   renderResult(result) {
-    const { totalAll, totalObj, totalDisc, acertos, erros, brancos, pct } = result;
+    const { totalScored, acertos, erros, pct, total, discursivasCount } = result;
 
     this.setHTML(
       "sim-body",
@@ -785,16 +795,14 @@ export const simulados = {
         <div class="sim-score">
           <div class="score-main">${pct}%</div>
           <div class="muted">
-            <b>Objetivas:</b> ${acertos} / ${totalObj}
-            ${brancos ? ` · Em branco: <b>${brancos}</b>` : ""}
-            ${totalDisc ? `<br><b>Discursivas:</b> <b>${totalDisc}</b> (corrija pela revisão)` : ""}
+            Acertos: <b>${acertos}</b> de <b>${totalScored}</b>
+            ${discursivasCount ? ` · Discursivas: <b>${discursivasCount}</b>` : ""}
           </div>
         </div>
 
         <div class="sim-meta">
-          <div><span class="chip">Total</span> ${totalAll}</div>
-          <div><span class="chip">Objetivas</span> ${totalObj}</div>
-          <div><span class="chip">Discursivas</span> ${totalDisc}</div>
+          <div><span class="chip">Total</span> ${total}</div>
+          <div><span class="chip">Objetivas</span> ${totalScored}</div>
           <div><span class="chip">Acertos</span> ${acertos}</div>
           <div><span class="chip">Erros</span> ${erros}</div>
           <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
@@ -810,7 +818,7 @@ export const simulados = {
 
       <div class="card hidden" id="sim-review">
         <div class="card-title">Revisão</div>
-        <div class="muted small">Objetivas com correta/explicação e discursivas com modelo + critérios.</div>
+        <div class="muted small">Respostas, correta e feedback. Discursivas aparecem com modelo/critério.</div>
         <div class="sim-review-list" id="sim-review-list"></div>
       </div>
     `
@@ -820,7 +828,6 @@ export const simulados = {
     this.renderReview(result);
   },
 
-  // ✅ revisão compatível com CE/MCQ/DISC
   renderReview(result) {
     const list = document.getElementById("sim-review-list");
     if (!list) return;
@@ -834,14 +841,8 @@ export const simulados = {
         const modelo = String(r.respostaModelo || "").trim();
         const criterios = Array.isArray(r.criterios) ? r.criterios : [];
 
-        const criteriosHtml = criterios.length
-          ? `<ul style="margin:6px 0 0 18px;">
-              ${criterios.slice(0, 10).map((c) => `<li>${this.escape(c)}</li>`).join("")}
-            </ul>`
-          : `<div class="muted small">Sem critérios informados.</div>`;
-
         return `
-          <div class="sim-review-item disc">
+          <div class="sim-review-item">
             <div class="sim-review-head">
               <div class="sim-review-q">Q${i + 1}</div>
               <div class="sim-review-badge">Discursiva</div>
@@ -851,29 +852,34 @@ export const simulados = {
 
             <div class="sim-review-ans">
               <div><b>Sua resposta:</b></div>
-              <div class="muted" style="white-space:pre-wrap;">${texto ? this.escape(texto) : "— (em branco)"}</div>
-
-              ${modelo ? `
-                <div style="margin-top:10px;"><b>Resposta-modelo:</b></div>
-                <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
-              ` : ""}
-
-              <div style="margin-top:10px;"><b>Critérios:</b></div>
-              ${criteriosHtml}
+              <div class="muted" style="white-space:pre-wrap;">${texto ? this.escape(texto) : "—"}</div>
             </div>
+
+            ${modelo ? `
+              <div class="sim-review-exp" style="margin-top:10px;">
+                <b>Resposta modelo:</b>
+                <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
+              </div>
+            ` : ""}
+
+            ${criterios.length ? `
+              <div class="sim-review-exp" style="margin-top:10px;">
+                <b>Critérios:</b>
+                <ul style="margin:6px 0 0 18px;">
+                  ${criterios.slice(0, 10).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+                </ul>
+              </div>
+            ` : ""}
           </div>
         `;
       }
 
       // MCQ/CE
+      const ok = !!r.correta;
       const sua = r.escolha;
       const correta = r.corretaIndex;
       const isCE = tipo === "ce" || (r.alternativas?.length || 0) === 2;
       const explicacao = (r.explicacao || "").trim();
-
-      const ok = sua != null ? sua === correta : false;
-
-      const badge = ok ? "Correta" : (sua == null ? "Em branco" : "Incorreta");
 
       const letter = (n) => {
         if (isCE) return n === 0 ? "C" : "E";
@@ -881,23 +887,23 @@ export const simulados = {
       };
 
       const labelText = (n) => {
-        if (n == null) return "—";
+        if (n == null) return "—_attach";
         if (isCE) return n === 0 ? "Certo" : "Errado";
         return this.escape(r.alternativas?.[n] ?? "");
       };
 
       return `
-        <div class="sim-review-item ${ok ? "ok" : (sua == null ? "" : "bad")}">
+        <div class="sim-review-item ${ok ? "ok" : "bad"}">
           <div class="sim-review-head">
             <div class="sim-review-q">Q${i + 1}</div>
-            <div class="sim-review-badge">${badge}</div>
+            <div class="sim-review-badge">${ok ? "Correta" : "Incorreta"}</div>
           </div>
 
           <div class="sim-review-enun">${this.escape(r.enunciado)}</div>
 
           <div class="sim-review-ans">
-            <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${labelText(sua)}` : "—"}</div>
-            <div><b>Correta:</b> ${letter(correta)}. ${labelText(correta)}</div>
+            <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${this.escape(isCE ? (sua === 0 ? "Certo" : "Errado") : (r.alternativas?.[sua] ?? ""))}` : "—"}</div>
+            <div><b>Correta:</b> ${letter(correta)}. ${this.escape(isCE ? (correta === 0 ? "Certo" : "Errado") : (r.alternativas?.[correta] ?? ""))}</div>
           </div>
 
           ${explicacao ? `<div class="sim-review-exp"><b>Explicação:</b> ${this.escape(explicacao)}</div>` : ""}
@@ -943,11 +949,7 @@ export const simulados = {
     const tipo = q?.tipo || ((q?.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
     if (!answered) {
-      this.setHint(
-        tipo === "disc"
-          ? "Digite sua resposta para liberar a próxima questão."
-          : "Selecione uma alternativa para liberar a próxima questão."
-      );
+      this.setHint(tipo === "disc" ? "Digite sua resposta para liberar a próxima questão." : "Selecione uma alternativa para liberar a próxima questão.");
       return;
     }
 
@@ -959,66 +961,47 @@ export const simulados = {
     this.setHint("Última questão. Quando quiser, clique em Finalizar.");
   },
 
+  // -----------------------------
+  // API
+  // -----------------------------
+  async fetchQuestoesAPI(config) {
+    const isDiscMode = (config.mode || "obj") === "disc";
 
-    // -----------------------------
-    // API (robusta para DISC vir em questoes OU em discursivas)
-    // -----------------------------
-    async fetchQuestoesAPI(config) {
-      const payload = {
-        banca: config.banca,
-        qtd: config.qtd,
-        dificuldade: config.dificuldade,
-        tema: config.tema || "",
-    
-        // ✅ mix para sensação de banca
-        // ~35% C/E e discursiva apenas se discEnabled=true
-        qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
-        qtdDiscursivas: config.discEnabled ? (config.qtd >= 8 ? 1 : 0) : 0
-      };
-    
-      const res = await fetch("/api/gerarSimulado", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status} — ${txt}`);
-      }
-    
-      const data = await res.json();
-    
-      // -------------------------
-      // 1) Objetivas (MCQ/CE)
-      // -------------------------
-      const base = (data?.questoes || [])
-        .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
-        .map((q) => {
-          const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
-          const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
-    
-          const isCE = tipo === "ce" || alts.length === 2;
-          const maxIdx = isCE ? 1 : 3;
-    
-          const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
-    
-          return {
-            tipo: isCE ? "ce" : "mcq",
-            enunciado: String(q.enunciado).trim(),
-            alternativas,
-            corretaIndex: Number.isInteger(q.corretaIndex)
-              ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
-              : 0,
-            explicacao: q.explicacao ? String(q.explicacao).trim() : ""
-          };
-        });
-    
-      // -------------------------
-      // 2) Discursivas (opcional)
-      // -------------------------
+    // Modo DISC: queremos só discursivas na UI.
+    // Para economizar no backend (que clampa qtd min 3), mandamos qtd=3 fixo.
+    // A UI ignora data.questoes e usa somente data.discursivas.
+    const payload = {
+      banca: config.banca,
+      qtd: isDiscMode ? 3 : config.qtd, // backend pode clamp; mantemos baixo no modo disc
+      dificuldade: config.dificuldade,
+      tema: config.tema || "",
+
+      // ✅ sensação de banca (OBJ) ou OFF (DISC)
+      qtdCE: isDiscMode
+        ? 0
+        : Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
+
+      // ✅ DISC opcional: OFF no modo OBJ, ON no modo DISC
+      qtdDiscursivas: isDiscMode ? config.qtd : 0
+    };
+
+    const res = await fetch("/api/gerarSimulado", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} — ${txt}`);
+    }
+
+    const data = await res.json();
+
+    // ---------- MODO DISC ----------
+    if (isDiscMode) {
       const disc = Array.isArray(data?.discursivas) ? data.discursivas : [];
-      const discMapped = (config.discEnabled ? disc : [])
+      const discMapped = disc
         .filter((d) => d && typeof d.enunciado === "string")
         .map((d) => ({
           tipo: "disc",
@@ -1027,81 +1010,57 @@ export const simulados = {
           criterios: Array.isArray(d.criterios)
             ? d.criterios.map((c) => String(c).trim()).filter(Boolean)
             : []
-        }));
-    
-      // ✅ disc no final (cara de prova)
-      let merged = this.mergeDiscIntoQuestions(base, discMapped);
-    
-      // -------------------------
-      // 3) Garantia de quantidade (TOP-UP)
-      // -------------------------
-      // Se o backend devolver menos objetivas do que o solicitado,
-      // a UI fica coerente: completa com mock objetivo (sem disc).
-      const targetTotal = Number(config.qtd) || 5;
-    
-      if (merged.length < targetTotal) {
-        const need = targetTotal - merged.length;
-    
-        // usa mock, mas só pega MCQ/CE para não “inventar discursiva”
-        const mock = this.buildMockQuestions({ ...config, qtd: targetTotal })
-          .filter((q) => q.tipo !== "disc")
-          .slice(0, need);
-    
-        merged = merged.concat(mock);
-      }
-    
-      // Se vier mais do que o esperado (raro), corta para não confundir a UI
-      if (merged.length > targetTotal) {
-        merged = merged.slice(0, targetTotal);
-      }
-    
-      return merged;
-    },
+        }))
+        .slice(0, config.qtd);
 
-    
-   mergeDiscIntoQuestions(base, discList) {
-      const out = Array.isArray(base) ? [...base] : [];
-      const disc = Array.isArray(discList) ? [...discList] : [];
-      if (!disc.length) return out;
-    
-      // ✅ DISC no final: primeiro objetivas, depois discursivas
-      return out.concat(disc);
-    },
+      if (!discMapped.length) {
+        throw new Error("API não retornou discursivas no modo DISC.");
+      }
 
-    
-    // ✅ mantém exatamente qtd questões no front (8 é 8!)
-    // - se vier menos, completa com mock
-    // - se vier mais, corta mantendo pelo menos 1 discursiva se existir
-    ensureQtd(list, qtd, config) {
-      const target = Number(qtd) || 0;
-      const arr = Array.isArray(list) ? [...list] : [];
-    
-      if (target <= 0) return arr;
-    
-      // Se veio mais do que precisa: corta, mas tenta preservar 1 discursiva se houver
-      if (arr.length > target) {
-        const hasDisc = arr.some((q) => q.tipo === "disc");
-        if (!hasDisc) return arr.slice(0, target);
-    
-        // mantém a primeira discursiva e completa o resto com as primeiras objetivas
-        const disc = arr.find((q) => q.tipo === "disc");
-        const objs = arr.filter((q) => q.tipo !== "disc");
-        const cut = objs.slice(0, Math.max(0, target - 1));
-        // insere discursiva perto do final
-        cut.splice(Math.floor(cut.length * 0.7), 0, disc);
-        return cut.slice(0, target);
+      // Garante que a UI mostra exatamente config.qtd (se vier menos, completa com mocks)
+      const out = [...discMapped];
+      while (out.length < config.qtd) {
+        out.push({
+          tipo: "disc",
+          enunciado: `(${config.banca}) (Discursiva) ${config.tema || "Tema livre"}: responda de forma objetiva.`,
+          respostaModelo: "Explique os pontos centrais, justifique e dê um exemplo.",
+          criterios: ["Correção conceitual", "Clareza", "Objetividade", "Exemplo pertinente"]
+        });
       }
-    
-      // Se veio menos: completa com mock (só objetivas, para não bugar correção)
-      if (arr.length < target) {
-        const missing = target - arr.length;
-        const filler = this.buildMockQuestions({ ...config, qtd: missing })
-          .filter((q) => q.tipo !== "disc"); // filler só objetiva
-        return arr.concat(filler).slice(0, target);
-      }
-    
-      return arr;
-    },
+
+      return out;
+    }
+
+    // ---------- MODO OBJ ----------
+    const base = (data?.questoes || [])
+      .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
+      .map((q) => {
+        const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
+        const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
+
+        const isCE = tipo === "ce" || alts.length === 2;
+        const maxIdx = isCE ? 1 : 3;
+        const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
+
+        return {
+          tipo: isCE ? "ce" : "mcq",
+          enunciado: String(q.enunciado).trim(),
+          alternativas,
+          corretaIndex: Number.isInteger(q.corretaIndex)
+            ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
+            : 0,
+          explicacao: q.explicacao ? String(q.explicacao).trim() : ""
+        };
+      });
+
+    // Garante exatamente config.qtd no modo OBJ (se vier menos, completa com mocks)
+    const out = [...base].slice(0, config.qtd);
+    while (out.length < config.qtd) {
+      out.push(...this.buildMockQuestions({ ...config, qtd: 1, mode: "obj" }));
+    }
+
+    return out.slice(0, config.qtd);
+  },
 
   // -----------------------------
   // MOCK (fallback)
@@ -1110,6 +1069,20 @@ export const simulados = {
     const qtd = config.qtd || 5;
     const tema = config.tema || "Geral";
     const banca = config.banca || "FGV";
+    const mode = config.mode || "obj";
+
+    if (mode === "disc") {
+      const out = [];
+      for (let i = 0; i < qtd; i++) {
+        out.push({
+          tipo: "disc",
+          enunciado: `(${banca}) (Discursiva) Em ${tema}, responda de forma objetiva e bem justificada.`,
+          respostaModelo: "A resposta deve cobrir conceitos-chave, aplicação prática e um exemplo.",
+          criterios: ["Correção conceitual", "Aplicação prática", "Clareza", "Exemplo pertinente"]
+        });
+      }
+      return out;
+    }
 
     const base = [
       {
@@ -1125,29 +1098,11 @@ export const simulados = {
         explicacao: "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
       },
       {
-        tipo: "mcq",
-        enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
-        alternativas: [
-          "Ignorar teoria",
-          "Treinar padrão de prova e consolidar conteúdo",
-          "Garantir acerto sem revisão",
-          "Evitar feedback"
-        ],
-        corretaIndex: 1,
-        explicacao: "Simulados ajudam a consolidar conteúdo e ajustar estratégia de prova."
-      },
-      {
         tipo: "ce",
         enunciado: `(${banca}) (C/E) Em ${tema}, é correto afirmar que revisar erros anteriores aumenta retenção e reduz reincidência.`,
         alternativas: ["Certo", "Errado"],
         corretaIndex: 0,
-        explicacao: "Revisar erros gera feedback e reforço de pontos fracos, reduzindo repetição do erro."
-      },
-      {
-        tipo: "disc",
-        enunciado: `(${banca}) (Discursiva) Em ${tema}, explique como você aplicaria os princípios-chave para reduzir risco e aumentar conformidade.`,
-        respostaModelo: "A resposta deve cobrir princípios, aplicação prática e justificativa. Mencione medidas técnicas e organizacionais.",
-        criterios: ["Correção conceitual", "Aplicação prática", "Clareza e objetividade", "Exemplos pertinentes"]
+        explicacao: "Revisar erros gera feedback e reforço de pontos fracos."
       }
     ];
 
@@ -1155,21 +1110,13 @@ export const simulados = {
     for (let i = 0; i < qtd; i++) {
       const item = base[i % base.length];
       out.push({
-        tipo: item.tipo || (item.alternativas?.length === 2 ? "ce" : "mcq"),
+        tipo: item.tipo,
         enunciado: item.enunciado,
-        alternativas: item.alternativas ? [...item.alternativas] : undefined,
-        corretaIndex: typeof item.corretaIndex === "number" ? item.corretaIndex : undefined,
-        explicacao: item.explicacao || "",
-        respostaModelo: item.respostaModelo || "",
-        criterios: item.criterios ? [...item.criterios] : []
+        alternativas: [...item.alternativas],
+        corretaIndex: item.corretaIndex,
+        explicacao: item.explicacao || ""
       });
     }
-
-    // Garante ao menos 1 discursiva se qtd >= 8 (para simular o mix)
-    if (qtd >= 8 && !out.some((q) => q.tipo === "disc")) {
-      out.splice(Math.floor(out.length * 0.7), 0, base.find((x) => x.tipo === "disc"));
-    }
-
     return out;
   },
 
@@ -1177,22 +1124,15 @@ export const simulados = {
   // RESULTS
   // -----------------------------
   computeResult() {
-    const totalAll = this.STATE.questoes.length;
+    const total = this.STATE.questoes.length;
     const detalhes = [];
 
-    let totalObj = 0; // mcq + ce
-    let totalDisc = 0;
-    let acertos = 0;
-    let erros = 0;
-    let brancos = 0;
-
-    for (let i = 0; i < totalAll; i++) {
+    for (let i = 0; i < total; i++) {
       const q = this.STATE.questoes[i];
       const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
       const r = this.STATE.respostas.find((x) => x.idx === i);
 
       if (tipo === "disc") {
-        totalDisc += 1;
         detalhes.push({
           idx: i,
           tipo: "disc",
@@ -1204,38 +1144,32 @@ export const simulados = {
         continue;
       }
 
-      totalObj += 1;
-
-      const escolha = typeof r?.escolha === "number" ? r.escolha : null;
-      const corretaIndex = typeof q.corretaIndex === "number" ? q.corretaIndex : 0;
-
-      const correta = escolha != null ? escolha === corretaIndex : false;
-
-      if (escolha == null) brancos += 1;
-      else if (correta) acertos += 1;
-      else erros += 1;
-
       detalhes.push({
         idx: i,
         tipo,
         enunciado: q.enunciado,
         alternativas: q.alternativas,
-        corretaIndex,
+        corretaIndex: q.corretaIndex,
         explicacao: q.explicacao || "",
-        escolha,
-        correta
+        escolha: r?.escolha ?? null,
+        correta: r ? r.escolha === q.corretaIndex : false
       });
     }
 
-    const pct = totalObj ? Math.round((acertos / totalObj) * 100) : 0;
+    const scored = detalhes.filter((d) => d.tipo !== "disc");
+    const totalScored = scored.length;
+    const acertos = scored.filter((d) => d.correta).length;
+    const erros = totalScored - acertos;
+    const pct = totalScored ? Math.round((acertos / totalScored) * 100) : 0;
+
+    const discursivasCount = detalhes.filter((d) => d.tipo === "disc").length;
 
     return {
-      totalAll,
-      totalObj,
-      totalDisc,
+      total,
+      totalScored,
+      discursivasCount,
       acertos,
       erros,
-      brancos,
       pct,
       detalhes,
       config: { ...this.STATE.config }
@@ -1276,12 +1210,13 @@ export const simulados = {
   },
 
   restoreIfAny() {
-    // restore config
+    // config
     try {
       const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
       if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
     } catch {}
 
+    // timer enabled
     try {
       const t = JSON.parse(localStorage.getItem("liora_sim_timer") || "null");
       if (typeof t?.enabled === "boolean") this.STATE.timer.enabled = t.enabled;
@@ -1360,9 +1295,3 @@ export const simulados = {
     console.log("🔔", msg);
   }
 };
-
-/*
-✅ Fora do simulados.js: nada obrigatório.
-Opcional: se quiser “banca vibes” ainda mais fortes, eu te passo um mini CSS
-só para .sim-review-item.disc e textarea ficar com cara de folha de redação.
-*/
