@@ -1,6 +1,6 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.6-PRODUCT (MCQ + CE + DISC MODE + QA hooks)
+// Versão: v2.7-PRODUCT (OBJ + DISC MODE + contrato API robusto)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração (robusto por JS)
@@ -22,11 +22,11 @@ export const simulados = {
     _savedRun: null,
     config: {
       banca: "FGV",
-      qtd: 5,
+      qtd: 5,         // OBJ: total de questões | DISC: total de discursivas
       dificuldade: "misturado",
       tema: "",
-      tempo: 20,     // minutos
-      mode: "obj"    // "obj" | "disc"
+      tempo: 20,      // minutos
+      mode: "obj"     // "obj" | "disc"
     },
     questoes: [],
     atual: 0,
@@ -69,7 +69,7 @@ export const simulados = {
       return JSON.parse(JSON.stringify(s));
     };
 
-    console.log("📝 simulados.js v2.6 — iniciado");
+    console.log("📝 simulados.js v2.7 — iniciado");
   },
 
   // -----------------------------
@@ -179,7 +179,7 @@ export const simulados = {
     // timer
     this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
 
-    // ✅ novo: modo
+    // ✅ modo (seu id: sim-kind)
     this.setValue("sim-kind", c.mode || "obj");
 
     modal.classList.add("open");
@@ -214,21 +214,43 @@ export const simulados = {
     window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
   },
 
+  getModeFromUI() {
+    // select principal (seu id)
+    const v = String(this.getValue("sim-kind") || "").toLowerCase();
+    if (v.includes("disc")) return "disc";
+    if (v.includes("obj")) return "obj";
+
+    // fallback (se algum dia mudar id)
+    const altIds = ["sim-mode", "sim-modo", "sim-tipo", "sim-questoes-mode"];
+    for (const id of altIds) {
+      const x = String(this.getValue(id) || "").toLowerCase();
+      if (x.includes("disc")) return "disc";
+      if (x.includes("obj")) return "obj";
+    }
+
+    return this.STATE?.config?.mode || "obj";
+  },
+
   saveConfig() {
     const banca = this.getValue("sim-banca") || "FGV";
-    const qtd = Number(this.getValue("sim-qtd") || 5);
+    const qtdRaw = Number(this.getValue("sim-qtd") || 5);
     const dificuldade = this.getValue("sim-dificuldade") || "misturado";
     const tema = (this.getValue("sim-tema") || "").trim();
     const tempo = Number(this.getValue("sim-tempo") || 20);
 
     const timerMode = this.getValue("sim-timer-mode") || "on";
+    const mode = this.getModeFromUI();
 
-    // ✅ modo: obj | disc
-    const mode = (this.getValue("sim-kind") || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+    // ✅ clamp muda conforme o modo
+    const qtd =
+      mode === "disc"
+        ? this.clamp(qtdRaw, 1, 10)   // discursivas
+        : this.clamp(qtdRaw, 3, 30);  // objetivas
 
     this.STATE.config = {
+      ...this.STATE.config,
       banca,
-      qtd: this.clamp(qtd, 3, 30),
+      qtd,
       dificuldade,
       tema,
       tempo: this.clamp(tempo, 5, 180),
@@ -259,7 +281,7 @@ export const simulados = {
     this.STATE.respostas = [];
     this.STATE.questoes = [];
 
-    // timer
+    // timer (opcional)
     if (this.STATE.timer.enabled) {
       this.STATE.timer.totalSec = this.STATE.config.tempo * 60;
       this.STATE.timer.leftSec = this.STATE.timer.totalSec;
@@ -284,16 +306,6 @@ export const simulados = {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
       this.toast("Não foi possível gerar agora. Usando modo offline.");
       this.STATE.questoes = this.buildMockQuestions(this.STATE.config);
-    }
-
-    // ✅ sanity: garante que contador bate com o que vamos exibir
-    if (this.STATE.questoes.length !== this.STATE.config.qtd) {
-      console.warn("⚠️ Quantidade exibida diferente do config.qtd", {
-        qtd: this.STATE.config.qtd,
-        got: this.STATE.questoes.length,
-        mode: this.STATE.config.mode
-      });
-      // Não força, mas dá um toque leve (evita poluição)
     }
 
     this.persistRun();
@@ -562,7 +574,6 @@ export const simulados = {
       const banca = r.config?.banca || this.STATE.config.banca;
       const tema = r.config?.tema || this.STATE.config.tema || "Livre";
       const mode = r.config?.mode || this.STATE.config.mode || "obj";
-
       const modeLabel = mode === "disc" ? "Discursivas" : "Objetivas";
 
       return `
@@ -583,6 +594,7 @@ export const simulados = {
     })();
 
     const modeLabel = this.STATE.config.mode === "disc" ? "Discursivas" : "Objetivas";
+    const qtdLabel = this.STATE.config.mode === "disc" ? "Discursivas" : "Questões";
 
     this.setHTML(
       "sim-body",
@@ -592,7 +604,7 @@ export const simulados = {
       <div class="card">
         <div class="card-title">${hasRun ? "Novo simulado" : "Simulado"}</div>
         <div class="muted">
-          Configure banca, quantidade e tema (opcional).<br>
+          Configure banca, tipo, quantidade e tema (opcional).<br>
           Depois clique em <b>${hasRun ? "Iniciar novo" : "Iniciar"}</b>.
         </div>
 
@@ -604,7 +616,7 @@ export const simulados = {
         <div class="sim-meta">
           <div><span class="chip">Tipo</span> ${this.escape(modeLabel)}</div>
           <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
-          <div><span class="chip">Questões</span> ${this.STATE.config.qtd}</div>
+          <div><span class="chip">${this.escape(qtdLabel)}</span> ${this.STATE.config.qtd}</div>
           <div><span class="chip">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
           <div><span class="chip">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
           <div><span class="chip">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
@@ -765,6 +777,8 @@ export const simulados = {
 
     if (btnPrev) btnPrev.disabled = idx <= 0;
     if (btnNext) btnNext.disabled = !answered || idx >= total - 1;
+
+    // finish: libera se respondeu pelo menos 1
     if (btnFinish) btnFinish.disabled = this.STATE.respostas.length === 0;
   },
 
@@ -886,8 +900,8 @@ export const simulados = {
         return String.fromCharCode(65 + n);
       };
 
-      const labelText = (n) => {
-        if (n == null) return "—_attach";
+      const textChoice = (n) => {
+        if (n == null) return "—";
         if (isCE) return n === 0 ? "Certo" : "Errado";
         return this.escape(r.alternativas?.[n] ?? "");
       };
@@ -902,8 +916,8 @@ export const simulados = {
           <div class="sim-review-enun">${this.escape(r.enunciado)}</div>
 
           <div class="sim-review-ans">
-            <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${this.escape(isCE ? (sua === 0 ? "Certo" : "Errado") : (r.alternativas?.[sua] ?? ""))}` : "—"}</div>
-            <div><b>Correta:</b> ${letter(correta)}. ${this.escape(isCE ? (correta === 0 ? "Certo" : "Errado") : (r.alternativas?.[correta] ?? ""))}</div>
+            <div><b>Sua:</b> ${sua != null ? `${letter(sua)}. ${textChoice(sua)}` : "—"}</div>
+            <div><b>Correta:</b> ${letter(correta)}. ${textChoice(correta)}</div>
           </div>
 
           ${explicacao ? `<div class="sim-review-exp"><b>Explicação:</b> ${this.escape(explicacao)}</div>` : ""}
@@ -949,7 +963,10 @@ export const simulados = {
     const tipo = q?.tipo || ((q?.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
     if (!answered) {
-      this.setHint(tipo === "disc" ? "Digite sua resposta para liberar a próxima questão." : "Selecione uma alternativa para liberar a próxima questão.");
+      this.setHint(tipo === "disc"
+        ? "Digite sua resposta para liberar a próxima questão."
+        : "Selecione uma alternativa para liberar a próxima questão."
+      );
       return;
     }
 
@@ -961,104 +978,172 @@ export const simulados = {
     this.setHint("Última questão. Quando quiser, clique em Finalizar.");
   },
 
- 
- // -----------------------------
-// API (robusta: usa o payload do backend como fonte de verdade)
-// -----------------------------
-async fetchQuestoesAPI(config) {
-  // ✅ Monte o payload conforme seu seletor de "Tipo" no modal
-  // Se você já tem config.tipo ("obj"/"disc"), use ela.
-  // Caso não tenha, padrão: "obj"
-  const mode = String(config.tipo || "obj").toLowerCase();
+  // -----------------------------
+  // API (robusta: mode vem de config.mode)
+  // -----------------------------
+  async fetchQuestoesAPI(config) {
+    const mode = String(config.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
 
-  const payload =
-    mode === "disc"
-      ? {
-          mode: "disc",
-          banca: config.banca,
-          dificuldade: config.dificuldade,
-          tema: config.tema || "",
-          qtdDiscursivas: Number(config.qtdDiscursivas || 3)
-        }
-      : {
-          mode: "obj",
-          banca: config.banca,
-          qtd: Number(config.qtd || 10),
-          qtdCE: Number(config.qtdCE || Math.max(0, Math.min(Math.floor(Number(config.qtd || 10) * 0.35), Number(config.qtd || 10) - 3))),
-          dificuldade: config.dificuldade,
-          tema: config.tema || ""
-        };
+    const payload =
+      mode === "disc"
+        ? {
+            mode: "disc",
+            banca: config.banca,
+            dificuldade: config.dificuldade,
+            tema: config.tema || "",
+            qtdDiscursivas: this.clamp(Number(config.qtd || 3), 1, 10)
+          }
+        : (() => {
+            const qtd = this.clamp(Number(config.qtd || 10), 3, 30);
+            const qtdCE = Math.max(0, Math.min(Math.floor(qtd * 0.35), qtd - 3));
+            return {
+              mode: "obj",
+              banca: config.banca,
+              qtd,
+              qtdCE,
+              dificuldade: config.dificuldade,
+              tema: config.tema || ""
+            };
+          })();
 
-  const res = await fetch("/api/gerarSimulado", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-    body: JSON.stringify(payload)
-  });
-
-  const data = await res.json().catch(() => null);
-
-  if (!res.ok || !data?.ok) {
-    const detail = data?.error || data?.detail || `HTTP ${res.status}`;
-    throw new Error(detail);
-  }
-
-  // ✅ Prioridade: questoes (novo contrato)
-  // ✅ Fallback: discursivas (para caso algum deploy fique misturado)
-  const raw = Array.isArray(data.questoes) && data.questoes.length
-    ? data.questoes
-    : (Array.isArray(data.discursivas) ? data.discursivas : []);
-
-  // Normaliza sem destruir conteúdo (zero “filter agressivo”)
-  const norm = raw
-    .filter((q) => q && typeof q === "object")
-    .map((q) => {
-      const tipo = String(q.tipo || "").toLowerCase() || (
-        Array.isArray(q.alternativas) && q.alternativas.length === 2 ? "ce" : "mcq"
-      );
-
-      const enunciado = String(q.enunciado || "").trim();
-
-      // ⚠️ Se vier vazio, a gente não apaga: devolve placeholder e loga
-      if (!enunciado) {
-        console.warn("⚠️ Questão sem enunciado (API):", q);
-      }
-
-      if (tipo === "disc") {
-        return {
-          tipo: "disc",
-          enunciado: enunciado || "[Enunciado não recebido]",
-          respostaModelo: String(q.respostaModelo || "").trim(),
-          criterios: Array.isArray(q.criterios)
-            ? q.criterios.map((c) => String(c).trim()).filter(Boolean).slice(0, 12)
-            : []
-        };
-      }
-
-      const alts = Array.isArray(q.alternativas) ? q.alternativas.map((a) => String(a).trim()) : [];
-      const isCE = tipo === "ce" || alts.length === 2;
-
-      return {
-        tipo: isCE ? "ce" : "mcq",
-        enunciado: enunciado || "[Enunciado não recebido]",
-        alternativas: isCE ? ["Certo", "Errado"] : alts.slice(0, 4),
-        corretaIndex: Number.isInteger(q.corretaIndex)
-          ? (isCE ? Math.max(0, Math.min(1, q.corretaIndex)) : Math.max(0, Math.min(3, q.corretaIndex)))
-          : 0,
-        explicacao: String(q.explicacao || "").trim()
-      };
+    const res = await fetch("/api/gerarSimulado", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload)
     });
 
-  // Segurança: se vier tudo vazio, explode e cai no mock (melhor que UI “muda”)
-  if (!norm.length) {
-    throw new Error("API retornou lista vazia.");
-  }
+    const data = await res.json().catch(() => null);
 
-  // ✅ debug rápido (pode remover depois)
-  console.log("✅ API OK:", { mode: payload.mode, len: norm.length, tipos: norm.map(x => x.tipo) });
+    if (!res.ok || !data?.ok) {
+      const detail = data?.error || data?.detail || `HTTP ${res.status}`;
+      throw new Error(detail);
+    }
 
-  return norm;
-},
+    // ✅ fonte de verdade:
+    // - backend novo: retorna "questoes" sempre
+    // - fallback: alguns deploys podem retornar "discursivas"
+    const raw = Array.isArray(data.questoes) && data.questoes.length
+      ? data.questoes
+      : (Array.isArray(data.discursivas) ? data.discursivas : []);
+
+    const norm = raw
+      .filter((q) => q && typeof q === "object")
+      .map((q) => {
+        const tipo = String(q.tipo || "").toLowerCase() || (
+          Array.isArray(q.alternativas) && q.alternativas.length === 2 ? "ce" : "mcq"
+        );
+
+        const enunciado = String(q.enunciado || "").trim();
+
+        if (!enunciado) console.warn("⚠️ Questão sem enunciado (API):", q);
+
+        if (tipo === "disc") {
+          return {
+            tipo: "disc",
+            enunciado: enunciado || "[Enunciado não recebido]",
+            respostaModelo: String(q.respostaModelo || "").trim(),
+            criterios: Array.isArray(q.criterios)
+              ? q.criterios.map((c) => String(c).trim()).filter(Boolean).slice(0, 12)
+              : []
+          };
+        }
+
+        const alts = Array.isArray(q.alternativas)
+          ? q.alternativas.map((a) => String(a).trim()).filter(Boolean)
+          : [];
+
+        const isCE = tipo === "ce" || alts.length === 2;
+
+        return {
+          tipo: isCE ? "ce" : "mcq",
+          enunciado: enunciado || "[Enunciado não recebido]",
+          alternativas: isCE ? ["Certo", "Errado"] : alts.slice(0, 4),
+          corretaIndex: Number.isInteger(q.corretaIndex)
+            ? (isCE ? this.clamp(q.corretaIndex, 0, 1) : this.clamp(q.corretaIndex, 0, 3))
+            : 0,
+          explicacao: String(q.explicacao || "").trim()
+        };
+      });
+
+    if (!norm.length) throw new Error("API retornou lista vazia.");
+
+    console.log("✅ API OK:", { mode: payload.mode, len: norm.length, tipos: norm.map((x) => x.tipo) });
+
+    return norm;
+  },
+
+  // -----------------------------
+  // MOCK (fallback)
+  // -----------------------------
+  buildMockQuestions(config) {
+    const banca = config.banca || "FGV";
+    const tema = config.tema || "Geral";
+    const mode = String(config.mode || "obj");
+
+    if (mode === "disc") {
+      const qtd = this.clamp(Number(config.qtd || 3), 1, 10);
+      const out = [];
+      for (let i = 0; i < qtd; i++) {
+        out.push({
+          tipo: "disc",
+          enunciado: `(${banca}) (Discursiva) Em ${tema}, explique o raciocínio e a justificativa para uma decisão administrativa, citando princípios aplicáveis.`,
+          respostaModelo: "A resposta deve apresentar: conceito, justificativa, princípios e exemplo prático. Clareza e coerência.",
+          criterios: ["Correção conceitual", "Clareza", "Justificativa", "Exemplos pertinentes"]
+        });
+      }
+      return out;
+    }
+
+    const qtd = this.clamp(Number(config.qtd || 5), 3, 30);
+
+    const base = [
+      {
+        tipo: "mcq",
+        enunciado: `(${banca}) Em ${tema}, qual alternativa descreve melhor o objetivo de uma revisão periódica?`,
+        alternativas: [
+          "Aumentar complexidade sem necessidade",
+          "Identificar falhas e corrigir inconsistências",
+          "Evitar documentação",
+          "Substituir testes por opinião"
+        ],
+        corretaIndex: 1,
+        explicacao: "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
+      },
+      {
+        tipo: "mcq",
+        enunciado: `(${banca}) Qual é uma vantagem prática de estudar por questões (simulados)?`,
+        alternativas: [
+          "Ignorar teoria",
+          "Treinar padrão de prova e consolidar conteúdo",
+          "Garantir acerto sem revisão",
+          "Evitar feedback"
+        ],
+        corretaIndex: 1,
+        explicacao: "Simulados ajudam a consolidar conteúdo e ajustar estratégia de prova."
+      },
+      {
+        tipo: "ce",
+        enunciado: `(${banca}) (C/E) Em ${tema}, revisar erros anteriores aumenta retenção e reduz reincidência.`,
+        alternativas: ["Certo", "Errado"],
+        corretaIndex: 0,
+        explicacao: "Revisar erros gera feedback e reforço de pontos fracos, reduzindo repetição do erro."
+      }
+    ];
+
+    const out = [];
+    for (let i = 0; i < qtd; i++) {
+      const item = base[i % base.length];
+      out.push({
+        tipo: item.tipo,
+        enunciado: item.enunciado,
+        alternativas: item.alternativas ? [...item.alternativas] : [],
+        corretaIndex: typeof item.corretaIndex === "number" ? item.corretaIndex : 0,
+        explicacao: item.explicacao || ""
+      });
+    }
+    return out;
+  },
 
   // -----------------------------
   // RESULTS
@@ -1153,7 +1238,7 @@ async fetchQuestoesAPI(config) {
     // config
     try {
       const c = JSON.parse(localStorage.getItem("liora_sim_config") || "null");
-      if (c?.qtd) this.STATE.config = { ...this.STATE.config, ...c };
+      if (c && typeof c === "object") this.STATE.config = { ...this.STATE.config, ...c };
     } catch {}
 
     // timer enabled
