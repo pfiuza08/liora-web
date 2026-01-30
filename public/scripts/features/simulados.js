@@ -947,90 +947,159 @@ export const simulados = {
     this.setHint("Última questão. Quando quiser, clique em Finalizar.");
   },
 
-  // -----------------------------
-  // API
-  // -----------------------------
-  async fetchQuestoesAPI(config) {
-    const payload = {
-      banca: config.banca,
-      qtd: config.qtd,
-      dificuldade: config.dificuldade,
-      tema: config.tema || "",
 
-      // ✅ mix para sensação de banca
-      // Regra simples: ~35% C/E e 1 discursiva quando qtd >= 8
-      qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
-      qtdDiscursivas: config.qtd >= 8 ? 1 : 0
-    };
-
-    const res = await fetch("/api/gerarSimulado", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} — ${txt}`);
-    }
-
-    const data = await res.json();
-
-    // Objetivas
-    const base = (data?.questoes || [])
-      .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
-      .map((q) => {
+    // -----------------------------
+    // API (robusta para DISC vir em questoes OU em discursivas)
+    // -----------------------------
+    async fetchQuestoesAPI(config) {
+      const payload = {
+        banca: config.banca,
+        qtd: config.qtd,
+        dificuldade: config.dificuldade,
+        tema: config.tema || "",
+        qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
+        qtdDiscursivas: config.qtd >= 8 ? 1 : 0
+      };
+    
+      const res = await fetch("/api/gerarSimulado", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status} — ${txt}`);
+      }
+    
+      const data = await res.json();
+    
+      // 1) NORMALIZA: discursivas podem vir em questoes OU em data.discursivas
+      const rawQuestoes = Array.isArray(data?.questoes) ? data.questoes : [];
+      const rawDisc = Array.isArray(data?.discursivas) ? data.discursivas : [];
+    
+      // 2) Separa objetivas e discursivas que vieram DENTRO de questoes
+      const objFromQuestoes = [];
+      const discFromQuestoes = [];
+    
+      rawQuestoes.forEach((q) => {
+        const tipo = String(q?.tipo || "").toLowerCase();
+    
+        // DISC dentro de questoes (geralmente sem alternativas)
+        if (tipo === "disc") {
+          discFromQuestoes.push({
+            tipo: "disc",
+            enunciado: String(q?.enunciado || "").trim(),
+            respostaModelo: String(q?.respostaModelo || "").trim(),
+            criterios: Array.isArray(q?.criterios)
+              ? q.criterios.map((c) => String(c).trim()).filter(Boolean)
+              : []
+          });
+          return;
+        }
+    
+        // Objetivas (MCQ/CE)
+        if (!q?.enunciado || !Array.isArray(q?.alternativas) || q.alternativas.length < 2) return;
+    
         const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
-        const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
-
-        const isCE = tipo === "ce" || alts.length === 2;
+        const tipoObj = tipo || (alts.length === 2 ? "ce" : "mcq");
+    
+        const isCE = tipoObj === "ce" || alts.length === 2;
         const maxIdx = isCE ? 1 : 3;
-
+    
         const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
-
-        return {
+    
+        objFromQuestoes.push({
           tipo: isCE ? "ce" : "mcq",
           enunciado: String(q.enunciado).trim(),
           alternativas,
-          corretaIndex: Number.isInteger(q.corretaIndex)
+          corretaIndex: Number.isInteger(q?.corretaIndex)
             ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
             : 0,
-          explicacao: q.explicacao ? String(q.explicacao).trim() : ""
-        };
+          explicacao: q?.explicacao ? String(q.explicacao).trim() : ""
+        });
       });
-
-    // ✅ Opção A: mesclar discursivas dentro da lista de questoes
-    const disc = Array.isArray(data?.discursivas) ? data.discursivas : [];
-    const discMapped = disc
-      .filter((d) => d && typeof d.enunciado === "string")
-      .map((d) => ({
-        tipo: "disc",
-        enunciado: String(d.enunciado || "").trim(),
-        respostaModelo: String(d.respostaModelo || "").trim(),
-        criterios: Array.isArray(d.criterios)
-          ? d.criterios.map((c) => String(c).trim()).filter(Boolean)
-          : []
-      }));
-
-    const merged = this.mergeDiscIntoQuestions(base, discMapped);
-
-    // Segurança: se por algum motivo vier mais/menos, não deixa quebrar
-    return Array.isArray(merged) ? merged : base;
-  },
-
-  mergeDiscIntoQuestions(base, discList) {
-    const out = Array.isArray(base) ? [...base] : [];
-    const disc = Array.isArray(discList) ? [...discList] : [];
-    if (!disc.length) return out;
-
-    // Insere cada discursiva perto do final (70% do caminho), para “cara de prova”
-    disc.forEach((dq) => {
-      const pos = Math.max(0, Math.min(out.length, Math.floor(out.length * 0.7)));
-      out.splice(pos, 0, dq);
-    });
-
-    return out;
-  },
+    
+      // 3) Discursivas vindas do campo data.discursivas
+      const discFromDiscursivas = rawDisc
+        .filter((d) => d && (typeof d.enunciado === "string" || typeof d.enunciado === "number"))
+        .map((d) => ({
+          tipo: "disc",
+          enunciado: String(d?.enunciado || "").trim(),
+          respostaModelo: String(d?.respostaModelo || "").trim(),
+          criterios: Array.isArray(d?.criterios)
+            ? d.criterios.map((c) => String(c).trim()).filter(Boolean)
+            : []
+        }))
+        .filter((d) => d.enunciado.length > 0);
+    
+      // 4) Junta tudo (disc pode vir duplicada em 2 fontes; dedup simples por enunciado)
+      const discAll = [...discFromQuestoes, ...discFromDiscursivas];
+      const discDedup = [];
+      const seen = new Set();
+      discAll.forEach((d) => {
+        const key = d.enunciado.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        discDedup.push(d);
+      });
+    
+      // 5) Mescla discursivas dentro das objetivas
+      let merged = this.mergeDiscIntoQuestions(objFromQuestoes, discDedup);
+    
+      // 6) GARANTE qtd final == config.qtd (sem quebrar a UI)
+      merged = this.ensureQtd(merged, config.qtd, config);
+    
+      return merged;
+    },
+    
+    mergeDiscIntoQuestions(base, discList) {
+      const out = Array.isArray(base) ? [...base] : [];
+      const disc = Array.isArray(discList) ? [...discList] : [];
+      if (!disc.length) return out;
+    
+      // Insere cada discursiva perto do final (70% do caminho)
+      disc.forEach((dq) => {
+        const pos = Math.max(0, Math.min(out.length, Math.floor(out.length * 0.7)));
+        out.splice(pos, 0, dq);
+      });
+    
+      return out;
+    },
+    
+    // ✅ mantém exatamente qtd questões no front (8 é 8!)
+    // - se vier menos, completa com mock
+    // - se vier mais, corta mantendo pelo menos 1 discursiva se existir
+    ensureQtd(list, qtd, config) {
+      const target = Number(qtd) || 0;
+      const arr = Array.isArray(list) ? [...list] : [];
+    
+      if (target <= 0) return arr;
+    
+      // Se veio mais do que precisa: corta, mas tenta preservar 1 discursiva se houver
+      if (arr.length > target) {
+        const hasDisc = arr.some((q) => q.tipo === "disc");
+        if (!hasDisc) return arr.slice(0, target);
+    
+        // mantém a primeira discursiva e completa o resto com as primeiras objetivas
+        const disc = arr.find((q) => q.tipo === "disc");
+        const objs = arr.filter((q) => q.tipo !== "disc");
+        const cut = objs.slice(0, Math.max(0, target - 1));
+        // insere discursiva perto do final
+        cut.splice(Math.floor(cut.length * 0.7), 0, disc);
+        return cut.slice(0, target);
+      }
+    
+      // Se veio menos: completa com mock (só objetivas, para não bugar correção)
+      if (arr.length < target) {
+        const missing = target - arr.length;
+        const filler = this.buildMockQuestions({ ...config, qtd: missing })
+          .filter((q) => q.tipo !== "disc"); // filler só objetiva
+        return arr.concat(filler).slice(0, target);
+      }
+    
+      return arr;
+    },
 
   // -----------------------------
   // MOCK (fallback)
