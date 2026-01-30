@@ -180,7 +180,7 @@ export const simulados = {
     this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
 
     // ✅ novo: modo
-    this.setValue("sim-mode", c.mode || "obj");
+    this.setValue("sim-kind", c.mode || "obj");
 
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
@@ -224,7 +224,7 @@ export const simulados = {
     const timerMode = this.getValue("sim-timer-mode") || "on";
 
     // ✅ modo: obj | disc
-    const mode = (this.getValue("sim-mode") || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+    const mode = (this.getValue("sim-kind") || "obj").toLowerCase() === "disc" ? "disc" : "obj";
 
     this.STATE.config = {
       banca,
