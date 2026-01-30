@@ -1,24 +1,21 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.5-PRODUCT (MCQ + CE + DISC + UI polish + QA hooks)
+// Versão: v2.6-PRODUCT (MCQ + CE + DISC + score real + revisão rica)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração (robusto por JS)
 // ✔ Idle mostra Continuar/Descartar quando existir run salvo
-// ✔ Próxima só habilita após responder (com hint contextual)
+// ✔ Próxima só habilita após responder (MCQ/CE ou DISC com texto mínimo)
 // ✔ Botões no padrão do app (btn-primary / btn-secondary / btn-link)
 // ✔ Timer + progresso + resultado + revisão com explicação
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
-// ✔ Suporta MCQ (4 alts) + CE (Certo/Errado, 2 alts) + DISC (textarea)
+// ✔ Suporta MCQ (4) + CE (C/E) + DISC (textarea)
 // ✔ Salvamento em localStorage
 //
-// 🔧 3 sugestões aplicadas (das últimas):
-// 1) CE suportado no front (render + revisão + validação de corretaIndex)
-// 2) "Próxima" com gating + hint que muda automaticamente
-// 3) QA no console: window.lioraSimDebug() + logs leves
-//
-// ✅ Opção A aplicada: mescla discursivas (data.discursivas) dentro de questoes
+// ✅ Opção A: mescla discursivas (data.discursivas) dentro de questoes,
 //    para o simulado ter qtdTotal “de verdade” na UI.
+// ✅ Resultado “sensação de banca”: nota (%) só nas objetivas,
+//    discursivas aparecem separadas na revisão (modelo + critérios).
 // =============================================================
 
 export const simulados = {
@@ -75,7 +72,7 @@ export const simulados = {
       return JSON.parse(JSON.stringify(s));
     };
 
-    console.log("📝 simulados.js v2.5 — iniciado");
+    console.log("📝 simulados.js v2.6 — iniciado");
   },
 
   // -----------------------------
@@ -87,80 +84,72 @@ export const simulados = {
       console.warn("⚠️ screen-simulados não encontrado no DOM.");
       return;
     }
-  
+
     // Helper: só processa eventos vindos do screen ou do modal
     const isFromSim = (el) => {
       if (!el) return false;
       return !!el.closest("#screen-simulados, #sim-config");
     };
-  
-    // -----------------------------
+
     // CLICKs (screen + modal)
-    // -----------------------------
     document.addEventListener("click", (ev) => {
       if (!isFromSim(ev.target)) return;
-  
+
       const btn = ev.target.closest("[data-action]");
       if (!btn) return;
-  
+
       const action = btn.getAttribute("data-action");
       if (!action) return;
-  
+
       switch (action) {
         case "openConfig":      return this.openConfig();
         case "closeConfig":     return this.closeConfig();
         case "saveConfig":      return this.saveConfig();
-  
+
         case "startSimulado":   return this.start();
         case "resumeSimulado":  return this.resumeSimulado();
         case "discardRun":      return this.discardRun();
-  
+
         case "cancelSimulado":  return this.cancel();
-  
+
         case "prevQuestao":     return this.prev();
         case "nextQuestao":     return this.next();
-  
+
         case "finishSimulado":  return this.finish();
         case "restartSimulado": return this.restart();
         case "reviewToggle":    return this.toggleReview();
-  
+
         default:
           return;
       }
     });
-  
-    // -----------------------------
-    // MCQ / CE (radio) — screen
-    // -----------------------------
+
+    // MCQ / CE (radio)
     document.addEventListener("change", (ev) => {
       if (!isFromSim(ev.target)) return;
-  
+
       const inp = ev.target;
       if (!inp?.matches?.("input[name='alt']")) return;
-  
+
       const val = Number(inp.value);
       this.pickAlternative(val);
     });
-  
-    // -----------------------------
-    // ✅ DISC (textarea) — screen
-    // -----------------------------
+
+    // ✅ DISC (textarea)
     document.addEventListener("input", (ev) => {
       if (!isFromSim(ev.target)) return;
-  
+
       const ta = ev.target;
       if (!ta?.matches?.("#sim-disc-answer")) return;
-  
+
       this.saveDiscAnswer(ta.value);
     });
-  
-    // -----------------------------
+
     // Eventos canônicos
-    // -----------------------------
     window.addEventListener("liora:open-simulados", () => {
       this.showScreen();
     });
-  
+
     window.addEventListener("liora:start-simulado", () => {
       this.showScreen();
       this.start();
@@ -429,7 +418,6 @@ export const simulados = {
 
     const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
     const r = this.STATE.respostas.find((x) => x.idx === idx);
-
     if (!r) return false;
 
     if (tipo === "disc") {
@@ -772,8 +760,9 @@ export const simulados = {
     this.setText("sim-timer-text", this.formatTime(this.STATE.timer.leftSec));
   },
 
+  // ✅ Resultado com “nota de prova”: só objetivas pontuam
   renderResult(result) {
-    const { totalScored, acertos, erros, pct, total, discursivasCount } = result;
+    const { totalAll, totalObj, totalDisc, acertos, erros, brancos, pct } = result;
 
     this.setHTML(
       "sim-body",
@@ -784,14 +773,16 @@ export const simulados = {
         <div class="sim-score">
           <div class="score-main">${pct}%</div>
           <div class="muted">
-            Acertos: <b>${acertos}</b> de <b>${totalScored}</b>
-            ${discursivasCount ? ` · Discursivas: <b>${discursivasCount}</b>` : ""}
+            <b>Objetivas:</b> ${acertos} / ${totalObj}
+            ${brancos ? ` · Em branco: <b>${brancos}</b>` : ""}
+            ${totalDisc ? `<br><b>Discursivas:</b> <b>${totalDisc}</b> (corrija pela revisão)` : ""}
           </div>
         </div>
 
         <div class="sim-meta">
-          <div><span class="chip">Total</span> ${total}</div>
-          <div><span class="chip">Objetivas</span> ${totalScored}</div>
+          <div><span class="chip">Total</span> ${totalAll}</div>
+          <div><span class="chip">Objetivas</span> ${totalObj}</div>
+          <div><span class="chip">Discursivas</span> ${totalDisc}</div>
           <div><span class="chip">Acertos</span> ${acertos}</div>
           <div><span class="chip">Erros</span> ${erros}</div>
           <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
@@ -807,7 +798,7 @@ export const simulados = {
 
       <div class="card hidden" id="sim-review">
         <div class="card-title">Revisão</div>
-        <div class="muted small">Respostas, correta e feedback. Discursivas aparecem com modelo/critério.</div>
+        <div class="muted small">Objetivas com correta/explicação e discursivas com modelo + critérios.</div>
         <div class="sim-review-list" id="sim-review-list"></div>
       </div>
     `
@@ -831,8 +822,14 @@ export const simulados = {
         const modelo = String(r.respostaModelo || "").trim();
         const criterios = Array.isArray(r.criterios) ? r.criterios : [];
 
+        const criteriosHtml = criterios.length
+          ? `<ul style="margin:6px 0 0 18px;">
+              ${criterios.slice(0, 10).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+            </ul>`
+          : `<div class="muted small">Sem critérios informados.</div>`;
+
         return `
-          <div class="sim-review-item">
+          <div class="sim-review-item disc">
             <div class="sim-review-head">
               <div class="sim-review-q">Q${i + 1}</div>
               <div class="sim-review-badge">Discursiva</div>
@@ -842,34 +839,29 @@ export const simulados = {
 
             <div class="sim-review-ans">
               <div><b>Sua resposta:</b></div>
-              <div class="muted" style="white-space:pre-wrap;">${texto ? this.escape(texto) : "—"}</div>
-            </div>
+              <div class="muted" style="white-space:pre-wrap;">${texto ? this.escape(texto) : "— (em branco)"}</div>
 
-            ${modelo ? `
-              <div class="sim-review-exp" style="margin-top:10px;">
-                <b>Resposta modelo:</b>
+              ${modelo ? `
+                <div style="margin-top:10px;"><b>Resposta-modelo:</b></div>
                 <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
-              </div>
-            ` : ""}
+              ` : ""}
 
-            ${criterios.length ? `
-              <div class="sim-review-exp" style="margin-top:10px;">
-                <b>Critérios:</b>
-                <ul style="margin:6px 0 0 18px;">
-                  ${criterios.slice(0, 10).map((c) => `<li>${this.escape(c)}</li>`).join("")}
-                </ul>
-              </div>
-            ` : ""}
+              <div style="margin-top:10px;"><b>Critérios:</b></div>
+              ${criteriosHtml}
+            </div>
           </div>
         `;
       }
 
       // MCQ/CE
-      const ok = !!r.correta;
       const sua = r.escolha;
       const correta = r.corretaIndex;
       const isCE = tipo === "ce" || (r.alternativas?.length || 0) === 2;
       const explicacao = (r.explicacao || "").trim();
+
+      const ok = sua != null ? sua === correta : false;
+
+      const badge = ok ? "Correta" : (sua == null ? "Em branco" : "Incorreta");
 
       const letter = (n) => {
         if (isCE) return n === 0 ? "C" : "E";
@@ -883,10 +875,10 @@ export const simulados = {
       };
 
       return `
-        <div class="sim-review-item ${ok ? "ok" : "bad"}">
+        <div class="sim-review-item ${ok ? "ok" : (sua == null ? "" : "bad")}">
           <div class="sim-review-head">
             <div class="sim-review-q">Q${i + 1}</div>
-            <div class="sim-review-badge">${ok ? "Correta" : "Incorreta"}</div>
+            <div class="sim-review-badge">${badge}</div>
           </div>
 
           <div class="sim-review-enun">${this.escape(r.enunciado)}</div>
@@ -939,7 +931,11 @@ export const simulados = {
     const tipo = q?.tipo || ((q?.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
     if (!answered) {
-      this.setHint(tipo === "disc" ? "Digite sua resposta para liberar a próxima questão." : "Selecione uma alternativa para liberar a próxima questão.");
+      this.setHint(
+        tipo === "disc"
+          ? "Digite sua resposta para liberar a próxima questão."
+          : "Selecione uma alternativa para liberar a próxima questão."
+      );
       return;
     }
 
@@ -980,6 +976,7 @@ export const simulados = {
 
     const data = await res.json();
 
+    // Objetivas
     const base = (data?.questoes || [])
       .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
       .map((q) => {
@@ -1010,11 +1007,15 @@ export const simulados = {
         tipo: "disc",
         enunciado: String(d.enunciado || "").trim(),
         respostaModelo: String(d.respostaModelo || "").trim(),
-        criterios: Array.isArray(d.criterios) ? d.criterios.map((c) => String(c).trim()).filter(Boolean) : []
+        criterios: Array.isArray(d.criterios)
+          ? d.criterios.map((c) => String(c).trim()).filter(Boolean)
+          : []
       }));
 
     const merged = this.mergeDiscIntoQuestions(base, discMapped);
-    return merged;
+
+    // Segurança: se por algum motivo vier mais/menos, não deixa quebrar
+    return Array.isArray(merged) ? merged : base;
   },
 
   mergeDiscIntoQuestions(base, discList) {
@@ -1074,7 +1075,7 @@ export const simulados = {
       {
         tipo: "disc",
         enunciado: `(${banca}) (Discursiva) Em ${tema}, explique como você aplicaria os princípios-chave para reduzir risco e aumentar conformidade.`,
-        respostaModelo: "A resposta deve cobrir princípios, aplicação prática e justificativa. Deve mencionar medidas técnicas e organizacionais.",
+        respostaModelo: "A resposta deve cobrir princípios, aplicação prática e justificativa. Mencione medidas técnicas e organizacionais.",
         criterios: ["Correção conceitual", "Aplicação prática", "Clareza e objetividade", "Exemplos pertinentes"]
       }
     ];
@@ -1105,15 +1106,22 @@ export const simulados = {
   // RESULTS
   // -----------------------------
   computeResult() {
-    const total = this.STATE.questoes.length;
+    const totalAll = this.STATE.questoes.length;
     const detalhes = [];
 
-    for (let i = 0; i < total; i++) {
+    let totalObj = 0; // mcq + ce
+    let totalDisc = 0;
+    let acertos = 0;
+    let erros = 0;
+    let brancos = 0;
+
+    for (let i = 0; i < totalAll; i++) {
       const q = this.STATE.questoes[i];
       const tipo = q.tipo || ((q.alternativas?.length || 0) === 2 ? "ce" : "mcq");
       const r = this.STATE.respostas.find((x) => x.idx === i);
 
       if (tipo === "disc") {
+        totalDisc += 1;
         detalhes.push({
           idx: i,
           tipo: "disc",
@@ -1125,32 +1133,38 @@ export const simulados = {
         continue;
       }
 
+      totalObj += 1;
+
+      const escolha = typeof r?.escolha === "number" ? r.escolha : null;
+      const corretaIndex = typeof q.corretaIndex === "number" ? q.corretaIndex : 0;
+
+      const correta = escolha != null ? escolha === corretaIndex : false;
+
+      if (escolha == null) brancos += 1;
+      else if (correta) acertos += 1;
+      else erros += 1;
+
       detalhes.push({
         idx: i,
         tipo,
         enunciado: q.enunciado,
         alternativas: q.alternativas,
-        corretaIndex: q.corretaIndex,
+        corretaIndex,
         explicacao: q.explicacao || "",
-        escolha: r?.escolha ?? null,
-        correta: r ? r.escolha === q.corretaIndex : false
+        escolha,
+        correta
       });
     }
 
-    const scored = detalhes.filter((d) => d.tipo !== "disc");
-    const totalScored = scored.length;
-    const acertos = scored.filter((d) => d.correta).length;
-    const erros = totalScored - acertos;
-    const pct = totalScored ? Math.round((acertos / totalScored) * 100) : 0;
-
-    const discursivasCount = detalhes.filter((d) => d.tipo === "disc").length;
+    const pct = totalObj ? Math.round((acertos / totalObj) * 100) : 0;
 
     return {
-      total,
-      totalScored,
-      discursivasCount,
+      totalAll,
+      totalObj,
+      totalDisc,
       acertos,
       erros,
+      brancos,
       pct,
       detalhes,
       config: { ...this.STATE.config }
@@ -1278,6 +1292,6 @@ export const simulados = {
 
 /*
 ✅ Fora do simulados.js: nada obrigatório.
-Opcional (se quiser mais bonito): criar estilos para textarea/input dentro de .sim-card,
-mas o inline style já deixa usável no MVP.
+Opcional: se quiser “banca vibes” ainda mais fortes, eu te passo um mini CSS
+só para .sim-review-item.disc e textarea ficar com cara de folha de redação.
 */
