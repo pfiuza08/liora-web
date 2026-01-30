@@ -56,6 +56,15 @@ export const simulados = {
     // ✅ hook de QA no console
     window.lioraSimDebug = () => {
       const s = this.STATE;
+      // ✅ Toggle de discursivas via console (sem mexer no modal HTML)
+      window.lioraSimSetDisc = (on) => {
+        this.STATE.config.discEnabled = !!on;
+        this.persistConfig();
+        console.log("✍️ Discursivas:", this.STATE.config.discEnabled ? "ON" : "OFF");
+        if (!this.STATE.running) this.renderIdle();
+        return this.STATE.config.discEnabled;
+      };
+     
       console.log("🧪 LIORA Simulados Debug");
       console.log("running:", s.running, "idx:", s.atual, "/", Math.max(0, s.questoes.length - 1));
       console.log("config:", s.config);
