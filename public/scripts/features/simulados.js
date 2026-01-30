@@ -24,12 +24,15 @@ export const simulados = {
   STATE: {
     running: false,
     _savedRun: null, // usado só no Idle para "Continuar"
-    config: {
+   config: {
       banca: "FGV",
       qtd: 5,
       dificuldade: "misturado",
       tema: "",
-      tempo: 20 // minutos
+      tempo: 20, // minutos
+    
+      // ✅ Discursivas: padrão OFF (MVP)
+      discEnabled: false
     },
     questoes: [],
     atual: 0,
@@ -957,8 +960,11 @@ export const simulados = {
         qtd: config.qtd,
         dificuldade: config.dificuldade,
         tema: config.tema || "",
+    
+        // ✅ mix para sensação de banca
+        // ~35% C/E e discursiva apenas se discEnabled=true
         qtdCE: Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
-        qtdDiscursivas: config.qtd >= 8 ? 1 : 0
+        qtdDiscursivas: config.discEnabled ? (config.qtd >= 8 ? 1 : 0) : 0
       };
     
       const res = await fetch("/api/gerarSimulado", {
@@ -974,98 +980,85 @@ export const simulados = {
     
       const data = await res.json();
     
-      // 1) NORMALIZA: discursivas podem vir em questoes OU em data.discursivas
-      const rawQuestoes = Array.isArray(data?.questoes) ? data.questoes : [];
-      const rawDisc = Array.isArray(data?.discursivas) ? data.discursivas : [];
+      // -------------------------
+      // 1) Objetivas (MCQ/CE)
+      // -------------------------
+      const base = (data?.questoes || [])
+        .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
+        .map((q) => {
+          const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
+          const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
     
-      // 2) Separa objetivas e discursivas que vieram DENTRO de questoes
-      const objFromQuestoes = [];
-      const discFromQuestoes = [];
+          const isCE = tipo === "ce" || alts.length === 2;
+          const maxIdx = isCE ? 1 : 3;
     
-      rawQuestoes.forEach((q) => {
-        const tipo = String(q?.tipo || "").toLowerCase();
+          const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
     
-        // DISC dentro de questoes (geralmente sem alternativas)
-        if (tipo === "disc") {
-          discFromQuestoes.push({
-            tipo: "disc",
-            enunciado: String(q?.enunciado || "").trim(),
-            respostaModelo: String(q?.respostaModelo || "").trim(),
-            criterios: Array.isArray(q?.criterios)
-              ? q.criterios.map((c) => String(c).trim()).filter(Boolean)
-              : []
-          });
-          return;
-        }
-    
-        // Objetivas (MCQ/CE)
-        if (!q?.enunciado || !Array.isArray(q?.alternativas) || q.alternativas.length < 2) return;
-    
-        const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
-        const tipoObj = tipo || (alts.length === 2 ? "ce" : "mcq");
-    
-        const isCE = tipoObj === "ce" || alts.length === 2;
-        const maxIdx = isCE ? 1 : 3;
-    
-        const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
-    
-        objFromQuestoes.push({
-          tipo: isCE ? "ce" : "mcq",
-          enunciado: String(q.enunciado).trim(),
-          alternativas,
-          corretaIndex: Number.isInteger(q?.corretaIndex)
-            ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
-            : 0,
-          explicacao: q?.explicacao ? String(q.explicacao).trim() : ""
+          return {
+            tipo: isCE ? "ce" : "mcq",
+            enunciado: String(q.enunciado).trim(),
+            alternativas,
+            corretaIndex: Number.isInteger(q.corretaIndex)
+              ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
+              : 0,
+            explicacao: q.explicacao ? String(q.explicacao).trim() : ""
+          };
         });
-      });
     
-      // 3) Discursivas vindas do campo data.discursivas
-      const discFromDiscursivas = rawDisc
-        .filter((d) => d && (typeof d.enunciado === "string" || typeof d.enunciado === "number"))
+      // -------------------------
+      // 2) Discursivas (opcional)
+      // -------------------------
+      const disc = Array.isArray(data?.discursivas) ? data.discursivas : [];
+      const discMapped = (config.discEnabled ? disc : [])
+        .filter((d) => d && typeof d.enunciado === "string")
         .map((d) => ({
           tipo: "disc",
-          enunciado: String(d?.enunciado || "").trim(),
-          respostaModelo: String(d?.respostaModelo || "").trim(),
-          criterios: Array.isArray(d?.criterios)
+          enunciado: String(d.enunciado || "").trim(),
+          respostaModelo: String(d.respostaModelo || "").trim(),
+          criterios: Array.isArray(d.criterios)
             ? d.criterios.map((c) => String(c).trim()).filter(Boolean)
             : []
-        }))
-        .filter((d) => d.enunciado.length > 0);
+        }));
     
-      // 4) Junta tudo (disc pode vir duplicada em 2 fontes; dedup simples por enunciado)
-      const discAll = [...discFromQuestoes, ...discFromDiscursivas];
-      const discDedup = [];
-      const seen = new Set();
-      discAll.forEach((d) => {
-        const key = d.enunciado.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        discDedup.push(d);
-      });
+      // ✅ disc no final (cara de prova)
+      let merged = this.mergeDiscIntoQuestions(base, discMapped);
     
-      // 5) Mescla discursivas dentro das objetivas
-      let merged = this.mergeDiscIntoQuestions(objFromQuestoes, discDedup);
+      // -------------------------
+      // 3) Garantia de quantidade (TOP-UP)
+      // -------------------------
+      // Se o backend devolver menos objetivas do que o solicitado,
+      // a UI fica coerente: completa com mock objetivo (sem disc).
+      const targetTotal = Number(config.qtd) || 5;
     
-      // 6) GARANTE qtd final == config.qtd (sem quebrar a UI)
-      merged = this.ensureQtd(merged, config.qtd, config);
+      if (merged.length < targetTotal) {
+        const need = targetTotal - merged.length;
+    
+        // usa mock, mas só pega MCQ/CE para não “inventar discursiva”
+        const mock = this.buildMockQuestions({ ...config, qtd: targetTotal })
+          .filter((q) => q.tipo !== "disc")
+          .slice(0, need);
+    
+        merged = merged.concat(mock);
+      }
+    
+      // Se vier mais do que o esperado (raro), corta para não confundir a UI
+      if (merged.length > targetTotal) {
+        merged = merged.slice(0, targetTotal);
+      }
     
       return merged;
     },
+
     
-    mergeDiscIntoQuestions(base, discList) {
+   mergeDiscIntoQuestions(base, discList) {
       const out = Array.isArray(base) ? [...base] : [];
       const disc = Array.isArray(discList) ? [...discList] : [];
       if (!disc.length) return out;
     
-      // Insere cada discursiva perto do final (70% do caminho)
-      disc.forEach((dq) => {
-        const pos = Math.max(0, Math.min(out.length, Math.floor(out.length * 0.7)));
-        out.splice(pos, 0, dq);
-      });
-    
-      return out;
+      // ✅ DISC no final: primeiro objetivas, depois discursivas
+      return out.concat(disc);
     },
+
     
     // ✅ mantém exatamente qtd questões no front (8 é 8!)
     // - se vier menos, completa com mock
