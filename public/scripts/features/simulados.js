@@ -961,164 +961,104 @@ export const simulados = {
     this.setHint("Última questão. Quando quiser, clique em Finalizar.");
   },
 
-  // -----------------------------
-  // API
-  // -----------------------------
-  async fetchQuestoesAPI(config) {
-    const isDiscMode = (config.mode || "obj") === "disc";
+ 
+ // -----------------------------
+// API (robusta: usa o payload do backend como fonte de verdade)
+// -----------------------------
+async fetchQuestoesAPI(config) {
+  // ✅ Monte o payload conforme seu seletor de "Tipo" no modal
+  // Se você já tem config.tipo ("obj"/"disc"), use ela.
+  // Caso não tenha, padrão: "obj"
+  const mode = String(config.tipo || "obj").toLowerCase();
 
-    // Modo DISC: queremos só discursivas na UI.
-    // Para economizar no backend (que clampa qtd min 3), mandamos qtd=3 fixo.
-    // A UI ignora data.questoes e usa somente data.discursivas.
-    const payload = {
-      banca: config.banca,
-      qtd: isDiscMode ? 3 : config.qtd, // backend pode clamp; mantemos baixo no modo disc
-      dificuldade: config.dificuldade,
-      tema: config.tema || "",
+  const payload =
+    mode === "disc"
+      ? {
+          mode: "disc",
+          banca: config.banca,
+          dificuldade: config.dificuldade,
+          tema: config.tema || "",
+          qtdDiscursivas: Number(config.qtdDiscursivas || 3)
+        }
+      : {
+          mode: "obj",
+          banca: config.banca,
+          qtd: Number(config.qtd || 10),
+          qtdCE: Number(config.qtdCE || Math.max(0, Math.min(Math.floor(Number(config.qtd || 10) * 0.35), Number(config.qtd || 10) - 3))),
+          dificuldade: config.dificuldade,
+          tema: config.tema || ""
+        };
 
-      // ✅ sensação de banca (OBJ) ou OFF (DISC)
-      qtdCE: isDiscMode
-        ? 0
-        : Math.max(0, Math.min(Math.floor(config.qtd * 0.35), config.qtd - 3)),
+  const res = await fetch("/api/gerarSimulado", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify(payload)
+  });
 
-      // ✅ DISC opcional: OFF no modo OBJ, ON no modo DISC
-      qtdDiscursivas: isDiscMode ? config.qtd : 0
-    };
+  const data = await res.json().catch(() => null);
 
-    const res = await fetch("/api/gerarSimulado", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+  if (!res.ok || !data?.ok) {
+    const detail = data?.error || data?.detail || `HTTP ${res.status}`;
+    throw new Error(detail);
+  }
+
+  // ✅ Prioridade: questoes (novo contrato)
+  // ✅ Fallback: discursivas (para caso algum deploy fique misturado)
+  const raw = Array.isArray(data.questoes) && data.questoes.length
+    ? data.questoes
+    : (Array.isArray(data.discursivas) ? data.discursivas : []);
+
+  // Normaliza sem destruir conteúdo (zero “filter agressivo”)
+  const norm = raw
+    .filter((q) => q && typeof q === "object")
+    .map((q) => {
+      const tipo = String(q.tipo || "").toLowerCase() || (
+        Array.isArray(q.alternativas) && q.alternativas.length === 2 ? "ce" : "mcq"
+      );
+
+      const enunciado = String(q.enunciado || "").trim();
+
+      // ⚠️ Se vier vazio, a gente não apaga: devolve placeholder e loga
+      if (!enunciado) {
+        console.warn("⚠️ Questão sem enunciado (API):", q);
+      }
+
+      if (tipo === "disc") {
+        return {
+          tipo: "disc",
+          enunciado: enunciado || "[Enunciado não recebido]",
+          respostaModelo: String(q.respostaModelo || "").trim(),
+          criterios: Array.isArray(q.criterios)
+            ? q.criterios.map((c) => String(c).trim()).filter(Boolean).slice(0, 12)
+            : []
+        };
+      }
+
+      const alts = Array.isArray(q.alternativas) ? q.alternativas.map((a) => String(a).trim()) : [];
+      const isCE = tipo === "ce" || alts.length === 2;
+
+      return {
+        tipo: isCE ? "ce" : "mcq",
+        enunciado: enunciado || "[Enunciado não recebido]",
+        alternativas: isCE ? ["Certo", "Errado"] : alts.slice(0, 4),
+        corretaIndex: Number.isInteger(q.corretaIndex)
+          ? (isCE ? Math.max(0, Math.min(1, q.corretaIndex)) : Math.max(0, Math.min(3, q.corretaIndex)))
+          : 0,
+        explicacao: String(q.explicacao || "").trim()
+      };
     });
 
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} — ${txt}`);
-    }
+  // Segurança: se vier tudo vazio, explode e cai no mock (melhor que UI “muda”)
+  if (!norm.length) {
+    throw new Error("API retornou lista vazia.");
+  }
 
-    const data = await res.json();
+  // ✅ debug rápido (pode remover depois)
+  console.log("✅ API OK:", { mode: payload.mode, len: norm.length, tipos: norm.map(x => x.tipo) });
 
-    // ---------- MODO DISC ----------
-    if (isDiscMode) {
-      const disc = Array.isArray(data?.discursivas) ? data.discursivas : [];
-      const discMapped = disc
-        .filter((d) => d && typeof d.enunciado === "string")
-        .map((d) => ({
-          tipo: "disc",
-          enunciado: String(d.enunciado || "").trim(),
-          respostaModelo: String(d.respostaModelo || "").trim(),
-          criterios: Array.isArray(d.criterios)
-            ? d.criterios.map((c) => String(c).trim()).filter(Boolean)
-            : []
-        }))
-        .slice(0, config.qtd);
-
-      if (!discMapped.length) {
-        throw new Error("API não retornou discursivas no modo DISC.");
-      }
-
-      // Garante que a UI mostra exatamente config.qtd (se vier menos, completa com mocks)
-      const out = [...discMapped];
-      while (out.length < config.qtd) {
-        out.push({
-          tipo: "disc",
-          enunciado: `(${config.banca}) (Discursiva) ${config.tema || "Tema livre"}: responda de forma objetiva.`,
-          respostaModelo: "Explique os pontos centrais, justifique e dê um exemplo.",
-          criterios: ["Correção conceitual", "Clareza", "Objetividade", "Exemplo pertinente"]
-        });
-      }
-
-      return out;
-    }
-
-    // ---------- MODO OBJ ----------
-    const base = (data?.questoes || [])
-      .filter((q) => q?.enunciado && Array.isArray(q?.alternativas) && q.alternativas.length >= 2)
-      .map((q) => {
-        const alts = q.alternativas.map((a) => String(a).trim()).filter(Boolean);
-        const tipo = q.tipo || (alts.length === 2 ? "ce" : "mcq");
-
-        const isCE = tipo === "ce" || alts.length === 2;
-        const maxIdx = isCE ? 1 : 3;
-        const alternativas = isCE ? alts.slice(0, 2) : alts.slice(0, 4);
-
-        return {
-          tipo: isCE ? "ce" : "mcq",
-          enunciado: String(q.enunciado).trim(),
-          alternativas,
-          corretaIndex: Number.isInteger(q.corretaIndex)
-            ? Math.max(0, Math.min(maxIdx, q.corretaIndex))
-            : 0,
-          explicacao: q.explicacao ? String(q.explicacao).trim() : ""
-        };
-      });
-
-    // Garante exatamente config.qtd no modo OBJ (se vier menos, completa com mocks)
-    const out = [...base].slice(0, config.qtd);
-    while (out.length < config.qtd) {
-      out.push(...this.buildMockQuestions({ ...config, qtd: 1, mode: "obj" }));
-    }
-
-    return out.slice(0, config.qtd);
-  },
-
-  // -----------------------------
-  // MOCK (fallback)
-  // -----------------------------
-  buildMockQuestions(config) {
-    const qtd = config.qtd || 5;
-    const tema = config.tema || "Geral";
-    const banca = config.banca || "FGV";
-    const mode = config.mode || "obj";
-
-    if (mode === "disc") {
-      const out = [];
-      for (let i = 0; i < qtd; i++) {
-        out.push({
-          tipo: "disc",
-          enunciado: `(${banca}) (Discursiva) Em ${tema}, responda de forma objetiva e bem justificada.`,
-          respostaModelo: "A resposta deve cobrir conceitos-chave, aplicação prática e um exemplo.",
-          criterios: ["Correção conceitual", "Aplicação prática", "Clareza", "Exemplo pertinente"]
-        });
-      }
-      return out;
-    }
-
-    const base = [
-      {
-        tipo: "mcq",
-        enunciado: `(${banca}) Em ${tema}, qual alternativa descreve melhor o objetivo de uma revisão periódica?`,
-        alternativas: [
-          "Aumentar complexidade sem necessidade",
-          "Identificar falhas e corrigir inconsistências",
-          "Evitar documentação",
-          "Substituir testes por opinião"
-        ],
-        corretaIndex: 1,
-        explicacao: "Revisões periódicas existem para encontrar problemas e melhorar consistência e qualidade."
-      },
-      {
-        tipo: "ce",
-        enunciado: `(${banca}) (C/E) Em ${tema}, é correto afirmar que revisar erros anteriores aumenta retenção e reduz reincidência.`,
-        alternativas: ["Certo", "Errado"],
-        corretaIndex: 0,
-        explicacao: "Revisar erros gera feedback e reforço de pontos fracos."
-      }
-    ];
-
-    const out = [];
-    for (let i = 0; i < qtd; i++) {
-      const item = base[i % base.length];
-      out.push({
-        tipo: item.tipo,
-        enunciado: item.enunciado,
-        alternativas: [...item.alternativas],
-        corretaIndex: item.corretaIndex,
-        explicacao: item.explicacao || ""
-      });
-    }
-    return out;
-  },
+  return norm;
+},
 
   // -----------------------------
   // RESULTS
