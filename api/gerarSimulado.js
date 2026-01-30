@@ -2,15 +2,16 @@
 // ==========================================================
 // LIORA — API GERAR SIMULADO (SEM SDK openai)
 // - OpenAI via fetch direto
-// - Retorna SEMPRE JSON (com questoes e discursivas, mesmo que vazios)
-// - MCQ: tipo="mcq" | alternativas(4) | corretaIndex 0..3 | explicacao
-// - CE : tipo="ce"  | alternativas(2) | corretaIndex 0..1 | explicacao
-// - DISC: tipo="disc" | sem alternativas | respostaModelo | criterios[]
+// - Retorna SEMPRE JSON
 //
-// ✅ NOVO (contrato):
-// - payload aceita mode: "obj" (default) | "disc"
-// - mode="obj" -> retorna questoes (mcq/ce) e discursivas: []
-// - mode="disc" -> retorna questoes: [] e discursivas (disc)
+// MODOS:
+// - mode="obj"  -> questoes (mcq + ce), discursivas opcional (geralmente vazio)
+// - mode="disc" -> questoes (somente discursivas) + discursivas (espelho)
+//
+// TIPOS:
+// - MCQ : tipo="mcq" | alternativas(4) | corretaIndex 0..3 | explicacao
+// - CE  : tipo="ce"  | alternativas(2) | corretaIndex 0..1 | explicacao
+// - DISC: tipo="disc" | sem alternativas | respostaModelo | criterios[]
 // ==========================================================
 
 function clamp(n, min, max) {
@@ -93,7 +94,8 @@ function bancaProfile(bancaRaw) {
 // mistura MCQ e CE alternando para dar sensação de prova
 function interleave(mcq, ce) {
   const out = [];
-  let i = 0, j = 0;
+  let i = 0;
+  let j = 0;
   while (i < mcq.length || j < ce.length) {
     if (i < mcq.length) out.push(mcq[i++]);
     if (j < ce.length) out.push(ce[j++]);
@@ -101,54 +103,98 @@ function interleave(mcq, ce) {
   return out;
 }
 
-export default async function handler(req, res) {
-  // ✅ contrato estável: sempre devolve esses campos
-  const empty = (status = 200, extra = {}) =>
-    res.status(status).json({
-      ok: false,
-      questoes: [],
-      discursivas: [],
-      meta: {},
-      ...extra
-    });
+// coloca discursivas em posições “humanas” (no meio/final)
+function insertDisc(questoes, disc) {
+  if (!disc.length) return questoes;
 
+  const out = [...questoes];
+  for (let k = 0; k < disc.length; k++) {
+    const base = Math.floor(out.length * 0.7);
+    const span = Math.max(1, out.length - base + 1);
+    const pos = clamp(base + Math.floor(Math.random() * span), 0, out.length);
+    out.splice(pos, 0, disc[k]);
+  }
+  return out;
+}
+
+async function callOpenAI({ apiKey, prompt }) {
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0.35,
+      max_tokens: 2600,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você gera simulado em JSON rigoroso. Responda apenas JSON válido conforme o schema pedido."
+        },
+        { role: "user", content: prompt }
+      ]
+    })
+  });
+
+  const rawText = await resp.text();
+
+  if (!resp.ok) {
+    let errJson = null;
+    try { errJson = JSON.parse(rawText); } catch {}
+    throw new Error(
+      `OpenAI erro HTTP ${resp.status}: ${errJson?.error?.message || rawText.slice(0, 300)}`
+    );
+  }
+
+  const data = JSON.parse(rawText);
+  const content = data?.choices?.[0]?.message?.content || "";
+
+  let parsed = null;
+  try {
+    const trimmed = String(content).trim();
+    if (trimmed.startsWith("{")) parsed = JSON.parse(trimmed);
+  } catch {}
+  if (!parsed) parsed = extractJsonObject(content);
+
+  if (!parsed) {
+    throw new Error(`Modelo não retornou JSON válido. preview=${String(content).slice(0, 220)}`);
+  }
+
+  return parsed;
+}
+
+export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
-      return empty(405, { error: "Use POST" });
+      return res.status(405).json({ ok: false, error: "Use POST" });
     }
 
-    const {
-      banca,
-      qtd,
-      dificuldade,
-      tema,
-      qtdCE,
-      qtdDiscursivas,
-      mode
-    } = req.body || {};
+    const body = req.body || {};
+    const MODE = String(body.mode || "obj").toLowerCase(); // "obj" | "disc"
 
-    const BANCA = String(banca || "FGV");
-    const DIFICULDADE = String(dificuldade || "misturado");
-    const TEMA = String(tema || "").trim();
+    const BANCA = String(body.banca || "FGV");
+    const DIFICULDADE = String(body.dificuldade || "misturado");
+    const TEMA = String(body.tema || "").trim();
 
     const profile = bancaProfile(BANCA);
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return empty(500, { error: "OPENAI_API_KEY ausente no ambiente" });
+      return res.status(500).json({ ok: false, error: "OPENAI_API_KEY ausente no ambiente" });
     }
 
-    const MODE = String(mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
-
-    // --------------------------------------------
-    // MODO DISC: gera SOMENTE discursivas
-    // --------------------------------------------
+    // ======================================================
+    // MODO DISC: somente discursivas
+    // Observação: usa qtdDiscursivas, mas aceita qtd como fallback
+    // ======================================================
     if (MODE === "disc") {
-      // regra: se qtdDiscursivas não vier, usa qtd como fallback
-      const QTD_DISC = clamp(qtdDiscursivas ?? qtd ?? 5, 1, 30);
+      const QTD_DISC = clamp(body.qtdDiscursivas ?? body.qtd ?? 3, 1, 20);
 
-      const promptDISC = `
-Você é um gerador de questões de simulado com estilo de banca.
+      const prompt = `
+Você é um gerador de questões DISCURSIVAS com estilo de banca.
 
 BANCA: ${profile.nome}
 PERFIL DA BANCA (aplique rigorosamente):
@@ -164,6 +210,7 @@ REGRAS IMPORTANTES:
 - NÃO use markdown.
 - NÃO inclua emojis.
 - Responda SOMENTE JSON válido.
+- Discursivas devem ter enunciado claro, resposta modelo e critérios.
 
 SCHEMA EXATO:
 {
@@ -177,116 +224,69 @@ SCHEMA EXATO:
   ]
 }
 
-DICAS DE QUALIDADE (sensação de banca real):
-- Comando claro (explique, discorra, analise, diferencie, justifique).
-- Resposta modelo com estrutura (2 a 8 linhas), objetiva e técnica.
-- Critérios avaliativos objetivos (3 a 6 itens).
+DICAS DE QUALIDADE:
+- Comando bem definido (explique, fundamente, analise, compare).
+- Resposta modelo objetiva e comparável.
+- Critérios curtos e avaliáveis.
 `.trim();
 
-      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          temperature: 0.35,
-          max_tokens: 2200,
-          messages: [
-            {
-              role: "system",
-              content:
-                "Você gera simulado em JSON rigoroso. Responda apenas JSON válido conforme o schema pedido."
-            },
-            { role: "user", content: promptDISC }
-          ]
-        })
-      });
-
-      const rawText = await resp.text();
-
-      if (!resp.ok) {
-        let errJson = null;
-        try { errJson = JSON.parse(rawText); } catch {}
-        return empty(500, {
-          error: "OpenAI retornou erro",
-          status: resp.status,
-          detail: errJson?.error?.message || rawText.slice(0, 300)
-        });
-      }
-
-      const data = JSON.parse(rawText);
-      const content = data?.choices?.[0]?.message?.content || "";
-
-      let parsed = null;
-      try {
-        if (String(content).trim().startsWith("{")) {
-          parsed = JSON.parse(String(content).trim());
-        }
-      } catch {}
-      if (!parsed) parsed = extractJsonObject(content);
-
-      if (!parsed) {
-        return empty(200, {
-          error: "Modelo não retornou JSON válido (DISC)",
-          rawPreview: String(content).slice(0, 300)
-        });
-      }
+      const parsed = await callOpenAI({ apiKey, prompt });
 
       const arrDISC = Array.isArray(parsed.disc) ? parsed.disc : [];
 
+      // saneamento: garante enunciado e evita itens vazios
       const saneDISC = arrDISC
-        .filter(
-          (d) =>
-            d &&
-            typeof d.enunciado === "string" &&
-            typeof d.respostaModelo === "string" &&
-            Array.isArray(d.criterios) &&
-            d.criterios.length >= 2
-        )
+        .filter((d) => d && typeof d.enunciado === "string" && String(d.enunciado).trim().length >= 8)
         .slice(0, QTD_DISC)
         .map((d) => ({
           tipo: "disc",
-          enunciado: String(d.enunciado).trim(),
-          respostaModelo: String(d.respostaModelo).trim(),
-          criterios: d.criterios.slice(0, 8).map((c) => String(c).trim())
+          enunciado: String(d.enunciado || "").trim(),
+          alternativas: [],
+          corretaIndex: null,
+          explicacao: "",
+          respostaModelo: String(d.respostaModelo || "").trim(),
+          criterios: Array.isArray(d.criterios)
+            ? d.criterios.map((c) => String(c).trim()).filter(Boolean).slice(0, 8)
+            : []
         }));
 
-      // se veio vazio, devolve ok=false mas mantendo contrato
-      if (!saneDISC.length) {
-        return empty(200, {
-          error: "DISC insuficientes após validação",
-          rawPreview: String(content).slice(0, 300)
+      if (saneDISC.length < Math.min(1, QTD_DISC)) {
+        return res.status(200).json({
+          ok: false,
+          error: "Discursivas insuficientes após validação"
         });
       }
 
+      // Aqui está o ponto importante para o seu front:
+      // questoes recebe as discursivas também.
       return res.status(200).json({
         ok: true,
-        questoes: [],
-        discursivas: saneDISC,
+        questoes: saneDISC,       // ✅ front usa um único array
+        discursivas: saneDISC,    // ✅ espelho para debug/compat
         meta: {
           mode: "disc",
           banca: BANCA,
           perfilBanca: profile.id,
           dificuldade: DIFICULDADE,
           tema: TEMA,
+          qtdTotal: saneDISC.length,
           qtdDiscursivas: saneDISC.length
         }
       });
     }
 
-    // --------------------------------------------
-    // MODO OBJ: gera SOMENTE objetivas (MCQ + CE)
-    // --------------------------------------------
-    const QTD_TOTAL = clamp(qtd ?? 5, 3, 30);
+    // ======================================================
+    // MODO OBJ: MCQ + CE (disc opcional, mas default 0)
+    // ======================================================
+    const QTD_TOTAL = clamp(body.qtd ?? 5, 3, 30);
 
     // regra: preserve pelo menos 3 MCQ
-    const CE_RAW = clamp(qtdCE ?? 0, 0, 30);
+    const CE_RAW = clamp(body.qtdCE ?? 0, 0, 30);
+
     const QTD_CE = Math.min(CE_RAW, Math.max(0, QTD_TOTAL - 3));
     const QTD_MCQ = Math.max(3, QTD_TOTAL - QTD_CE);
 
-    const promptOBJ = `
+    const prompt = `
 Você é um gerador de questões de simulado com estilo de banca.
 
 BANCA: ${profile.nome}
@@ -329,75 +329,20 @@ SCHEMA EXATO:
   ]
 }
 
-DICAS DE QUALIDADE (sensação de banca real):
+DICAS DE QUALIDADE:
 - Distratores plausíveis, errados por 1 detalhe.
 - Varie comandos (assinale, considere, é correto afirmar, etc).
 - Para C/E, use assertivas com nuance (não óbvias).
-- Explicação: 1–2 frases, objetiva, sem floreio.
+- Explicação: 1–2 frases, objetiva.
 `.trim();
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.35,
-        max_tokens: 2400,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você gera simulado em JSON rigoroso. Responda apenas JSON válido conforme o schema pedido."
-          },
-          { role: "user", content: promptOBJ }
-        ]
-      })
-    });
-
-    const rawText = await resp.text();
-
-    if (!resp.ok) {
-      let errJson = null;
-      try { errJson = JSON.parse(rawText); } catch {}
-      return empty(500, {
-        error: "OpenAI retornou erro",
-        status: resp.status,
-        detail: errJson?.error?.message || rawText.slice(0, 300)
-      });
-    }
-
-    const data = JSON.parse(rawText);
-    const content = data?.choices?.[0]?.message?.content || "";
-
-    let parsed = null;
-    try {
-      if (String(content).trim().startsWith("{")) {
-        parsed = JSON.parse(String(content).trim());
-      }
-    } catch {}
-    if (!parsed) parsed = extractJsonObject(content);
-
-    if (!parsed) {
-      return empty(200, {
-        error: "Modelo não retornou JSON válido (OBJ)",
-        rawPreview: String(content).slice(0, 300)
-      });
-    }
+    const parsed = await callOpenAI({ apiKey, prompt });
 
     const arrMCQ = Array.isArray(parsed.mcq) ? parsed.mcq : [];
     const arrCE = Array.isArray(parsed.ce) ? parsed.ce : [];
 
     const saneMCQ = arrMCQ
-      .filter(
-        (q) =>
-          q &&
-          typeof q.enunciado === "string" &&
-          Array.isArray(q.alternativas) &&
-          q.alternativas.length >= 4
-      )
+      .filter((q) => q && typeof q.enunciado === "string" && Array.isArray(q.alternativas) && q.alternativas.length >= 4)
       .slice(0, QTD_MCQ)
       .map((q) => ({
         tipo: "mcq",
@@ -408,13 +353,7 @@ DICAS DE QUALIDADE (sensação de banca real):
       }));
 
     const saneCE = arrCE
-      .filter(
-        (q) =>
-          q &&
-          typeof q.enunciado === "string" &&
-          Array.isArray(q.alternativas) &&
-          q.alternativas.length >= 2
-      )
+      .filter((q) => q && typeof q.enunciado === "string")
       .slice(0, QTD_CE)
       .map((q) => ({
         tipo: "ce",
@@ -424,24 +363,20 @@ DICAS DE QUALIDADE (sensação de banca real):
         explicacao: String(q.explicacao || "").trim()
       }));
 
-    // garante mínimo de MCQ (segurança)
     if (saneMCQ.length < 3) {
-      return empty(200, {
-        error: "MCQ insuficientes após validação",
-        rawPreview: String(content).slice(0, 300)
+      return res.status(200).json({
+        ok: false,
+        error: "MCQ insuficientes após validação"
       });
     }
 
-    // “cara de prova”: alterna mcq/ce
     let questoes = interleave(saneMCQ, saneCE);
-
-    // corta para o total pedido
     questoes = questoes.slice(0, QTD_TOTAL);
 
     return res.status(200).json({
       ok: true,
       questoes,
-      discursivas: [], // ✅ contrato estável (no modo OBJ é vazio)
+      discursivas: [], // modo obj não traz disc
       meta: {
         mode: "obj",
         banca: BANCA,
@@ -456,7 +391,8 @@ DICAS DE QUALIDADE (sensação de banca real):
     });
   } catch (err) {
     console.error("❌ gerarSimulado error:", err);
-    return empty(500, {
+    return res.status(500).json({
+      ok: false,
       error: "Falha interna ao gerar simulado",
       detail: String(err?.message || err)
     });
