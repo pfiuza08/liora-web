@@ -321,23 +321,39 @@ function isUserPremium() {
 // EXPORT
 // ==========================================================
 export const dashboard = {
-  init() {
+  ctx: null,
+
+  showScreen() {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    document.getElementById("screen-dashboard")?.classList.add("active");
+  },
+
+  init(ctx) {
+    // guarda ctx (mesmo que não use agora)
+    this.ctx = ctx;
+
+    // anti-init duplicado
+    if (window.__lioraDashboardInited) return;
+    window.__lioraDashboardInited = true;
+
     console.log("📊 dashboard.js iniciado (MVP local)");
 
-    // expor API para o Simulados registrar tentativas
-    window.lioraMetrics = window.lioraMetrics || {};
-    window.lioraMetrics.recordAttempt = recordAttempt;
-    window.lioraMetrics.renderDashboard = () => renderDashboard({ isPremium: isUserPremium() });
-
-    // render em 2 cenários:
-    // 1) quando a tela dashboard for aberta via evento
+    // ✅ quando pedir pra abrir dashboard: ativa a tela + renderiza
     window.addEventListener("liora:open-dashboard", () => {
-      renderDashboard({ isPremium: isUserPremium() });
+      this.showScreen();
+
+      // renderiza se a função estiver exposta
+      if (typeof window.lioraMetrics?.renderDashboard === "function") {
+        window.lioraMetrics.renderDashboard();
+      } else {
+        // fallback: tenta disparar um refresh simples
+        window.dispatchEvent(new Event("liora:dashboard-refresh"));
+      }
     });
 
-    // 2) fallback: se a screen já existe no DOM e você não emite evento
-    document.addEventListener("DOMContentLoaded", () => {
-      if (qs("screen-dashboard")) renderDashboard({ isPremium: isUserPremium() });
+    // fallback extra (se você quiser usar esse refresh)
+    window.addEventListener("liora:dashboard-refresh", () => {
+      window.lioraMetrics?.renderDashboard?.();
     });
-  },
+  }
 };
