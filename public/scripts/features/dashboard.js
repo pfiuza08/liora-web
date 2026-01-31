@@ -43,7 +43,9 @@ function saveStore(data) {
 //   dificuldade: string,
 //   total: number,
 //   correct: number,
-//   timeSec: number
+//   timeSec: number,
+//   mode: "obj" | "disc"
+
 // }
 function recordAttempt(attempt) {
   // ✅ trava: não salva tentativa sem questões pontuadas (evita poluir com discursivas/vazio)
