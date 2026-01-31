@@ -305,18 +305,54 @@
 
       <!-- DASHBOARD -->
       <section id="screen-dashboard" class="screen">
-        <div class="screen-head">
-          <button class="btn-link" data-nav="home">← Voltar</button>
-          <h3>Meu desempenho</h3>
+      <div class="screen-head">
+        <button class="btn-link" data-nav="home">← Voltar</button>
+        <h3>Meu desempenho</h3>
+      </div>
+    
+      <!-- RESUMO (FREE) -->
+      <div class="panel">
+        <div class="dash-grid" id="dash-kpis">
+          <!-- preenchido via JS -->
         </div>
+      </div>
+    
+      <!-- INSIGHTS (parte PREMIUM com bloqueio no MVP) -->
+      <div class="panel">
+        <div class="panel-head">
+          <h4>Insights</h4>
+          <div class="muted">Análises e recomendações</div>
+        </div>
+    
+        <div class="dash-grid dash-grid-2" id="dash-insights">
+          <!-- preenchido via JS -->
+        </div>
+      </div>
+    
+      <!-- DETALHES (tabelas) -->
+      <div class="panel">
+        <div class="panel-head">
+          <h4>Detalhes</h4>
+          <div class="muted">Onde você mais ganha pontos</div>
+        </div>
+    
+        <div class="dash-grid dash-grid-2" id="dash-tables">
+          <!-- preenchido via JS -->
+        </div>
+      </div>
+    
+      <!-- EMPTY STATE -->
+      <div class="panel hidden" id="dash-empty">
+        <div class="muted">
+          Ainda não há dados suficientes.<br />
+          Faça seu primeiro simulado para começar a medir seu progresso ✅
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn-primary" data-action="startSimulado">Fazer simulado agora</button>
+        </div>
+      </div>
+    </section>
 
-        <div class="panel">
-          <div class="muted">
-            Em breve ✅<br>
-            Aqui entra evolução por banca + recomendações.
-          </div>
-        </div>
-      </section>
 
     </main>
 
