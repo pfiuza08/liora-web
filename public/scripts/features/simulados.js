@@ -492,19 +492,42 @@ export const simulados = {
 
   finish() {
     if (!this.STATE.running) return;
-
+  
     this.STATE.running = false;
     this.stopTimer();
-
+  
     const res = this.computeResult();
+  
+    // ✅ 4) REGISTRAR MÉTRICAS (MVP local)
+    // Usa o snapshot do run (se existir) para não “misturar” config
+    const cfg = this.STATE._runConfig || this.STATE.config;
+  
+    // tempo gasto real (se timer ligado)
+    const timeSpentSec =
+      this.STATE.timer.enabled && this.STATE.timer.totalSec
+        ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
+        : 0;
+  
+    // Só registra acurácia quando houver questões pontuadas (OBJ/CE/MCQ).
+    // Discursivas não entram em "acerto" (por enquanto).
+    if ((res.totalScored || 0) > 0) {
+      window.lioraMetrics?.recordAttempt?.({
+        banca: cfg.banca,
+        tema: cfg.tema,
+        dificuldade: cfg.dificuldade,
+        total: res.totalScored,   // ✅ quantidade pontuada (MCQ/CE)
+        correct: res.acertos,     // ✅ acertos nas pontuadas
+        timeSec: timeSpentSec
+      });
+    }
+  
     this.persistResult(res);
-
+  
     window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
-
+  
     this.closeConfig();
     this.renderResult(res);
   },
-
   cancel() {
     this.closeConfig();
 
