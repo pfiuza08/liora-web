@@ -220,12 +220,11 @@ function topN(map, n = 5) {
 function renderDashboard({ isPremium = false } = {}) {
   const attempts = loadStore().attempts || [];
 
-  const empty = qs("dash-empty"); // ✅ opcional
+  const empty = qs("dash-empty"); // opcional
   const kpis = qs("dash-kpis");
   const insights = qs("dash-insights");
   const tables = qs("dash-tables");
 
-  // ✅ só exige os containers essenciais
   if (!kpis || !insights || !tables) return;
 
   if (!attempts.length) {
@@ -239,6 +238,23 @@ function renderDashboard({ isPremium = false } = {}) {
   }
 
   const s = computeStats(attempts);
+
+  // helpers locais
+  const fmtLast = (ts) => {
+    if (!ts) return "—";
+    const d = new Date(ts);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm} ${hh}:${mi}`;
+  };
+
+  const getMode = (a) => (String(a?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj");
+  const objCount = attempts.filter((a) => getMode(a) === "obj").length;
+  const discCount = attempts.filter((a) => getMode(a) === "disc").length;
+
+  const last = attempts[attempts.length - 1];
 
   // KPIs (FREE)
   kpis.innerHTML = [
@@ -256,13 +272,38 @@ function renderDashboard({ isPremium = false } = {}) {
       value: s.totalQ ? `${Math.round(s.avgSec)}s` : "—",
       sub: "Média geral",
     }),
+
+    // ✅ novo: último simulado
+    cardKPI({
+      title: "Último simulado",
+      value: fmtLast(last?.ts),
+      sub: `${(last?.banca || "—")} · ${(last?.tema || "Geral")}`,
+    }),
+
+    // ✅ novo: tipos (OBJ/DISC)
+    cardKPI({
+      title: "Tipos",
+      value: `${objCount} OBJ`,
+      sub: `${discCount} DISC`,
+    }),
   ].join("");
 
-  // INSIGHTS (Premium bloqueado)
+  // ✅ novo (FREE): foco atual (tema mais praticado)
+  const topTema = topN(s.byTema, 1)[0];
+  const focoAtualCard = cardKPI({
+    title: "Foco atual",
+    value: topTema?.name || "—",
+    sub: topTema ? `${topTema.total} questões` : "Sem dados",
+    tone: "ok",
+  });
+
+  // INSIGHTS
   const w7txt = s.w7.q ? `${pct(s.w7.acc)} em ${s.w7.q} questões` : "Sem dados";
   const w30txt = s.w30.q ? `${pct(s.w30.acc)} em ${s.w30.q} questões` : "Sem dados";
 
   insights.innerHTML = [
+    focoAtualCard, // ✅ livre
+
     isPremium
       ? cardKPI({ title: "Últimos 7 dias", value: w7txt, sub: `Simulados: ${s.w7.attempts}` })
       : cardLocked({ title: "Últimos 7 dias", teaser: "Evolução semanal (acertos e volume)" }),
