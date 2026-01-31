@@ -256,36 +256,41 @@ function renderDashboard({ isPremium = false } = {}) {
 
   const last = attempts[attempts.length - 1];
 
-  // KPIs (FREE)
+ 
+    // KPIs (FREE) — layout 3 colunas (desktop) preenchido (3×2)
   kpis.innerHTML = [
+    // Linha 1
     cardKPI({
       title: "Acerto geral",
       value: s.totalQ ? pct(s.acc) : "—",
       sub: `${s.totalC}/${s.totalQ} questões`,
       tone: s.acc >= 0.75 ? "good" : s.acc >= 0.6 ? "ok" : "warn",
     }),
-    cardKPI({ title: "Simulados", value: String(s.totalAttempts), sub: "Total feitos" }),
     cardKPI({ title: "Questões", value: String(s.totalQ), sub: "Respondidas" }),
-    cardKPI({ title: "Streak", value: `${s.streak} dia(s)`, sub: "Sequência ativa" }),
+    cardKPI({ title: "Simulados", value: String(s.totalAttempts), sub: "Total feitos" }),
+  
+    // Linha 2
     cardKPI({
       title: "Tempo / questão",
       value: s.totalQ ? `${Math.round(s.avgSec)}s` : "—",
       sub: "Média geral",
     }),
-
-    // ✅ novo: último simulado
+    cardKPI({ title: "Streak", value: `${s.streak} dia(s)`, sub: "Sequência ativa" }),
     cardKPI({
       title: "Último simulado",
       value: fmtLast(last?.ts),
       sub: `${(last?.banca || "—")} · ${(last?.tema || "Geral")}`,
     }),
-
-    // ✅ novo: tipos (OBJ/DISC)
+  
+    // Linha 3 (compacta): Tipos como mini-card, mas ainda em 3 colunas
     cardKPI({
       title: "Tipos",
       value: `${objCount} OBJ`,
       sub: `${discCount} DISC`,
     }),
+    // dois "spacers" invisíveis para fechar 3 colunas sem buracos feios
+    `<div class="dash-spacer"></div>`,
+    `<div class="dash-spacer"></div>`,
   ].join("");
 
   // ✅ novo (FREE): foco atual (tema mais praticado)
