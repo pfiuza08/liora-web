@@ -210,21 +210,22 @@ function topN(map, n = 5) {
 function renderDashboard({ isPremium = false } = {}) {
   const attempts = loadStore().attempts || [];
 
-  const empty = qs("dash-empty");
+  const empty = qs("dash-empty"); // ✅ opcional
   const kpis = qs("dash-kpis");
   const insights = qs("dash-insights");
   const tables = qs("dash-tables");
 
-  if (!empty || !kpis || !insights || !tables) return;
+  // ✅ só exige os containers essenciais
+  if (!kpis || !insights || !tables) return;
 
   if (!attempts.length) {
-    empty.classList.remove("hidden");
+    if (empty) empty.classList.remove("hidden");
     kpis.innerHTML = "";
     insights.innerHTML = "";
     tables.innerHTML = "";
     return;
   } else {
-    empty.classList.add("hidden");
+    if (empty) empty.classList.add("hidden");
   }
 
   const s = computeStats(attempts);
@@ -305,9 +306,13 @@ function renderDashboard({ isPremium = false } = {}) {
   }));
 
   tables.innerHTML = [
-    isPremium ? miniTable("Por banca (top 5)", bancaTop) : cardLocked({ title: "Por banca", teaser: "Acerto e volume por banca" }),
-    isPremium ? miniTable("Por tema (top 5)", temaTop) : cardLocked({ title: "Por tema", teaser: "Acerto e volume por tema" }),
-    miniTable("Por dificuldade", difTop), // eu deixei livre porque dá valor sem entregar o ouro
+    isPremium
+      ? miniTable("Por banca (top 5)", bancaTop)
+      : cardLocked({ title: "Por banca", teaser: "Acerto e volume por banca" }),
+    isPremium
+      ? miniTable("Por tema (top 5)", temaTop)
+      : cardLocked({ title: "Por tema", teaser: "Acerto e volume por tema" }),
+    miniTable("Por dificuldade", difTop),
   ].join("");
 }
 
@@ -329,31 +334,27 @@ export const dashboard = {
   },
 
   init(ctx) {
-    // guarda ctx (mesmo que não use agora)
     this.ctx = ctx;
 
-    // anti-init duplicado
     if (window.__lioraDashboardInited) return;
     window.__lioraDashboardInited = true;
+
+    // ✅ EXPÕE API GLOBAL DO MVP (isso estava faltando)
+    window.lioraMetrics = window.lioraMetrics || {};
+    window.lioraMetrics.recordAttempt = recordAttempt;
+    window.lioraMetrics.renderDashboard = () => renderDashboard({ isPremium: isUserPremium() });
 
     console.log("📊 dashboard.js iniciado (MVP local)");
 
     // ✅ quando pedir pra abrir dashboard: ativa a tela + renderiza
     window.addEventListener("liora:open-dashboard", () => {
       this.showScreen();
-
-      // renderiza se a função estiver exposta
-      if (typeof window.lioraMetrics?.renderDashboard === "function") {
-        window.lioraMetrics.renderDashboard();
-      } else {
-        // fallback: tenta disparar um refresh simples
-        window.dispatchEvent(new Event("liora:dashboard-refresh"));
-      }
+      window.lioraMetrics.renderDashboard();
     });
 
-    // fallback extra (se você quiser usar esse refresh)
+    // opcional: refresh manual
     window.addEventListener("liora:dashboard-refresh", () => {
-      window.lioraMetrics?.renderDashboard?.();
+      window.lioraMetrics.renderDashboard();
     });
-  }
+  },
 };
