@@ -27,6 +27,10 @@ export const ui = {
   },
 
   toast(msg) {
-    console.log("🟠 UI:", msg);
+  console.log("🟠 UI:", msg);
+  if (String(msg).includes("Em breve")) {
+    console.trace("📍 toast() chamado a partir de:");
   }
+}
+
 };
