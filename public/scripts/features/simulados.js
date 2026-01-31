@@ -1236,7 +1236,7 @@ export const simulados = {
       }
     };
     localStorage.setItem("liora_sim_run", JSON.stringify(payload));
-  }
+  },
 
   persistResult(result) {
     localStorage.setItem("liora_sim_last_result", JSON.stringify(result));
