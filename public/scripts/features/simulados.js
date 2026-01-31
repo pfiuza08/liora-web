@@ -525,10 +525,16 @@ export const simulados = {
       banca: cfg?.banca || "—",
       tema: (cfg?.tema || "").trim() || "Geral",
       dificuldade: cfg?.dificuldade || "misturado",
+    
+      // ✅ novo: modo do simulado (obj/disc)
+      mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+    
+      // ✅ usa totalScored (MCQ/CE apenas)
       total: Number(res?.totalScored || 0),
       correct: Number(res?.acertos || 0),
       timeSec: Number(timeSpentSec || 0),
     };
+
   
     // 1) tenta via API do dashboard (se existir)
     try {
@@ -537,27 +543,35 @@ export const simulados = {
       console.warn("⚠️ recordAttempt falhou:", e);
     }
   
-    // 2) fallback: grava direto no localStorage sempre que tiver questões pontuadas
-    // (e mesmo que lioraMetrics não exista)
-    if (attempt.total > 0) {
+    // ✅ Não registra tentativa sem questões pontuadas (evita “disc” poluir)
+    if (attempt.total <= 0) {
+      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
+    } else {
+      // 1) tenta via API do dashboard (se existir)
+      try {
+        window.lioraMetrics?.recordAttempt?.(attempt);
+      } catch (e) {
+        console.warn("⚠️ recordAttempt falhou:", e);
+      }
+    
+      // 2) fallback: grava direto no localStorage (garantia)
       try {
         const key = "lioraMetrics:v1";
         const raw = localStorage.getItem(key);
         const data = raw ? JSON.parse(raw) : { attempts: [] };
-  
+    
         data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
         data.attempts.push(attempt);
-  
+    
         if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-  
+    
         localStorage.setItem(key, JSON.stringify(data));
         console.log("✅ Métrica salva:", attempt);
       } catch (e) {
         console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
       }
-    } else {
-      console.log("ℹ️ Sem questões pontuadas (provável modo discursivo). Não grava acertos.");
     }
+
   
     // -----------------------------
     // fluxo original
