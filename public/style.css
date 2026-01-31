@@ -1989,4 +1989,67 @@ html.light #screen-dashboard .muted{
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+/* ================================
+   DASHBOARD — POLIMENTO FINAL
+================================= */
+
+/* KPIs: deixa o grid mais “compacto” visualmente */
+@media (min-width: 980px){
+  #screen-dashboard #dash-kpis{
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  /* "Tipos" não precisa ser um card alto: reduz altura mínima */
+  #screen-dashboard #dash-kpis .dash-card{
+    min-height: 84px;
+  }
+}
+
+/* Ajuste fino de tipografia: mais hierarquia */
+#screen-dashboard .dash-title{
+  font-size: 12px;
+  letter-spacing: .2px;
+}
+
+#screen-dashboard .dash-value{
+  font-size: 22px;
+  font-weight: 700;
+}
+
+#screen-dashboard .dash-sub{
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* "Tipos": deixa a leitura mais clara (OBJ e DISC) */
+#screen-dashboard #dash-kpis .dash-card:nth-last-child(1) .dash-sub{
+  opacity: .9;
+}
+/* Premium cards: travado mas legível */
+html.dark #screen-dashboard .dash-card.dash-locked{
+  background: rgba(255,255,255,.035);
+  border-color: rgba(255,255,255,.10);
+}
+
+html.dark #screen-dashboard .dash-card.dash-locked .dash-title{
+  opacity: .78;
+}
+
+html.dark #screen-dashboard .dash-card.dash-locked .dash-sub{
+  opacity: .72;
+}
+
+/* Selo Premium mais visível e alinhado */
+html.dark #screen-dashboard .dash-card.dash-locked .dash-lock{
+  opacity: .85;
+  font-size: 12px;
+}
+/* Tone OK (ex: "Foco atual"): glow suave */
+html.dark #screen-dashboard .dash-card.ok{
+  border-color: rgba(59,130,246,.22);
+  box-shadow:
+    0 0 0 1px rgba(59,130,246,.08) inset,
+    0 8px 24px rgba(0,0,0,.25);
+}
 
