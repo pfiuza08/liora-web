@@ -318,7 +318,7 @@ export const simulados = {
   
     this.persistRun(); // persistRun vai usar _runConfig (vamos ajustar)
     this.renderQuestion();
-  }
+  },
 
   resumeSimulado() {
     this.closeConfig();
