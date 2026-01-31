@@ -17,27 +17,28 @@
 export const simulados = {
   ctx: null,
 
-  STATE: {
-    running: false,
-    _savedRun: null,
-    config: {
-      banca: "FGV",
-      qtd: 5,         // OBJ: total de questões | DISC: total de discursivas
-      dificuldade: "misturado",
-      tema: "",
-      tempo: 20,      // minutos
-      mode: "obj"     // "obj" | "disc"
+     STATE: {
+      running: false,
+      _savedRun: null,
+      _runConfig: null, // ✅ snapshot do config usado no run (blinda o mode)
+      config: {
+        banca: "FGV",
+        qtd: 5,         // OBJ: total de questões | DISC: total de discursivas
+        dificuldade: "misturado",
+        tema: "",
+        tempo: 20,      // minutos
+        mode: "obj"     // "obj" | "disc"
+      },
+      questoes: [],
+      atual: 0,
+      respostas: [], // { idx, tipo, escolha?, texto?, correta?, enunciado, alternativas?, corretaIndex?, explicacao?, respostaModelo?, criterios? }
+      timer: {
+        enabled: true,
+        totalSec: 0,
+        leftSec: 0,
+        tickId: null
+      }
     },
-    questoes: [],
-    atual: 0,
-    respostas: [], // { idx, tipo, escolha?, texto?, correta?, enunciado, alternativas?, corretaIndex?, explicacao?, respostaModelo?, criterios? }
-    timer: {
-      enabled: true,
-      totalSec: 0,
-      leftSec: 0,
-      tickId: null
-    }
-  },
 
   // -----------------------------
   // INIT
@@ -268,22 +269,29 @@ export const simulados = {
   // -----------------------------
   // START / FLOW
   // -----------------------------
-  async start() {
+   async start() {
     if (this.STATE.running) return;
-
+  
     this.closeConfig();
-
-    window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...this.STATE.config } }));
-
+  
+    // ✅ snapshot blindado do config no momento do start
+    const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
+    runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+    this.STATE._runConfig = runConfig;
+  
+    console.log("🚦 START snapshot mode =", runConfig.mode, runConfig);
+  
+    window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...runConfig } }));
+  
     // reset runtime
     this.STATE.running = true;
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
-
-    // timer (opcional)
+  
+    // timer
     if (this.STATE.timer.enabled) {
-      this.STATE.timer.totalSec = this.STATE.config.tempo * 60;
+      this.STATE.timer.totalSec = runConfig.tempo * 60;
       this.STATE.timer.leftSec = this.STATE.timer.totalSec;
       this.startTimer();
     } else {
@@ -291,26 +299,26 @@ export const simulados = {
       this.STATE.timer.totalSec = 0;
       this.STATE.timer.leftSec = 0;
     }
-
+  
     this.renderRunning();
     this.setText("sim-enunciado", "Gerando questões...");
     this.setHTML("sim-alts", `<div class="muted small">Isso pode levar alguns segundos.</div>`);
     this.setHint("Carregando questões...");
     this.renderButtonsState();
-
+  
     try {
-      const questoes = await this.fetchQuestoesAPI(this.STATE.config);
+      const questoes = await this.fetchQuestoesAPI(runConfig); // ✅ usa snapshot
       if (!questoes?.length) throw new Error("API retornou vazio.");
       this.STATE.questoes = questoes;
     } catch (err) {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
       this.toast("Não foi possível gerar agora. Usando modo offline.");
-      this.STATE.questoes = this.buildMockQuestions(this.STATE.config);
+      this.STATE.questoes = this.buildMockQuestions(runConfig); // ✅ usa snapshot
     }
-
-    this.persistRun();
+  
+    this.persistRun(); // persistRun vai usar _runConfig (vamos ajustar)
     this.renderQuestion();
-  },
+  }
 
   resumeSimulado() {
     this.closeConfig();
@@ -982,31 +990,34 @@ export const simulados = {
   // API (robusta: mode vem de config.mode)
   // -----------------------------
   async fetchQuestoesAPI(config) {
-    const mode = String(config.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+  // ✅ sempre respeita o config recebido (snapshot do start)
+  const mode = String(config?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
 
-    const payload =
-      mode === "disc"
-        ? {
-            mode: "disc",
+  console.log("🛰️ fetchQuestoesAPI mode =", mode, "config.mode =", config?.mode, "STATE.mode =", this.STATE.config?.mode);
+
+  const payload =
+    mode === "disc"
+      ? {
+          mode: "disc",
+          banca: config.banca,
+          dificuldade: config.dificuldade,
+          tema: config.tema || "",
+          qtdDiscursivas: this.clamp(Number(config.qtd || 3), 1, 10)
+        }
+      : (() => {
+          const qtd = this.clamp(Number(config.qtd || 10), 3, 30);
+          const qtdCE = Math.max(0, Math.min(Math.floor(qtd * 0.35), qtd - 3));
+          return {
+            mode: "obj",
             banca: config.banca,
+            qtd,
+            qtdCE,
             dificuldade: config.dificuldade,
-            tema: config.tema || "",
-            qtdDiscursivas: this.clamp(Number(config.qtd || 3), 1, 10)
-          }
-        : (() => {
-            const qtd = this.clamp(Number(config.qtd || 10), 3, 30);
-            const qtdCE = Math.max(0, Math.min(Math.floor(qtd * 0.35), qtd - 3));
-            return {
-              mode: "obj",
-              banca: config.banca,
-              qtd,
-              qtdCE,
-              dificuldade: config.dificuldade,
-              tema: config.tema || ""
-            };
-          })();
+            tema: config.tema || ""
+          };
+        })();
 
-    const res = await fetch("/api/gerarSimulado", {
+      const res = await fetch("/api/gerarSimulado", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
@@ -1209,10 +1220,12 @@ export const simulados = {
     localStorage.setItem("liora_sim_timer", JSON.stringify({ enabled: this.STATE.timer.enabled }));
   },
 
-  persistRun() {
+    persistRun() {
+    const cfg = this.STATE._runConfig || this.STATE.config;
+  
     const payload = {
       running: this.STATE.running,
-      config: this.STATE.config,
+      config: cfg, // ✅ salva o snapshot
       questoes: this.STATE.questoes,
       atual: this.STATE.atual,
       respostas: this.STATE.respostas,
@@ -1223,7 +1236,7 @@ export const simulados = {
       }
     };
     localStorage.setItem("liora_sim_run", JSON.stringify(payload));
-  },
+  }
 
   persistResult(result) {
     localStorage.setItem("liora_sim_last_result", JSON.stringify(result));
