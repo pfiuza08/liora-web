@@ -2052,4 +2052,27 @@ html.dark #screen-dashboard .dash-card.ok{
     0 0 0 1px rgba(59,130,246,.08) inset,
     0 8px 24px rgba(0,0,0,.25);
 }
+/* KPIs — spacers invisíveis para fechar grid 3 colunas */
+#screen-dashboard .dash-spacer{
+  display: none;
+}
+
+/* Só aparece em desktop (>=980px), mas invisível mesmo assim */
+@media (min-width: 980px){
+  #screen-dashboard #dash-kpis .dash-spacer{
+    display: block;
+    visibility: hidden;
+    height: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+  }
+
+  /* Deixa o último KPI ("Tipos") mais baixo (mini-card) */
+  #screen-dashboard #dash-kpis .dash-card:last-of-type{
+    min-height: 68px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
 
