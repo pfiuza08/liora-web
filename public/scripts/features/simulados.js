@@ -715,12 +715,12 @@ export const simulados = {
            </div>`
         : "";
 
-      this.setHTML(
+       this.setHTML(
         "sim-alts",
         `
         <div class="card" style="padding:12px;">
           <div class="muted small" style="margin-bottom:8px;">Resposta discursiva</div>
-
+      
           <textarea
             id="sim-disc-answer"
             class="input"
@@ -728,12 +728,13 @@ export const simulados = {
             placeholder="Digite sua resposta (rascunho)."
             style="width:100%; resize:vertical;"
           >${this.escape(texto)}</textarea>
-
+      
           ${criteriosHtml}
-          ${modeloHtml}
         </div>
         `
       );
+
+
 
       this.renderProgress();
       this.renderButtonsState();
