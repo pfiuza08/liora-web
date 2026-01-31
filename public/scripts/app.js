@@ -61,6 +61,22 @@ function setupAuthMock() {
 function setupNav() {
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.addEventListener("click", (ev) => {
+      const to = el.getAttribute("data-nav");
+      if (!to) return;
+
+      // ✅ EXCEÇÕES: estes dois já estão funcionais e não devem ser bloqueados
+      if (to === "simulados") {
+        ev.preventDefault();
+        window.dispatchEvent(new Event("liora:open-simulados"));
+        return;
+      }
+
+      if (to === "dashboard") {
+        ev.preventDefault();
+        window.dispatchEvent(new Event("liora:open-dashboard"));
+        return;
+      }
+
       // ✅ Bloqueia apenas quando o item estiver marcado como "em breve"
       // Regras:
       // 1) se tiver data-soon="1" -> bloqueia
@@ -75,9 +91,6 @@ function setupNav() {
         ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
         return;
       }
-
-      const to = el.getAttribute("data-nav");
-      if (!to) return;
 
       router.go(to);
     });
@@ -94,7 +107,6 @@ function boot() {
   pdf.init({ router, store, gates, ui });
   simulados.init({ router, store, gates, ui });
   dashboard.init({ router, store, gates, ui });
-
 
   // rota inicial
   router.go("home");
