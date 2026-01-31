@@ -498,8 +498,9 @@ export const simulados = {
   
     const res = this.computeResult();
   
-    // ✅ 4) REGISTRAR MÉTRICAS (MVP local)
-    // Usa o snapshot do run (se existir) para não “misturar” config
+    // -----------------------------
+    // ✅ DASH METRICS (GRAVAÇÃO GARANTIDA)
+    // -----------------------------
     const cfg = this.STATE._runConfig || this.STATE.config;
   
     // tempo gasto real (se timer ligado)
@@ -508,19 +509,59 @@ export const simulados = {
         ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
         : 0;
   
-    // Só registra acurácia quando houver questões pontuadas (OBJ/CE/MCQ).
-    // Discursivas não entram em "acerto" (por enquanto).
-    if ((res.totalScored || 0) > 0) {
-      window.lioraMetrics?.recordAttempt?.({
-        banca: cfg.banca,
-        tema: cfg.tema,
-        dificuldade: cfg.dificuldade,
-        total: res.totalScored,   // ✅ quantidade pontuada (MCQ/CE)
-        correct: res.acertos,     // ✅ acertos nas pontuadas
-        timeSec: timeSpentSec
-      });
+    // helper yyyy-mm-dd
+    const todayISO = (d = new Date()) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+  
+    // Monta tentativa (OBJ/CE/MCQ)
+    // Discursivas não entram em acerto por enquanto (para não zerar sua taxa).
+    const attempt = {
+      ts: Date.now(),
+      date: todayISO(),
+      banca: cfg?.banca || "—",
+      tema: (cfg?.tema || "").trim() || "Geral",
+      dificuldade: cfg?.dificuldade || "misturado",
+      total: Number(res?.totalScored || 0),
+      correct: Number(res?.acertos || 0),
+      timeSec: Number(timeSpentSec || 0),
+    };
+  
+    // 1) tenta via API do dashboard (se existir)
+    try {
+      window.lioraMetrics?.recordAttempt?.(attempt);
+    } catch (e) {
+      console.warn("⚠️ recordAttempt falhou:", e);
     }
   
+    // 2) fallback: grava direto no localStorage sempre que tiver questões pontuadas
+    // (e mesmo que lioraMetrics não exista)
+    if (attempt.total > 0) {
+      try {
+        const key = "lioraMetrics:v1";
+        const raw = localStorage.getItem(key);
+        const data = raw ? JSON.parse(raw) : { attempts: [] };
+  
+        data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
+        data.attempts.push(attempt);
+  
+        if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
+  
+        localStorage.setItem(key, JSON.stringify(data));
+        console.log("✅ Métrica salva:", attempt);
+      } catch (e) {
+        console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
+      }
+    } else {
+      console.log("ℹ️ Sem questões pontuadas (provável modo discursivo). Não grava acertos.");
+    }
+  
+    // -----------------------------
+    // fluxo original
+    // -----------------------------
     this.persistResult(res);
   
     window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
@@ -528,6 +569,7 @@ export const simulados = {
     this.closeConfig();
     this.renderResult(res);
   },
+
   cancel() {
     this.closeConfig();
 
