@@ -46,6 +46,10 @@ function saveStore(data) {
 //   timeSec: number
 // }
 function recordAttempt(attempt) {
+  // ✅ trava: não salva tentativa sem questões pontuadas (evita poluir com discursivas/vazio)
+  const total = Number(attempt?.total || 0);
+  if (total <= 0) return;
+
   const data = loadStore();
 
   data.attempts.push({
@@ -54,9 +58,12 @@ function recordAttempt(attempt) {
     banca: attempt?.banca || "—",
     tema: (attempt?.tema || "").trim() || "Geral",
     dificuldade: attempt?.dificuldade || "misturado",
-    total: Number(attempt?.total || 0),
+    total,
     correct: Number(attempt?.correct || 0),
     timeSec: Number(attempt?.timeSec || 0),
+
+    // ✅ novo: modo do simulado (compatível com histórico antigo)
+    mode: String(attempt?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
   });
 
   // cap de histórico (evitar localStorage gigante)
@@ -64,6 +71,7 @@ function recordAttempt(attempt) {
 
   saveStore(data);
 }
+
 
 function computeStats(attempts) {
   const totalAttempts = attempts.length;
