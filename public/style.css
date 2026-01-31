@@ -1856,4 +1856,25 @@ html.light .checkpoint-box .cq-input {
   padding: 14px;
   box-shadow: var(--shadow);
 }
+.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.dash-grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media (max-width: 720px){ .dash-grid, .dash-grid-2 { grid-template-columns: 1fr; } }
+
+.dash-card { border: 1px solid rgba(0,0,0,.08); border-radius: 14px; padding: 12px; background: rgba(255,255,255,.6); }
+.dash-title { font-weight: 700; font-size: 13px; }
+.dash-value { font-weight: 900; font-size: 22px; margin-top: 6px; }
+.dash-sub { margin-top: 6px; font-size: 12px; }
+
+.dash-locked { position: relative; opacity: .85; filter: saturate(.7); }
+.dash-lock { position: absolute; top: 10px; right: 10px; font-size: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,.06); }
+
+.dash-list { margin-top: 10px; display: grid; gap: 10px; }
+.dash-row { display:flex; align-items:center; justify-content:space-between; gap: 10px; }
+.dash-row-title { font-weight: 800; font-size: 13px; }
+.dash-row-sub { font-size: 12px; }
+.dash-row-metric { font-weight: 900; }
+
+.dash-card.good { border-color: rgba(0,150,60,.20); }
+.dash-card.ok { border-color: rgba(0,120,200,.20); }
+.dash-card.warn { border-color: rgba(200,120,0,.25); }
 
