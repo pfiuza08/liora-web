@@ -2075,4 +2075,44 @@ html.dark #screen-dashboard .dash-card.ok{
     padding-bottom: 10px;
   }
 }
+/* ================================
+   DASHBOARD — POLIMENTO VISUAL (Opção A)
+   Cola no final do CSS
+================================= */
+
+/* Card Tipos: mais compacto e “badge-like” */
+@media (min-width: 980px){
+  #screen-dashboard #dash-kpis .dash-card:last-of-type{
+    min-height: 64px;
+    padding: 10px 12px;
+  }
+  #screen-dashboard #dash-kpis .dash-card:last-of-type .dash-value{
+    font-size: 18px;
+  }
+  #screen-dashboard #dash-kpis .dash-card:last-of-type .dash-sub{
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: .8;
+  }
+}
+
+/* Selo Premium: padroniza no canto superior direito */
+#screen-dashboard .dash-card{
+  position: relative;
+}
+
+#screen-dashboard .dash-card.dash-locked .dash-lock{
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 12px;
+  opacity: .85;
+}
+
+/* Foco atual: evita quebra feia e mantém hierarquia */
+#screen-dashboard .dash-card.ok .dash-value{
+  font-size: 20px;
+  line-height: 1.15;
+  word-break: keep-all;
+}
 
