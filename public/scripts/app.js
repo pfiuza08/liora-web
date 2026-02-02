@@ -62,24 +62,29 @@ function setupAuthMock() {
 function setupNav() {
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.addEventListener("click", (ev) => {
+      const to = el.getAttribute("data-nav");
+      if (!to) return;
+
+      // ✅ rotas sempre liberadas
+      const ALWAYS_ALLOWED = new Set(["home", "tema", "pdf", "simulados", "dashboard"]);
+
+      // ✅ só bloqueia "em breve" se NÃO estiver na allowlist
       const isSoon = el.getAttribute("data-soon") === "1";
       const pill = el.querySelector(".pill");
       const pillText = (pill?.innerText || "").toLowerCase().trim();
       const pillSaysSoon = pillText.includes("em breve");
 
-      if (isSoon || pillSaysSoon) {
+      if (!ALWAYS_ALLOWED.has(to) && (isSoon || pillSaysSoon)) {
         ev.preventDefault();
         ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
         return;
       }
 
-      const to = el.getAttribute("data-nav");
-      if (!to) return;
-
       router.go(to);
     });
   });
 }
+
 
 function boot() {
   router.init();
