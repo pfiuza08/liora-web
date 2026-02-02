@@ -116,7 +116,8 @@ export const simulados = {
         case "finishSimulado": return this.finish();
         case "restartSimulado": return this.restart();
         case "reviewToggle": return this.toggleReview();
-
+        case "toggleFlag": return this.toggleFlag();
+ 
         default:
           return;
       }
@@ -446,16 +447,18 @@ export const simulados = {
     const correta = index === q.corretaIndex;
 
     const existing = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
-    const payload = {
+        const payload = {
       idx: this.STATE.atual,
       tipo,
       escolha: index,
       correta,
+      flagged: existing?.flagged ?? false,
       enunciado: q.enunciado,
       alternativas: q.alternativas,
       corretaIndex: q.corretaIndex,
       explicacao: q.explicacao || ""
     };
+
 
     if (existing) Object.assign(existing, payload);
     else this.STATE.respostas.push(payload);
@@ -482,10 +485,12 @@ export const simulados = {
       idx: this.STATE.atual,
       tipo: "disc",
       texto: t,
+      flagged: existing?.flagged ?? false,
       enunciado: q.enunciado,
       respostaModelo: q.respostaModelo || "",
       criterios: Array.isArray(q.criterios) ? q.criterios : []
     };
+
 
     if (existing) Object.assign(existing, payload);
     else this.STATE.respostas.push(payload);
@@ -776,7 +781,11 @@ restart() {
         <div class="sim-card sim-question">
           <div class="sim-q-head">
             <div class="sim-q-label" id="sim-q-label"></div>
-            <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
+          
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button class="btn-link small" data-action="toggleFlag" id="btn-flag">Marcar</button>
+              <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
+            </div>
           </div>
 
           <div class="sim-enunciado" id="sim-enunciado"></div>
@@ -849,6 +858,7 @@ restart() {
       this.renderProgress();
       this.renderButtonsState();
       this.updateHintForCurrent();
+      this.renderFlagButton();
       return;
     }
 
@@ -881,6 +891,7 @@ restart() {
     this.renderProgress();
     this.renderButtonsState();
     this.updateHintForCurrent();
+    this.renderFlagButton();
   },
 
   renderButtonsState() {
@@ -1048,6 +1059,37 @@ restart() {
     el.classList.toggle("hidden");
   },
 
+  toggleFlag() {
+    if (!this.STATE.running) return;
+
+    const idx = this.STATE.atual;
+    const existing = this.STATE.respostas.find((r) => r.idx === idx);
+
+    // se ainda não respondeu, cria um placeholder flagged
+    const payload = existing || { idx, tipo: this.STATE.questoes[idx]?.tipo || "mcq" };
+
+    payload.flagged = !payload.flagged;
+
+    if (!existing) this.STATE.respostas.push(payload);
+
+    this.persistRun();
+    this.renderFlagButton();
+    this.toast(payload.flagged ? "Questão marcada." : "Marca removida.");
+  },
+
+  renderFlagButton() {
+    const btn = document.getElementById("btn-flag");
+    if (!btn) return;
+
+    const idx = this.STATE.atual;
+    const r = this.STATE.respostas.find((x) => x.idx === idx);
+    const flagged = !!r?.flagged;
+
+    btn.textContent = flagged ? "Marcada ✓" : "Marcar";
+    btn.style.opacity = flagged ? "1" : "0.75";
+  },
+
+  
   renderHeaderState({ mode }) {
     const badge = document.getElementById("sim-mode");
     if (!badge) return;
@@ -1403,7 +1445,62 @@ restart() {
       console.warn("⚠️ Falha ao salvar stats:", e);
     }
   },
+  // -----------------------------
+  // ✅ REVIEW QUEUE (erradas + marcadas)
+  // localStorage: liora_review_queue:v1
+  // -----------------------------
+  reviewGetQueue() {
+    const key = "liora_review_queue:v1";
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      return { items };
+    } catch {
+      return { items: [] };
+    }
+  },
 
+  reviewSetQueue(next) {
+    const key = "liora_review_queue:v1";
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch (e) {
+      console.warn("⚠️ Falha ao salvar review queue:", e);
+    }
+  },
+
+  reviewHash(str) {
+    // hash simples (estável) só para dedup
+    const s = String(str || "");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i);
+      h |= 0;
+    }
+    return String(h);
+  },
+
+  reviewUpsertItem(item) {
+    const q = this.reviewGetQueue();
+    const items = q.items || [];
+
+    const id = String(item.id || "");
+    const idx = items.findIndex((x) => String(x.id) === id);
+
+    if (idx >= 0) {
+      items[idx] = { ...items[idx], ...item, ts: Date.now() };
+    } else {
+      items.push({ ...item, ts: Date.now() });
+    }
+
+    // limita para não crescer infinito
+    const MAX = 60;
+    const sorted = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, MAX);
+
+    this.reviewSetQueue({ items: sorted });
+  },
+ 
   statsRecordAttempt(attempt) {
     const data = this.statsGet();
     data.attempts.push(attempt);
