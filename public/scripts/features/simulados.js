@@ -161,6 +161,26 @@ export const simulados = {
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-simulados")?.classList.add("active");
+    // se o dashboard pediu para abrir revisão do último resultado
+    try {
+      const flag = localStorage.getItem("liora_sim_open_review");
+      if (flag === "1") {
+        localStorage.removeItem("liora_sim_open_review");
+
+        const last = JSON.parse(localStorage.getItem("liora_sim_last_result") || "null");
+        if (last && typeof last === "object") {
+          // render direto o resultado + revisão
+          this.closeConfig?.();
+          this.renderResult(last);
+          // abre a seção de revisão
+          setTimeout(() => {
+            const el = document.getElementById("sim-review");
+            if (el) el.classList.remove("hidden");
+          }, 50);
+        }
+      }
+    } catch {}
+ 
   },
 
   // -----------------------------
