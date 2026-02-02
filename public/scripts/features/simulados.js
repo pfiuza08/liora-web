@@ -6,127 +6,40 @@
 // ✔ MODAL apenas para configuração (robusto por JS)
 // ✔ Idle mostra Continuar/Descartar quando existir run salvo
 // ✔ Próxima só habilita após responder (hint contextual)
-// ✔ Timer + progresso + resultado + revisão com explicaçãofinish() {
-  if (!this.STATE.running) return;
-
-  this.STATE.running = false;
-  this.stopTimer();
-
-  const res = this.computeResult();
-
-  // -----------------------------
-  // ✅ DASH METRICS (1x + fallback)
-  // -----------------------------
-  const cfg = this.STATE._runConfig || this.STATE.config;
-
-  // tempo gasto real (se timer ligado)
-  const timeSpentSec =
-    this.STATE.timer.enabled && this.STATE.timer.totalSec
-      ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
-      : 0;
-
-  // helper yyyy-mm-dd
-  const todayISO = (d = new Date()) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-
-  // tentativa: só pontua OBJ/CE/MCQ (disc não entra no acerto agora)
-  const attempt = {
-    ts: Date.now(),
-    date: todayISO(),
-    banca: cfg?.banca || "—",
-    tema: (cfg?.tema || "").trim() || "Geral",
-    dificuldade: cfg?.dificuldade || "misturado",
-    mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
-    total: Number(res?.totalScored || 0),
-    correct: Number(res?.acertos || 0),
-    timeSec: Number(timeSpentSec || 0),
-  };
-
-  // ✅ só registra se tiver questões pontuadas (evita “disc” poluir)
-  if (attempt.total > 0) {
-    // 1) tenta via API global do dashboard
-    let saved = false;
-    try {
-      if (typeof window.lioraMetrics?.recordAttempt === "function") {
-        window.lioraMetrics.recordAttempt(attempt);
-        saved = true;
-      }
-    } catch (e) {
-      console.warn("⚠️ recordAttempt falhou:", e);
-    }
-
-    // 2) fallback: grava direto no localStorage (garantia)
-    if (!saved) {
-      try {
-        const key = "lioraMetrics:v1";
-        const raw = localStorage.getItem(key);
-        const data = raw ? JSON.parse(raw) : { attempts: [] };
-
-        data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
-        data.attempts.push(attempt);
-
-        if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-
-        localStorage.setItem(key, JSON.stringify(data));
-        console.log("✅ Métrica salva (fallback):", attempt);
-      } catch (e) {
-        console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
-      }
-    }
-
-    // ✅ refresh do dashboard (se estiver aberto ou quando abrir)
-    window.dispatchEvent(new Event("liora:dashboard-refresh"));
-  } else {
-    console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
-  }
-
-  // -----------------------------
-  // fluxo original
-  // -----------------------------
-  this.persistResult(res);
-
-  window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
-
-  this.closeConfig();
-  this.renderResult(res);
-}
-
+// ✔ Timer + progresso + resultado + revisão com explicação
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
 // ✔ Suporta:
 //    - OBJ: MCQ (4) + CE (2)
 //    - DISC: Discursivas (textarea) em modo separado
 // ✔ Salvamento em localStorage
+// ✔ Métricas: registra tentativas (OBJ/CE/MCQ) para Dashboard
 // =============================================================
 
 export const simulados = {
   ctx: null,
 
-     STATE: {
-      running: false,
-      _savedRun: null,
-      _runConfig: null, // ✅ snapshot do config usado no run (blinda o mode)
-      config: {
-        banca: "FGV",
-        qtd: 5,         // OBJ: total de questões | DISC: total de discursivas
-        dificuldade: "misturado",
-        tema: "",
-        tempo: 20,      // minutos
-        mode: "obj"     // "obj" | "disc"
-      },
-      questoes: [],
-      atual: 0,
-      respostas: [], // { idx, tipo, escolha?, texto?, correta?, enunciado, alternativas?, corretaIndex?, explicacao?, respostaModelo?, criterios? }
-      timer: {
-        enabled: true,
-        totalSec: 0,
-        leftSec: 0,
-        tickId: null
-      }
+  STATE: {
+    running: false,
+    _savedRun: null,
+    _runConfig: null, // ✅ snapshot do config usado no run (blinda o mode)
+    config: {
+      banca: "FGV",
+      qtd: 5,         // OBJ: total de questões | DISC: total de discursivas
+      dificuldade: "misturado",
+      tema: "",
+      tempo: 20,      // minutos
+      mode: "obj"     // "obj" | "disc"
     },
+    questoes: [],
+    atual: 0,
+    respostas: [], // { idx, tipo, escolha?, texto?, correta?, enunciado, alternativas?, corretaIndex?, explicacao?, respostaModelo?, criterios? }
+    timer: {
+      enabled: true,
+      totalSec: 0,
+      leftSec: 0,
+      tickId: null
+    }
+  },
 
   // -----------------------------
   // INIT
@@ -268,7 +181,7 @@ export const simulados = {
     // timer
     this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
 
-    // ✅ modo (seu id: sim-kind)
+    // ✅ modo
     this.setValue("sim-kind", c.mode || "obj");
 
     modal.classList.add("open");
@@ -304,7 +217,6 @@ export const simulados = {
   },
 
   getModeFromUI() {
-    // select principal (seu id)
     const v = String(this.getValue("sim-kind") || "").toLowerCase();
     if (v.includes("disc")) return "disc";
     if (v.includes("obj")) return "obj";
@@ -357,26 +269,26 @@ export const simulados = {
   // -----------------------------
   // START / FLOW
   // -----------------------------
-   async start() {
+  async start() {
     if (this.STATE.running) return;
-  
+
     this.closeConfig();
-  
+
     // ✅ snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
     runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
     this.STATE._runConfig = runConfig;
-  
+
     console.log("🚦 START snapshot mode =", runConfig.mode, runConfig);
-  
+
     window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...runConfig } }));
-  
+
     // reset runtime
     this.STATE.running = true;
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
-  
+
     // timer
     if (this.STATE.timer.enabled) {
       this.STATE.timer.totalSec = runConfig.tempo * 60;
@@ -387,24 +299,24 @@ export const simulados = {
       this.STATE.timer.totalSec = 0;
       this.STATE.timer.leftSec = 0;
     }
-  
+
     this.renderRunning();
     this.setText("sim-enunciado", "Gerando questões...");
     this.setHTML("sim-alts", `<div class="muted small">Isso pode levar alguns segundos.</div>`);
     this.setHint("Carregando questões...");
     this.renderButtonsState();
-  
+
     try {
-      const questoes = await this.fetchQuestoesAPI(runConfig); // ✅ usa snapshot
+      const questoes = await this.fetchQuestoesAPI(runConfig);
       if (!questoes?.length) throw new Error("API retornou vazio.");
       this.STATE.questoes = questoes;
     } catch (err) {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
       this.toast("Não foi possível gerar agora. Usando modo offline.");
-      this.STATE.questoes = this.buildMockQuestions(runConfig); // ✅ usa snapshot
+      this.STATE.questoes = this.buildMockQuestions(runConfig);
     }
-  
-    this.persistRun(); // persistRun vai usar _runConfig (vamos ajustar)
+
+    this.persistRun();
     this.renderQuestion();
   },
 
@@ -430,6 +342,7 @@ export const simulados = {
 
     this.STATE.running = true;
     this.STATE.config = run.config || this.STATE.config;
+    this.STATE._runConfig = run.config || this.STATE._runConfig; // ✅ mantém snapshot do run
     this.STATE.questoes = run.questoes || [];
     this.STATE.atual = run.atual || 0;
     this.STATE.respostas = run.respostas || [];
@@ -578,95 +491,90 @@ export const simulados = {
     }
   },
 
-     finish() {
-      if (!this.STATE.running) return;
-    
-      this.STATE.running = false;
-      this.stopTimer();
-    
-      const res = this.computeResult();
-    
-      // -----------------------------
-      // ✅ DASH METRICS (1x + fallback)
-      // -----------------------------
-      const cfg = this.STATE._runConfig || this.STATE.config;
-    
-      // tempo gasto real (se timer ligado)
-      const timeSpentSec =
-        this.STATE.timer.enabled && this.STATE.timer.totalSec
-          ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
-          : 0;
-    
-      // helper yyyy-mm-dd
-      const todayISO = (d = new Date()) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      };
-    
-      // tentativa: só pontua OBJ/CE/MCQ (disc não entra no acerto agora)
-      const attempt = {
-        ts: Date.now(),
-        date: todayISO(),
-        banca: cfg?.banca || "—",
-        tema: (cfg?.tema || "").trim() || "Geral",
-        dificuldade: cfg?.dificuldade || "misturado",
-        mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
-        total: Number(res?.totalScored || 0),
-        correct: Number(res?.acertos || 0),
-        timeSec: Number(timeSpentSec || 0),
-      };
-    
-      // ✅ só registra se tiver questões pontuadas (evita “disc” poluir)
-      if (attempt.total > 0) {
-        // 1) tenta via API global do dashboard
-        let saved = false;
-        try {
-          if (typeof window.lioraMetrics?.recordAttempt === "function") {
-            window.lioraMetrics.recordAttempt(attempt);
-            saved = true;
-          }
-        } catch (e) {
-          console.warn("⚠️ recordAttempt falhou:", e);
+  // ✅ versão corrigida: registra métrica 1x, sem duplicar
+  finish() {
+    if (!this.STATE.running) return;
+
+    this.STATE.running = false;
+    this.stopTimer();
+
+    const res = this.computeResult();
+
+    // -----------------------------
+    // ✅ DASH METRICS (1x + fallback)
+    // -----------------------------
+    const cfg = this.STATE._runConfig || this.STATE.config;
+
+    const timeSpentSec =
+      this.STATE.timer.enabled && this.STATE.timer.totalSec
+        ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
+        : 0;
+
+    const todayISO = (d = new Date()) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    const attempt = {
+      ts: Date.now(),
+      date: todayISO(),
+      banca: cfg?.banca || "—",
+      tema: (cfg?.tema || "").trim() || "Geral",
+      dificuldade: cfg?.dificuldade || "misturado",
+      mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+      total: Number(res?.totalScored || 0),
+      correct: Number(res?.acertos || 0),
+      timeSec: Number(timeSpentSec || 0),
+    };
+
+    if (attempt.total > 0) {
+      let saved = false;
+
+      try {
+        if (typeof window.lioraMetrics?.recordAttempt === "function") {
+          window.lioraMetrics.recordAttempt(attempt);
+          saved = true;
         }
-    
-        // 2) fallback: grava direto no localStorage (garantia)
-        if (!saved) {
-          try {
-            const key = "lioraMetrics:v1";
-            const raw = localStorage.getItem(key);
-            const data = raw ? JSON.parse(raw) : { attempts: [] };
-    
-            data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
-            data.attempts.push(attempt);
-    
-            if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-    
-            localStorage.setItem(key, JSON.stringify(data));
-            console.log("✅ Métrica salva (fallback):", attempt);
-          } catch (e) {
-            console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
-          }
-        }
-    
-        // ✅ refresh do dashboard (se estiver aberto ou quando abrir)
-        window.dispatchEvent(new Event("liora:dashboard-refresh"));
-      } else {
-        console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
+      } catch (e) {
+        console.warn("⚠️ recordAttempt falhou:", e);
       }
-    
-      // -----------------------------
-      // fluxo original
-      // -----------------------------
-      this.persistResult(res);
-    
-      window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
-    
-      this.closeConfig();
-      this.renderResult(res);
+
+      if (!saved) {
+        try {
+          const key = "lioraMetrics:v1";
+          const raw = localStorage.getItem(key);
+          const data = raw ? JSON.parse(raw) : { attempts: [] };
+
+          data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
+          data.attempts.push(attempt);
+
+          if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
+
+          localStorage.setItem(key, JSON.stringify(data));
+          console.log("✅ Métrica salva (fallback):", attempt);
+        } catch (e) {
+          console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
+        }
+      }
+
+      // refresh do dashboard
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    } else {
+      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
     }
 
+    // -----------------------------
+    // fluxo original
+    // -----------------------------
+    this.persistResult(res);
+
+    window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
+
+    this.closeConfig();
+    this.renderResult(res);
+  },
 
   cancel() {
     this.closeConfig();
@@ -870,20 +778,12 @@ export const simulados = {
            </div>`
         : "";
 
-      const modelo = String(q.respostaModelo || "").trim();
-      const modeloHtml = modelo
-        ? `<div class="muted small" style="margin-top:10px;">
-             <b>Resposta modelo (para comparar depois):</b>
-             <div style="white-space:pre-wrap; margin-top:6px;">${this.escape(modelo)}</div>
-           </div>`
-        : "";
-
-       this.setHTML(
+      this.setHTML(
         "sim-alts",
         `
         <div class="card" style="padding:12px;">
           <div class="muted small" style="margin-bottom:8px;">Resposta discursiva</div>
-      
+
           <textarea
             id="sim-disc-answer"
             class="input"
@@ -891,13 +791,11 @@ export const simulados = {
             placeholder="Digite sua resposta (rascunho)."
             style="width:100%; resize:vertical;"
           >${this.escape(texto)}</textarea>
-      
+
           ${criteriosHtml}
         </div>
         `
       );
-
-
 
       this.renderProgress();
       this.renderButtonsState();
@@ -957,11 +855,11 @@ export const simulados = {
   renderProgress() {
     const total = this.STATE.questoes.length || 1;
     const answered = this.STATE.respostas.length;
-    const pct = Math.round((answered / total) * 100);
+    const p = Math.round((answered / total) * 100);
 
     this.setText("sim-progress-text", `Respondidas: ${answered} / ${total}`);
     const fill = document.getElementById("sim-progress-bar");
-    if (fill) fill.style.width = `${pct}%`;
+    if (fill) fill.style.width = `${p}%`;
   },
 
   renderTimer() {
@@ -1135,9 +1033,10 @@ export const simulados = {
     const tipo = q?.tipo || ((q?.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
     if (!answered) {
-      this.setHint(tipo === "disc"
-        ? "Digite sua resposta para liberar a próxima questão."
-        : "Selecione uma alternativa para liberar a próxima questão."
+      this.setHint(
+        tipo === "disc"
+          ? "Digite sua resposta para liberar a próxima questão."
+          : "Selecione uma alternativa para liberar a próxima questão."
       );
       return;
     }
@@ -1154,34 +1053,40 @@ export const simulados = {
   // API (robusta: mode vem de config.mode)
   // -----------------------------
   async fetchQuestoesAPI(config) {
-  // ✅ sempre respeita o config recebido (snapshot do start)
-  const mode = String(config?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+    const mode = String(config?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
 
-  console.log("🛰️ fetchQuestoesAPI mode =", mode, "config.mode =", config?.mode, "STATE.mode =", this.STATE.config?.mode);
+    console.log(
+      "🛰️ fetchQuestoesAPI mode =",
+      mode,
+      "config.mode =",
+      config?.mode,
+      "STATE.mode =",
+      this.STATE.config?.mode
+    );
 
-  const payload =
-    mode === "disc"
-      ? {
-          mode: "disc",
-          banca: config.banca,
-          dificuldade: config.dificuldade,
-          tema: config.tema || "",
-          qtdDiscursivas: this.clamp(Number(config.qtd || 3), 1, 10)
-        }
-      : (() => {
-          const qtd = this.clamp(Number(config.qtd || 10), 3, 30);
-          const qtdCE = Math.max(0, Math.min(Math.floor(qtd * 0.35), qtd - 3));
-          return {
-            mode: "obj",
+    const payload =
+      mode === "disc"
+        ? {
+            mode: "disc",
             banca: config.banca,
-            qtd,
-            qtdCE,
             dificuldade: config.dificuldade,
-            tema: config.tema || ""
-          };
-        })();
+            tema: config.tema || "",
+            qtdDiscursivas: this.clamp(Number(config.qtd || 3), 1, 10)
+          }
+        : (() => {
+            const qtd = this.clamp(Number(config.qtd || 10), 3, 30);
+            const qtdCE = Math.max(0, Math.min(Math.floor(qtd * 0.35), qtd - 3));
+            return {
+              mode: "obj",
+              banca: config.banca,
+              qtd,
+              qtdCE,
+              dificuldade: config.dificuldade,
+              tema: config.tema || ""
+            };
+          })();
 
-      const res = await fetch("/api/gerarSimulado", {
+    const res = await fetch("/api/gerarSimulado", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
@@ -1195,9 +1100,6 @@ export const simulados = {
       throw new Error(detail);
     }
 
-    // ✅ fonte de verdade:
-    // - backend novo: retorna "questoes" sempre
-    // - fallback: alguns deploys podem retornar "discursivas"
     const raw = Array.isArray(data.questoes) && data.questoes.length
       ? data.questoes
       : (Array.isArray(data.discursivas) ? data.discursivas : []);
@@ -1384,9 +1286,9 @@ export const simulados = {
     localStorage.setItem("liora_sim_timer", JSON.stringify({ enabled: this.STATE.timer.enabled }));
   },
 
-    persistRun() {
+  persistRun() {
     const cfg = this.STATE._runConfig || this.STATE.config;
-  
+
     const payload = {
       running: this.STATE.running,
       config: cfg, // ✅ salva o snapshot
