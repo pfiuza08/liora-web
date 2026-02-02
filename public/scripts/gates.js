@@ -107,3 +107,10 @@ export const gates = {
     return true;
   }
 };
+// -------------------------------------------------------------
+// 🌐 Expor gates global (para módulos sem import)
+// -------------------------------------------------------------
+try {
+  window.lioraGates = gates;
+} catch {}
+
