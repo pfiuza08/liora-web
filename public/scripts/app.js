@@ -1,10 +1,10 @@
-// app.js — LIORA Projeto Zero (de luxe)
-// ✔ boot robusto (DOM pronto ou não)
+// app.js — LIORA Projeto Zero (de luxe + reload-proof)
+// ✔ boot robusto
 // ✔ tema dark/light persistido
 // ✔ auth mock (login/logout) + evento canonical
 // ✔ navegação por delegação (data-nav)
-// ✔ bloqueio de rotas "em breve" via data-soon="1" ou pill "em breve"
-// ✔ init de features + refresh do dashboard ao trocar usuário
+// ✔ bloqueio de rotas "em breve"
+// ✔ init de features + refresh quando rota vira dashboard
 
 import { router } from "./router.js";
 import { store } from "./store.js";
@@ -49,7 +49,6 @@ function setupAuthMock() {
     btnLogout?.classList.toggle("hidden", !isLogged);
   }
 
-  // estado inicial
   const u = user.get(store);
   setLogged(!!u);
 
@@ -69,7 +68,6 @@ function setupAuthMock() {
 }
 
 function setupNav() {
-  // ✅ Delegação: funciona para header, home cards, qualquer elemento com data-nav
   document.addEventListener("click", (ev) => {
     const el = ev.target?.closest?.("[data-nav]");
     if (!el) return;
@@ -77,12 +75,11 @@ function setupNav() {
     const to = (el.getAttribute("data-nav") || "").trim();
     if (!to) return;
 
-    // se for <a>, evita navegação padrão
+    // se for <a>, evita navegação do browser
     if (el.tagName === "A") ev.preventDefault();
 
-    // ✅ bloqueio "em breve"
+    // bloqueio "em breve"
     const isSoon = el.getAttribute("data-soon") === "1";
-
     const pill = el.querySelector?.(".pill");
     const pillText = (pill?.innerText || "").toLowerCase().trim();
     const pillSaysSoon = pillText.includes("em breve");
@@ -93,19 +90,14 @@ function setupNav() {
       return;
     }
 
-    router.go(to);
+    router.go(to, { pushHash: true });
 
-    // opcional: volta pro topo quando trocar de tela
-    try {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      window.scrollTo(0, 0);
-    }
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); }
+    catch { window.scrollTo(0, 0); }
   });
 }
 
 function boot() {
-  // router (marca active + suporta hash se você colou o router de luxe)
   router.init();
 
   setupTheme();
@@ -115,7 +107,7 @@ function boot() {
   // helpers no console
   user.installWindow(store);
 
-  // init features (cada uma usa { router, store, gates, ui })
+  // init features
   const ctx = { router, store, gates, ui };
 
   try { planos.init(ctx); } catch (e) { console.warn("⚠️ planos.init falhou:", e); }
@@ -123,20 +115,31 @@ function boot() {
   try { simulados.init(ctx); } catch (e) { console.warn("⚠️ simulados.init falhou:", e); }
   try { dashboard.init(ctx); } catch (e) { console.warn("⚠️ dashboard.init falhou:", e); }
 
-  // quando usuário mudar: refresca dashboard
+  // user change -> refresh dashboard
   window.addEventListener("liora:user-changed", () => {
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   });
 
-  // rota inicial:
-  // - se o router de luxe tiver hash, ele já abriu no init()
-  // - se não tiver, cai aqui
-  if (!location.hash) router.go("home");
+  // ✅ sempre que trocar rota para dashboard, refresca
+  window.addEventListener("liora:route-changed", (ev) => {
+    const route = ev?.detail?.route;
+    if (route === "dashboard") {
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    }
+  });
+
+  // ✅ rota inicial (hash) só depois das features iniciarem
+  const initial = router.getInitialRoute();
+  router.go(initial, { pushHash: false });
+
+  // ✅ garantia extra no primeiro load do dashboard
+  if (initial === "dashboard") {
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  }
 
   console.log("✅ Projeto Zero pronto");
 }
 
-// ✅ Boot robusto: se o DOM já estiver pronto, roda já; se não, espera.
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", boot);
 } else {
