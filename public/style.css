@@ -2115,4 +2115,28 @@ html.dark #screen-dashboard .dash-card.ok{
   line-height: 1.15;
   word-break: keep-all;
 }
+/* Card Tipos: mini-card garantido (sem depender de posição no DOM) */
+@media (min-width: 980px){
+  #screen-dashboard #dash-kpis .dash-card.dash-kpi-types{
+    min-height: 64px;
+    padding: 10px 12px;
+  }
+  #screen-dashboard #dash-kpis .dash-card.dash-kpi-types .dash-value{
+    font-size: 18px;
+  }
+  #screen-dashboard #dash-kpis .dash-card.dash-kpi-types .dash-sub{
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: .8;
+  }
+}
+#screen-dashboard #dash-kpis .dash-card{
+  overflow: hidden;
+}
+
+#screen-dashboard #dash-kpis .dash-sub{
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
 
