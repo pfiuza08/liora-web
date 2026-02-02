@@ -6,6 +6,9 @@ export const planos = {
   _idxAtual: 0,
   _sessoes: [],
 
+  _currentSessaoId: null,
+
+
   init(ctx) {
     this.ctx = ctx;
 
@@ -190,7 +193,7 @@ export const planos = {
   // -----------------------------
   // 🧭 Navegação + Progresso
   // -----------------------------
-  _setCurrentIndex(i, opts = {}) {
+    _setCurrentIndex(i, opts = {}) {
     const lista = document.getElementById("lista-sessoes");
     const n = this._sessoes.length;
     if (!n) return;
@@ -204,12 +207,21 @@ export const planos = {
     btn?.classList.add("active");
 
     const sessao = this._sessoes[idx];
+
+    // ✅ inicia cronômetro ao ENTRAR numa sessão nova (não ao re-render)
+    const sid = sessao?.id || null;
+    if (sid && sid !== this._currentSessaoId) {
+      this._currentSessaoId = sid;
+      this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
+    }
+
     this.renderSessao(sessao);
 
     if (!opts.silentSave) {
       this._saveState({ currentId: sessao?.id });
     }
   },
+
 
   _goPrev() {
     this._setCurrentIndex(this._idxAtual - 1);
