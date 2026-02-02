@@ -2,6 +2,7 @@ import { router } from "./router.js";
 import { store } from "./store.js";
 import { gates } from "./gates.js";
 import { ui } from "./ui.js";
+import { user } from "./user.js";
 
 import { planos } from "./features/planos.js";
 import { pdf } from "./features/pdf.js";
@@ -31,8 +32,6 @@ function setupTheme() {
 }
 
 function setupAuthMock() {
-  // ✅ Por enquanto é “mock simples”
-  // depois plugamos Firebase/Auth do jeito certo
   const btnLogin = document.getElementById("btn-login");
   const btnLogout = document.getElementById("btn-logout");
 
@@ -41,46 +40,28 @@ function setupAuthMock() {
     btnLogout?.classList.toggle("hidden", !isLogged);
   }
 
-  const user = store.get("user") || null;
-  setLogged(!!user);
+  // estado inicial
+  const u = user.get(store);
+  setLogged(!!u);
 
   btnLogin?.addEventListener("click", () => {
-    // mock login
-    store.set("user", { name: "Patricia", premium: false });
+    user.set(store, { name: "Patricia", premium: false });
     setLogged(true);
-    ui.toast("✅ Login mock ativado (user premium=false)");
+    ui.toast("✅ Login mock (premium=false)");
+    window.dispatchEvent(new Event("liora:user-changed"));
   });
 
   btnLogout?.addEventListener("click", () => {
-    store.remove("user");
+    user.clear(store);
     setLogged(false);
     ui.toast("✅ Logout");
+    window.dispatchEvent(new Event("liora:user-changed"));
   });
 }
 
 function setupNav() {
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.addEventListener("click", (ev) => {
-      const to = el.getAttribute("data-nav");
-      if (!to) return;
-
-      // ✅ EXCEÇÕES: estes dois já estão funcionais e não devem ser bloqueados
-      if (to === "simulados") {
-        ev.preventDefault();
-        window.dispatchEvent(new Event("liora:open-simulados"));
-        return;
-      }
-
-      if (to === "dashboard") {
-        ev.preventDefault();
-        window.dispatchEvent(new Event("liora:open-dashboard"));
-        return;
-      }
-
-      // ✅ Bloqueia apenas quando o item estiver marcado como "em breve"
-      // Regras:
-      // 1) se tiver data-soon="1" -> bloqueia
-      // 2) se a pill existir E tiver texto "em breve" -> bloqueia
       const isSoon = el.getAttribute("data-soon") === "1";
       const pill = el.querySelector(".pill");
       const pillText = (pill?.innerText || "").toLowerCase().trim();
@@ -91,6 +72,9 @@ function setupNav() {
         ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
         return;
       }
+
+      const to = el.getAttribute("data-nav");
+      if (!to) return;
 
       router.go(to);
     });
@@ -103,14 +87,20 @@ function boot() {
   setupAuthMock();
   setupNav();
 
+  // expõe helpers pro console
+  user.installWindow(store);
+
   planos.init({ router, store, gates, ui });
   pdf.init({ router, store, gates, ui });
   simulados.init({ router, store, gates, ui });
   dashboard.init({ router, store, gates, ui });
 
-  // rota inicial
-  router.go("home");
+  // quando usuário mudar (login/logout/premium): refresca dashboard
+  window.addEventListener("liora:user-changed", () => {
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  });
 
+  router.go("home");
   console.log("✅ Projeto Zero pronto");
 }
 
