@@ -57,6 +57,18 @@ export const dashboard = {
     }
   },
 
+    reviewGetQueue() {
+    const key = "liora_review_queue:v1";
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      return items;
+    } catch {
+      return [];
+    }
+  },
+ 
   // -----------------------------
   // Last result (simulados)
   // -----------------------------
@@ -235,6 +247,9 @@ export const dashboard = {
     const u = this.getUser();
 
     const k = this.compute();
+    const reviewItems = this.reviewGetQueue();
+    const reviewCount = reviewItems.length;
+
 
     // helpers de UI
     const chipMode = (m) => (String(m) === "disc" ? "DISC" : "OBJ");
