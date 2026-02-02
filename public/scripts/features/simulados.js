@@ -1510,7 +1510,62 @@ restart() {
 
     this.statsSet(data);
   },
+    // -----------------------------
+  // ✅ REVIEW QUEUE (erradas + marcadas)
+  // localStorage: liora_review_queue:v1
+  // -----------------------------
+  reviewGetQueue() {
+    const key = "liora_review_queue:v1";
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      return { items };
+    } catch {
+      return { items: [] };
+    }
+  },
 
+  reviewSetQueue(next) {
+    const key = "liora_review_queue:v1";
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch (e) {
+      console.warn("⚠️ Falha ao salvar review queue:", e);
+    }
+  },
+
+  reviewHash(str) {
+    // hash simples (estável) só para dedup
+    const s = String(str || "");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h << 5) - h + s.charCodeAt(i);
+      h |= 0;
+    }
+    return String(h);
+  },
+
+  reviewUpsertItem(item) {
+    const q = this.reviewGetQueue();
+    const items = q.items || [];
+
+    const id = String(item.id || "");
+    const idx = items.findIndex((x) => String(x.id) === id);
+
+    if (idx >= 0) {
+      items[idx] = { ...items[idx], ...item, ts: Date.now() };
+    } else {
+      items.push({ ...item, ts: Date.now() });
+    }
+
+    // limita para não crescer infinito
+    const MAX = 60;
+    const sorted = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, MAX);
+
+    this.reviewSetQueue({ items: sorted });
+  },
+  
   // -----------------------------
   // HELPERS
   // -----------------------------
