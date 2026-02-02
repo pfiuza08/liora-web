@@ -1,6 +1,6 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.7-PRODUCT (OBJ + DISC MODE + contrato API robusto)
+// Versão: v2.8-PRODUCT (OBJ + DISC + métricas locais + eventos canônicos)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração (robusto por JS)
@@ -12,7 +12,7 @@
 //    - OBJ: MCQ (4) + CE (2)
 //    - DISC: Discursivas (textarea) em modo separado
 // ✔ Salvamento em localStorage
-// ✔ Métricas: registra tentativas (OBJ/CE/MCQ) para Dashboard
+// ✔ ✅ MÉTRICAS: grava tentativas em liora_stats:v1 e dispara liora:stats-changed
 // =============================================================
 
 export const simulados = {
@@ -21,14 +21,14 @@ export const simulados = {
   STATE: {
     running: false,
     _savedRun: null,
-    _runConfig: null, // ✅ snapshot do config usado no run (blinda o mode)
+    _runConfig: null, // snapshot do config usado no run (blinda o mode)
     config: {
       banca: "FGV",
-      qtd: 5,         // OBJ: total de questões | DISC: total de discursivas
+      qtd: 5, // OBJ: total de questões | DISC: total de discursivas
       dificuldade: "misturado",
       tema: "",
-      tempo: 20,      // minutos
-      mode: "obj"     // "obj" | "disc"
+      tempo: 20, // minutos
+      mode: "obj" // "obj" | "disc"
     },
     questoes: [],
     atual: 0,
@@ -49,12 +49,13 @@ export const simulados = {
     this.bindUI();
     this.restoreIfAny();
 
-    // ✅ hook de QA no console
+    // hook de QA no console
     window.lioraSimDebug = () => {
       const s = this.STATE;
       console.log("🧪 LIORA Simulados Debug");
       console.log("running:", s.running, "idx:", s.atual, "/", Math.max(0, s.questoes.length - 1));
       console.log("config:", s.config);
+      console.log("runConfig:", s._runConfig);
       console.log("timer:", s.timer);
       console.log(
         "questoes:",
@@ -71,7 +72,7 @@ export const simulados = {
       return JSON.parse(JSON.stringify(s));
     };
 
-    console.log("📝 simulados.js v2.7 — iniciado");
+    console.log("📝 simulados.js v2.8 — iniciado");
   },
 
   // -----------------------------
@@ -84,7 +85,6 @@ export const simulados = {
       return;
     }
 
-    // Helper: só processa eventos vindos do screen ou do modal
     const isFromSim = (el) => {
       if (!el) return false;
       return !!el.closest("#screen-simulados, #sim-config");
@@ -101,29 +101,28 @@ export const simulados = {
       if (!action) return;
 
       switch (action) {
-        case "openConfig":      return this.openConfig();
-        case "closeConfig":     return this.closeConfig();
-        case "saveConfig":      return this.saveConfig();
+        case "openConfig": return this.openConfig();
+        case "closeConfig": return this.closeConfig();
+        case "saveConfig": return this.saveConfig();
 
-        case "startSimulado":   return this.start();
-        case "resumeSimulado":  return this.resumeSimulado();
-        case "discardRun":      return this.discardRun();
+        case "startSimulado": return this.start();
+        case "resumeSimulado": return this.resumeSimulado();
+        case "discardRun": return this.discardRun();
 
-        case "cancelSimulado":  return this.cancel();
+        case "cancelSimulado": return this.cancel();
+        case "prevQuestao": return this.prev();
+        case "nextQuestao": return this.next();
 
-        case "prevQuestao":     return this.prev();
-        case "nextQuestao":     return this.next();
-
-        case "finishSimulado":  return this.finish();
+        case "finishSimulado": return this.finish();
         case "restartSimulado": return this.restart();
-        case "reviewToggle":    return this.toggleReview();
+        case "reviewToggle": return this.toggleReview();
 
         default:
           return;
       }
     });
 
-    // MCQ / CE (radio) — screen
+    // MCQ / CE (radio)
     document.addEventListener("change", (ev) => {
       if (!isFromSim(ev.target)) return;
 
@@ -134,7 +133,7 @@ export const simulados = {
       this.pickAlternative(val);
     });
 
-    // DISC (textarea) — screen
+    // DISC (textarea)
     document.addEventListener("input", (ev) => {
       if (!isFromSim(ev.target)) return;
 
@@ -147,6 +146,7 @@ export const simulados = {
     // Eventos canônicos
     window.addEventListener("liora:open-simulados", () => {
       this.showScreen();
+      // não inicia automaticamente
     });
 
     window.addEventListener("liora:start-simulado", () => {
@@ -178,24 +178,14 @@ export const simulados = {
     this.setValue("sim-tema", c.tema);
     this.setValue("sim-tempo", c.tempo);
 
-    // timer (FREE: sem timer)
-    const premium = this.isPremium();
-    this.setValue("sim-timer-mode", premium && this.STATE.timer.enabled ? "on" : "off");
-
-    const timerSel = document.getElementById("sim-timer-mode");
-    if (timerSel) {
-      timerSel.disabled = !premium;
-      if (!premium) timerSel.value = "off";
-    }
-
-    // ✅ modo
+    this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
     this.setValue("sim-kind", c.mode || "obj");
 
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("liora-modal-open");
 
-    // fallback caso CSS do modal seja parcial
+    // fallback se CSS do modal falhar
     modal.style.display = "block";
     modal.style.position = "fixed";
     modal.style.inset = "0";
@@ -217,7 +207,6 @@ export const simulados = {
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("liora-modal-open");
-
     modal.style.display = "none";
 
     window.dispatchEvent(new CustomEvent("liora:modal-close", { detail: { id: "sim-config" } }));
@@ -228,7 +217,7 @@ export const simulados = {
     if (v.includes("disc")) return "disc";
     if (v.includes("obj")) return "obj";
 
-    // fallback (se algum dia mudar id)
+    // fallback se mudar ids no futuro
     const altIds = ["sim-mode", "sim-modo", "sim-tipo", "sim-questoes-mode"];
     for (const id of altIds) {
       const x = String(this.getValue(id) || "").toLowerCase();
@@ -246,20 +235,13 @@ export const simulados = {
     const tema = (this.getValue("sim-tema") || "").trim();
     const tempo = Number(this.getValue("sim-tempo") || 20);
 
-        const timerMode = this.getValue("sim-timer-mode") || "on";
+    const timerMode = this.getValue("sim-timer-mode") || "on";
     const mode = this.getModeFromUI();
-    const premium = this.isPremium();
 
-    // clamp muda conforme o modo
-    let qtd =
+    const qtd =
       mode === "disc"
-        ? this.clamp(qtdRaw, 1, 10)    // discursivas
-        : this.clamp(qtdRaw, 3, 30);   // objetivas
-
-    // ✅ TRAVA 2: FREE = no máximo 10 questões OBJ
-    if (!premium && mode !== "disc") {
-      qtd = this.clamp(qtd, 3, 10);
-    }
+        ? this.clamp(qtdRaw, 1, 10)
+        : this.clamp(qtdRaw, 3, 30);
 
     this.STATE.config = {
       ...this.STATE.config,
@@ -271,14 +253,7 @@ export const simulados = {
       mode
     };
 
-    // ✅ TRAVA 3: FREE = sem timer
-    if (!premium) {
-      this.STATE.timer.enabled = false;
-      this.setValue("sim-timer-mode", "off");
-      this.toast("⏱️ Timer é Premium. No FREE, seguimos sem timer.");
-    } else {
-      this.STATE.timer.enabled = timerMode === "on";
-    }
+    this.STATE.timer.enabled = timerMode === "on";
 
     this.persistConfig();
     this.toast("Configurações salvas.");
@@ -291,39 +266,27 @@ export const simulados = {
   // -----------------------------
   async start() {
     if (this.STATE.running) return;
-  
+
     this.closeConfig();
-  
-    // ✅ snapshot blindado do config no momento do start
+
+    // snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
     runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
-  
-    // ✅ TRAVA 2 (FREE): OBJ no máximo 10 questões (DISC já é 1..10)
-    const premium = this.isPremium?.() === true;
-    if (!premium && runConfig.mode !== "disc") {
-      runConfig.qtd = this.clamp(Number(runConfig.qtd || 5), 3, 10);
-    }
-  
     this.STATE._runConfig = runConfig;
-  
+
     console.log("🚦 START snapshot mode =", runConfig.mode, runConfig);
-  
-    window.dispatchEvent(
-      new CustomEvent("liora:simulado-start", { detail: { ...runConfig } })
-    );
-  
+
+    window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...runConfig } }));
+
     // reset runtime
     this.STATE.running = true;
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
-  
-    // ✅ TRAVA 3 (blindada): FREE nunca liga timer
-    if (!premium) this.STATE.timer.enabled = false;
-  
+
     // timer
     if (this.STATE.timer.enabled) {
-      this.STATE.timer.totalSec = Number(runConfig.tempo || 0) * 60;
+      this.STATE.timer.totalSec = runConfig.tempo * 60;
       this.STATE.timer.leftSec = this.STATE.timer.totalSec;
       this.startTimer();
     } else {
@@ -331,27 +294,24 @@ export const simulados = {
       this.STATE.timer.totalSec = 0;
       this.STATE.timer.leftSec = 0;
     }
-  
+
     this.renderRunning();
     this.setText("sim-enunciado", "Gerando questões...");
-    this.setHTML(
-      "sim-alts",
-      `<div class="muted small">Isso pode levar alguns segundos.</div>`
-    );
+    this.setHTML("sim-alts", `<div class="muted small">Isso pode levar alguns segundos.</div>`);
     this.setHint("Carregando questões...");
     this.renderButtonsState();
-  
+
     try {
-      const questoes = await this.fetchQuestoesAPI(runConfig); // ✅ usa snapshot (já travado)
+      const questoes = await this.fetchQuestoesAPI(runConfig);
       if (!questoes?.length) throw new Error("API retornou vazio.");
       this.STATE.questoes = questoes;
     } catch (err) {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
       this.toast("Não foi possível gerar agora. Usando modo offline.");
-      this.STATE.questoes = this.buildMockQuestions(runConfig); // ✅ usa snapshot (já travado)
+      this.STATE.questoes = this.buildMockQuestions(runConfig);
     }
-  
-    this.persistRun(); // persistRun salva _runConfig
+
+    this.persistRun();
     this.renderQuestion();
   },
 
@@ -377,7 +337,10 @@ export const simulados = {
 
     this.STATE.running = true;
     this.STATE.config = run.config || this.STATE.config;
-    this.STATE._runConfig = run.config || this.STATE._runConfig; // ✅ mantém snapshot do run
+
+    // garante _runConfig pra não “mudar modo” no meio do run
+    this.STATE._runConfig = run.config || this.STATE._runConfig;
+
     this.STATE.questoes = run.questoes || [];
     this.STATE.atual = run.atual || 0;
     this.STATE.respostas = run.respostas || [];
@@ -408,6 +371,7 @@ export const simulados = {
     this.STATE.respostas = [];
     this.STATE.timer.totalSec = 0;
     this.STATE.timer.leftSec = 0;
+    this.STATE._runConfig = null;
 
     this.closeConfig();
     this.renderIdle();
@@ -526,7 +490,6 @@ export const simulados = {
     }
   },
 
-  // ✅ versão corrigida: registra métrica 1x, sem duplicar
   finish() {
     if (!this.STATE.running) return;
 
@@ -534,10 +497,9 @@ export const simulados = {
     this.stopTimer();
 
     const res = this.computeResult();
+    this.persistResult(res);
 
-    // -----------------------------
-    // ✅ DASH METRICS (1x + fallback)
-    // -----------------------------
+    // ✅ MÉTRICAS (somente se houver questões pontuadas)
     const cfg = this.STATE._runConfig || this.STATE.config;
 
     const timeSpentSec =
@@ -561,49 +523,15 @@ export const simulados = {
       mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
       total: Number(res?.totalScored || 0),
       correct: Number(res?.acertos || 0),
-      timeSec: Number(timeSpentSec || 0),
+      timeSec: Number(timeSpentSec || 0)
     };
 
     if (attempt.total > 0) {
-      let saved = false;
-
-      try {
-        if (typeof window.lioraMetrics?.recordAttempt === "function") {
-          window.lioraMetrics.recordAttempt(attempt);
-          saved = true;
-        }
-      } catch (e) {
-        console.warn("⚠️ recordAttempt falhou:", e);
-      }
-
-      if (!saved) {
-        try {
-          const key = "lioraMetrics:v1";
-          const raw = localStorage.getItem(key);
-          const data = raw ? JSON.parse(raw) : { attempts: [] };
-
-          data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
-          data.attempts.push(attempt);
-
-          if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-
-          localStorage.setItem(key, JSON.stringify(data));
-          console.log("✅ Métrica salva (fallback):", attempt);
-        } catch (e) {
-          console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
-        }
-      }
-
-      // refresh do dashboard
-      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+      this.statsRecordAttempt(attempt);
+      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "attempt", attempt } }));
     } else {
-      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
+      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva pura). Não registra métricas.");
     }
-
-    // -----------------------------
-    // fluxo original
-    // -----------------------------
-    this.persistResult(res);
 
     window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
 
@@ -622,6 +550,7 @@ export const simulados = {
     this.STATE.running = false;
     this.stopTimer();
     this.clearRun();
+    this.STATE._runConfig = null;
 
     window.dispatchEvent(new Event("liora:simulado-cancel"));
 
@@ -634,6 +563,7 @@ export const simulados = {
     this.clearRun();
     this.STATE.running = false;
     this.stopTimer();
+    this.STATE._runConfig = null;
 
     window.dispatchEvent(new Event("liora:simulado-restart"));
 
@@ -842,7 +772,6 @@ export const simulados = {
     const chosen = saved?.escolha ?? null;
     const alts = Array.isArray(q.alternativas) ? q.alternativas : [];
     const isCE = tipo === "ce" || alts.length === 2;
-
     const labelsCE = ["Certo", "Errado"];
 
     const html = alts
@@ -890,11 +819,11 @@ export const simulados = {
   renderProgress() {
     const total = this.STATE.questoes.length || 1;
     const answered = this.STATE.respostas.length;
-    const p = Math.round((answered / total) * 100);
+    const pct = Math.round((answered / total) * 100);
 
     this.setText("sim-progress-text", `Respondidas: ${answered} / ${total}`);
     const fill = document.getElementById("sim-progress-bar");
-    if (fill) fill.style.width = `${p}%`;
+    if (fill) fill.style.width = `${pct}%`;
   },
 
   renderTimer() {
@@ -1000,11 +929,7 @@ export const simulados = {
       const isCE = tipo === "ce" || (r.alternativas?.length || 0) === 2;
       const explicacao = (r.explicacao || "").trim();
 
-      const letter = (n) => {
-        if (isCE) return n === 0 ? "C" : "E";
-        return String.fromCharCode(65 + n);
-      };
-
+      const letter = (n) => (isCE ? (n === 0 ? "C" : "E") : String.fromCharCode(65 + n));
       const textChoice = (n) => {
         if (n == null) return "—";
         if (isCE) return n === 0 ? "Certo" : "Errado";
@@ -1085,19 +1010,12 @@ export const simulados = {
   },
 
   // -----------------------------
-  // API (robusta: mode vem de config.mode)
+  // API
   // -----------------------------
   async fetchQuestoesAPI(config) {
     const mode = String(config?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
 
-    console.log(
-      "🛰️ fetchQuestoesAPI mode =",
-      mode,
-      "config.mode =",
-      config?.mode,
-      "STATE.mode =",
-      this.STATE.config?.mode
-    );
+    console.log("🛰️ fetchQuestoesAPI mode =", mode);
 
     const payload =
       mode === "disc"
@@ -1135,9 +1053,10 @@ export const simulados = {
       throw new Error(detail);
     }
 
-    const raw = Array.isArray(data.questoes) && data.questoes.length
-      ? data.questoes
-      : (Array.isArray(data.discursivas) ? data.discursivas : []);
+    const raw =
+      Array.isArray(data.questoes) && data.questoes.length
+        ? data.questoes
+        : (Array.isArray(data.discursivas) ? data.discursivas : []);
 
     const norm = raw
       .filter((q) => q && typeof q === "object")
@@ -1147,8 +1066,6 @@ export const simulados = {
         );
 
         const enunciado = String(q.enunciado || "").trim();
-
-        if (!enunciado) console.warn("⚠️ Questão sem enunciado (API):", q);
 
         if (tipo === "disc") {
           return {
@@ -1181,12 +1098,11 @@ export const simulados = {
     if (!norm.length) throw new Error("API retornou lista vazia.");
 
     console.log("✅ API OK:", { mode: payload.mode, len: norm.length, tipos: norm.map((x) => x.tipo) });
-
     return norm;
   },
 
   // -----------------------------
-  // MOCK (fallback)
+  // MOCK
   // -----------------------------
   buildMockQuestions(config) {
     const banca = config.banca || "FGV";
@@ -1326,7 +1242,7 @@ export const simulados = {
 
     const payload = {
       running: this.STATE.running,
-      config: cfg, // ✅ salva o snapshot
+      config: cfg, // salva o snapshot
       questoes: this.STATE.questoes,
       atual: this.STATE.atual,
       respostas: this.STATE.respostas,
@@ -1367,6 +1283,7 @@ export const simulados = {
       if (run?.questoes?.length) {
         this.STATE._savedRun = run;
         this.STATE.running = false;
+        this.STATE._runConfig = run.config || null;
         this.renderIdle();
         return;
       }
@@ -1374,6 +1291,43 @@ export const simulados = {
 
     this.STATE._savedRun = null;
     this.renderIdle();
+  },
+
+  // -----------------------------
+  // ✅ MÉTRICAS (local)
+  // -----------------------------
+  statsGet() {
+    const key = "liora_stats:v1";
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : {};
+      return {
+        attempts: Array.isArray(data.attempts) ? data.attempts : [],
+        sessions: Array.isArray(data.sessions) ? data.sessions : [],
+        meta: data.meta && typeof data.meta === "object" ? data.meta : {}
+      };
+    } catch {
+      return { attempts: [], sessions: [], meta: {} };
+    }
+  },
+
+  statsSet(next) {
+    const key = "liora_stats:v1";
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch (e) {
+      console.warn("⚠️ Falha ao salvar stats:", e);
+    }
+  },
+
+  statsRecordAttempt(attempt) {
+    const data = this.statsGet();
+    data.attempts.push(attempt);
+
+    // guarda só as últimas 800
+    if (data.attempts.length > 800) data.attempts = data.attempts.slice(-800);
+
+    this.statsSet(data);
   },
 
   // -----------------------------
@@ -1427,19 +1381,6 @@ export const simulados = {
     return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
   },
 
-    // -----------------------------
-    // ACCESS HELPERS (FREE vs PREMIUM)
-    // -----------------------------
-    isPremium() {
-      try {
-        return !!this.ctx?.store?.get?.("user")?.premium;
-      } catch {
-        return false;
-      }
-    },
-
-
-  
   toast(msg) {
     try {
       this.ctx?.ui?.toast?.(msg);
