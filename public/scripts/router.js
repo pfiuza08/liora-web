@@ -1,118 +1,133 @@
+// ==========================================================
+// 🧭 LIORA — ROUTER (Deluxe)
+// - Hash routing (#home, #dashboard, etc.)
+// - Deep-link (recarrega e volta na mesma tela)
+// - Dispara eventos canônicos por tela (open-*)
+// - Evita loops (hashchange -> go -> hashchange)
+// ==========================================================
+
 export const router = {
   screens: ["home", "tema", "pdf", "simulados", "dashboard"],
-  current: null,
-  _inited: false,
 
-  // -----------------------------
-  // INIT
-  // -----------------------------
-  init({ useHash = true } = {}) {
+  _inited: false,
+  _useHash: true,
+  _defaultRoute: "home",
+  _current: null,
+
+  init({ useHash = true, defaultRoute = "home" } = {}) {
     if (this._inited) return;
     this._inited = true;
 
-    this.useHash = !!useHash;
+    this._useHash = !!useHash;
+    this._defaultRoute = this.screens.includes(defaultRoute) ? defaultRoute : "home";
 
-    // back/forward + hash change
-    const onNav = () => {
-      const r = this.useHash ? this._readHash() : this._readPath();
-      this.go(r, { silentUrl: true });
+    const onLocationChange = () => {
+      const r = this._readRouteFromLocation() || this._defaultRoute;
+      this.go(r, { fromLocation: true, replace: true });
     };
 
-    window.addEventListener("hashchange", onNav);
-    window.addEventListener("popstate", onNav);
+    if (this._useHash) {
+      window.addEventListener("hashchange", onLocationChange);
+    } else {
+      window.addEventListener("popstate", onLocationChange);
+    }
 
-    // rota inicial
-    const initial = this.useHash ? this._readHash() : this._readPath();
-    this.go(initial, { silentUrl: true, force: true });
-
-    console.log("🧭 Router init ok →", this.current);
+    // rota inicial (hash ou default)
+    onLocationChange();
   },
 
-  // -----------------------------
-  // NAV
-  // -----------------------------
+  current() {
+    return this._current || this._defaultRoute;
+  },
+
   go(route, opts = {}) {
-    const { silentUrl = false, force = false } = opts;
+    const {
+      fromLocation = false, // veio do hashchange/popstate
+      replace = false,      // replace hash/pushstate
+      force = false         // re-render mesmo se já está na rota
+    } = opts;
 
-    if (!this.screens.includes(route)) route = "home";
+    // normaliza + valida
+    route = String(route || "").trim().toLowerCase();
+    if (!this.screens.includes(route)) route = this._defaultRoute;
 
-    // evita “re-tocar a mesma música”
-    if (!force && this.current === route) {
-      // ainda assim dispara um ping (útil pra "refresh manual")
-      this._after(route, { reason: "same-route" });
+    // atualiza URL (se a navegação foi interna)
+    if (this._useHash && !fromLocation) {
+      const target = `#${route}`;
+      if (location.hash !== target) {
+        if (replace) location.replace(target);
+        else location.hash = target;
+      }
+    }
+
+    // evita render redundante
+    if (!force && this._current === route) {
+      // mesmo assim, dispara o evento canônico para garantir re-render quando precisar
+      this._dispatchRoute(route);
       return;
     }
 
-    this.current = route;
-
-    // aplica classes
+    // ativa tela
     this.screens.forEach((r) => {
       const el = document.getElementById(`screen-${r}`);
       if (!el) return;
       el.classList.toggle("active", r === route);
     });
 
-    // atualiza URL (sem recarregar)
-    if (!silentUrl) {
-      this.useHash ? this._writeHash(route) : this._writePath(route);
-    }
+    this._current = route;
 
     console.log("🧭 Router →", route);
 
-    // pós-navegação
-    this._after(route, { reason: "go" });
+    // evento global (útil pra debug/telemetria)
+    window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route } }));
+
+    // eventos canônicos por tela
+    this._dispatchRoute(route);
   },
 
-  refresh() {
-    if (!this.current) return;
-    this._after(this.current, { reason: "refresh" });
+  // ----------------------------------------------------------
+  // Internals
+  // ----------------------------------------------------------
+  _readRouteFromLocation() {
+    if (this._useHash) {
+      // suporta: #dashboard, #/dashboard, etc.
+      const h = String(location.hash || "")
+        .replace(/^#\/?/, "")
+        .trim()
+        .toLowerCase();
+
+      if (!h) return null;
+
+      // permite hashes com extras (ex: #dashboard?x=1) sem quebrar
+      const clean = h.split("?")[0].split("&")[0];
+      return clean || null;
+    }
+
+    // (fallback opcional) path routing:
+    // /dashboard -> "dashboard"
+    const p = String(location.pathname || "/").replace(/^\/+/, "").toLowerCase();
+    const first = p.split("/")[0];
+    return first || null;
   },
 
-  // -----------------------------
-  // HOOKS
-  // -----------------------------
-  _after(route, meta = {}) {
-    // garante que o DOM já alternou de tela
-    requestAnimationFrame(() => {
-      // evento global (útil pra analytics/telemetria)
-      window.dispatchEvent(new CustomEvent("liora:route", { detail: { route, ...meta } }));
-
-      // hooks específicos por rota
-      if (route === "dashboard") {
+  _dispatchRoute(route) {
+    // “open-*” mantém compatibilidade com seu padrão atual
+    switch (route) {
+      case "dashboard":
         window.dispatchEvent(new Event("liora:open-dashboard"));
-      }
-
-      if (route === "simulados") {
+        break;
+      case "simulados":
         window.dispatchEvent(new Event("liora:open-simulados"));
-      }
-
-      // Se um dia quiser “auto-render” de outras telas:
-      // if (route === "tema") window.dispatchEvent(new Event("liora:open-tema"));
-      // if (route === "pdf") window.dispatchEvent(new Event("liora:open-pdf"));
-    });
-  },
-
-  // -----------------------------
-  // URL HELPERS
-  // -----------------------------
-  _readHash() {
-    const h = (location.hash || "").replace("#", "").trim();
-    return h || "home";
-  },
-
-  _writeHash(route) {
-    const next = `#${route}`;
-    if (location.hash !== next) location.hash = next;
-  },
-
-  // (opcional) path mode, se você quiser no futuro: /dashboard
-  _readPath() {
-    const p = (location.pathname || "/").replace("/", "").trim();
-    return p || "home";
-  },
-
-  _writePath(route) {
-    const url = route === "home" ? "/" : `/${route}`;
-    history.pushState({}, "", url);
+        break;
+      case "tema":
+        window.dispatchEvent(new Event("liora:open-tema"));
+        break;
+      case "pdf":
+        window.dispatchEvent(new Event("liora:open-pdf"));
+        break;
+      default:
+        window.dispatchEvent(new Event("liora:open-home"));
+        break;
+    }
   }
 };
