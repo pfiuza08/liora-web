@@ -329,8 +329,8 @@ async function loadFeature(path, exportName) {
   const pdf = await loadFeature("./features/pdf.js", "pdf");
   pdf?.init?.(ctx);
 
-  const estudos = await loadFeature("./features/estudos.js", "estudos");
-  estudos?.init?.(ctx);
+  //const estudos = await loadFeature("./features/estudos.js", "estudos");
+  //estudos?.init?.(ctx);
 
   // handlers canônicos para login/premium (caso sua tela de login seja separada)
   window.addEventListener("liora:login-required", () => {
