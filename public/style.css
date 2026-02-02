@@ -2226,4 +2226,43 @@ body.liora-modal-open{
   outline: 2px solid rgba(196, 75, 4, 0.55);
   border-radius: 12px;
 }
+/* ---------------------------------------------
+   PILL (badge) — padrão único + variações
+--------------------------------------------- */
+.pill{
+  position:absolute;
+  top:12px;
+  right:12px;
+
+  font-size:12px;
+  font-weight:600;
+  letter-spacing:.2px;
+  padding:6px 10px;
+  border-radius:999px;
+
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.88);
+
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  pointer-events:none; /* não “vira botão” acidentalmente */
+}
+
+/* tema claro */
+.light .pill{
+  border:1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.04);
+  color: rgba(0,0,0,.72);
+}
+
+/* variações sem cor “gritante” (só nuance) */
+.pill-base   { }
+.pill-upload { opacity:.92; }
+.pill-ia     { opacity:1; }
+.pill-mvp    { opacity:.9; }
+.card-btn{
+  position: relative;
+}
 
