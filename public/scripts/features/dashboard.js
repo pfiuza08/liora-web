@@ -1,10 +1,16 @@
 // =============================================================
 // 📊 LIORA — DASHBOARD (MVP local, de verdade)
-// Versão: v1.2 (stats v1 + travas 2/3/4 + render automático)
+// Versão: v1.3 (stats v1 + travas 2/3/4 + último resultado + fila revisão)
 //
 // Fonte: localStorage "liora_stats:v1"
 // - attempts: { ts, date, banca, tema, dificuldade, mode, total, correct, timeSec }
 // - sessions: (fica para Tema/PDF depois)
+//
+// Revisões (fila):
+// - localStorage "liora_review_queue:v1" => { items: [...] }
+//
+// Último resultado:
+// - localStorage "liora_sim_last_result"
 //
 // Eventos que atualizam:
 // - liora:dashboard-refresh
@@ -17,13 +23,9 @@ export const dashboard = {
   init(ctx) {
     this.ctx = ctx;
 
-    // render quando pedirem refresh
     window.addEventListener("liora:dashboard-refresh", () => this.render());
-
-    // render quando stats mudarem (simulados/tarefas)
     window.addEventListener("liora:stats-changed", () => this.render());
 
-    // render quando entrar na tela (se você disparar esse evento)
     window.addEventListener("liora:open-dashboard", () => {
       this.showScreen();
       this.render();
@@ -37,51 +39,6 @@ export const dashboard = {
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-dashboard")?.classList.add("active");
-    // se o dashboard pediu para iniciar revisão da fila
-    try {
-      const flag = localStorage.getItem("liora_review_start");
-      if (flag === "1") {
-        localStorage.removeItem("liora_review_start");
-
-        const raw = localStorage.getItem("liora_review_queue:v1");
-        const data = raw ? JSON.parse(raw) : { items: [] };
-        const items = Array.isArray(data.items) ? data.items : [];
-
-        if (items.length) {
-          const first = items[0];
-
-          // cria um "simulado" de 1 questão para revisão
-          this.STATE.running = true;
-          this.STATE.atual = 0;
-          this.STATE.respostas = [];
-          this.STATE.questoes = [
-            first.tipo === "disc"
-              ? {
-                  tipo: "disc",
-                  enunciado: first.enunciado,
-                  respostaModelo: first.respostaModelo || "",
-                  criterios: Array.isArray(first.criterios) ? first.criterios : []
-                }
-              : {
-                  tipo: first.tipo === "ce" ? "ce" : "mcq",
-                  enunciado: first.enunciado,
-                  alternativas: Array.isArray(first.alternativas) && first.alternativas.length ? first.alternativas : ["Certo", "Errado"],
-                  corretaIndex: Number.isInteger(first.corretaIndex) ? first.corretaIndex : 0,
-                  explicacao: String(first.explicacao || "")
-                }
-          ];
-
-          this.stopTimer();
-          this.STATE.timer.totalSec = 0;
-          this.STATE.timer.leftSec = 0;
-
-          this.renderRunning();
-          this.renderQuestion();
-          this.setHint("Revisão rápida: responda e finalize.");
-        }
-      }
-    } catch {}
-  
   },
 
   // -----------------------------
@@ -102,7 +59,7 @@ export const dashboard = {
     }
   },
 
-    reviewGetQueue() {
+  reviewGetQueue() {
     const key = "liora_review_queue:v1";
     try {
       const raw = localStorage.getItem(key);
@@ -113,7 +70,14 @@ export const dashboard = {
       return [];
     }
   },
- 
+
+  reviewClearQueue() {
+    const key = "liora_review_queue:v1";
+    try {
+      localStorage.setItem(key, JSON.stringify({ items: [] }));
+    } catch {}
+  },
+
   // -----------------------------
   // Last result (simulados)
   // -----------------------------
@@ -134,14 +98,16 @@ export const dashboard = {
 
     const totalScored = Number(r.totalScored || 0);
     const acertos = Number(r.acertos || 0);
-    const pct = Number.isFinite(Number(r.pct)) ? Number(r.pct) : (totalScored ? Math.round((acertos / totalScored) * 100) : 0);
+    const pct =
+      Number.isFinite(Number(r.pct))
+        ? Number(r.pct)
+        : (totalScored ? Math.round((acertos / totalScored) * 100) : 0);
 
     const banca = String(r?.config?.banca || "—");
     const tema = String(r?.config?.tema || "Geral");
     const mode = String(r?.config?.mode || "obj");
     const modeLabel = mode === "disc" ? "DISC" : "OBJ";
 
-    // se quiser mostrar data/hora: r.config não tem ts; então fica só “último”
     return `
       <div class="panel" style="margin:12px 0;">
         <div class="card-title">Último resultado</div>
@@ -168,9 +134,11 @@ export const dashboard = {
       </div>
     `;
   },
-  
+
+  // -----------------------------
+  // User / Premium
+  // -----------------------------
   getUser() {
-    // tenta alguns padrões comuns
     try {
       const u =
         this.ctx?.store?.get?.("user") ||
@@ -209,19 +177,16 @@ export const dashboard = {
       const mode = String(a.mode || "obj");
       const tema = String(a.tema || "Geral");
 
-      // banca
       const b = byBanca.get(banca) || { banca, total: 0, correct: 0, qs: 0 };
       b.total += 1;
       b.correct += Number(a.correct || 0);
       b.qs += Number(a.total || 0);
       byBanca.set(banca, b);
 
-      // mode
       const m = byMode.get(mode) || { mode, total: 0 };
       m.total += 1;
       byMode.set(mode, m);
 
-      // tema
       const t = byTema.get(tema) || { tema, total: 0, correct: 0, qs: 0 };
       t.total += 1;
       t.correct += Number(a.correct || 0);
@@ -264,14 +229,14 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Render
+  // Render (modo "wrap")
   // -----------------------------
   ensureShell() {
     const screen = document.getElementById("screen-dashboard");
     if (!screen) return;
 
-    // se você já tem um HTML próprio, ok.
-    // mas se não tiver #dash-body, criamos um container seguro.
+    // Se você já tem HTML fixo com ids, pode remover #dash-body e adaptar depois.
+    // Para o seu código atual (que usa wrap.innerHTML), garantimos um container.
     if (!screen.querySelector("#dash-body")) {
       const wrap = document.createElement("div");
       wrap.id = "dash-body";
@@ -295,8 +260,6 @@ export const dashboard = {
     const reviewItems = this.reviewGetQueue();
     const reviewCount = reviewItems.length;
 
-
-    // helpers de UI
     const chipMode = (m) => (String(m) === "disc" ? "DISC" : "OBJ");
     const fmtTime = (sec) => {
       const s = Math.max(0, Number(sec || 0));
@@ -323,14 +286,12 @@ export const dashboard = {
       </div>
     `;
 
-    // Se não tiver tentativas ainda:
     if (!k.totalAttempts) {
       wrap.innerHTML = emptyState;
       this.bindDashActions();
       return;
     }
 
-    // Cards base (sempre liberados)
     const kpiHtml = `
       <div class="dash-grid" id="dash-kpis">
         <div class="dash-card good">
@@ -369,7 +330,6 @@ export const dashboard = {
       </div>
     `;
 
-    // Trava 2 (Insights)
     const insightsHtml = premium
       ? `
         <div class="panel">
@@ -402,7 +362,6 @@ export const dashboard = {
         </div>
       `;
 
-    // Trava 3/4 (Detalhes + Histórico)
     const detailsHtml = premium
       ? `
         <div class="panel">
@@ -431,7 +390,7 @@ export const dashboard = {
               <div class="dash-row">
                 <div>
                   <div class="dash-row-title">${this.escape(a.banca)} · ${this.escape(a.tema)}</div>
-                  <div class="dash-row-sub">${a.date} · ${chipMode(a.mode)} · ${fmtTime(a.timeSec)} </div>
+                  <div class="dash-row-sub">${a.date} · ${chipMode(a.mode)} · ${fmtTime(a.timeSec)}</div>
                 </div>
                 <div class="dash-row-metric">${Math.round((a.correct / a.total) * 100)}%</div>
               </div>
@@ -447,14 +406,13 @@ export const dashboard = {
         </div>
       `;
 
-    // header pequeno (mostra login/premium)
     const userLine = (() => {
       if (!u) return `<span class="pill pill-base">visitante</span>`;
       if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
       return `<span class="pill pill-upload">free</span>`;
     })();
 
-        const lastResultHtml = this.buildLastResultCard();
+    const lastResultHtml = this.buildLastResultCard();
 
     wrap.innerHTML = `
       <div class="panel" style="margin-bottom:12px;">
@@ -467,7 +425,8 @@ export const dashboard = {
           ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
         </div>
       </div>
-            <div class="panel" style="margin-bottom:12px;">
+
+      <div class="panel" style="margin-bottom:12px;">
         <div class="card-title">Revisões pendentes</div>
         <div class="muted">Erradas e marcadas</div>
 
@@ -486,7 +445,6 @@ export const dashboard = {
       </div>
 
       ${lastResultHtml}
-
       ${kpiHtml}
       ${insightsHtml}
       ${detailsHtml}
@@ -495,20 +453,19 @@ export const dashboard = {
     this.bindDashActions();
   },
 
+  // -----------------------------
+  // Actions
+  // -----------------------------
   bindDashActions() {
     const screen = document.getElementById("screen-dashboard");
     if (!screen) return;
 
-    // navegação a partir do empty-state (data-nav) ou botões internos
+    // data-nav
     screen.querySelectorAll("[data-nav]").forEach((el) => {
       el.addEventListener("click", () => {
         const to = el.getAttribute("data-nav");
         if (!to) return;
-        // tenta usar router se existir no window
-        try {
-          window.router?.go?.(to);
-        } catch {}
-        // fallback: evento canônico
+        try { window.router?.go?.(to); } catch {}
         window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to } }));
       });
     });
@@ -516,26 +473,11 @@ export const dashboard = {
     const btnRefresh = screen.querySelector("[data-action='dashRefresh']");
     btnRefresh?.addEventListener("click", () => this.render());
 
-    const btnLastReview = screen.querySelector("[data-action='dashOpenLastReview']");
-    btnLastReview?.addEventListener("click", () => {
-      // marca intenção de abrir revisão ao entrar em simulados
-      try {
-        localStorage.setItem("liora_sim_open_review", "1");
-      } catch {}
-      // navega para simulados
-      try {
-        window.router?.go?.("simulados");
-      } catch {}
-      window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
-    });
-
-    
     const btnUpgrade = screen.querySelector("[data-action='dashUpgrade']");
     btnUpgrade?.addEventListener("click", () => {
       window.dispatchEvent(new Event("liora:premium-bloqueado"));
     });
 
-     
     const btnMock = screen.querySelector("[data-action='dashMock']");
     btnMock?.addEventListener("click", () => {
       this.seedMock();
@@ -543,25 +485,31 @@ export const dashboard = {
       window.dispatchEvent(new CustomEvent("liora:stats-changed"));
     });
 
+    const btnLastReview = screen.querySelector("[data-action='dashOpenLastReview']");
+    btnLastReview?.addEventListener("click", () => {
+      try { localStorage.setItem("liora_sim_open_review", "1"); } catch {}
+      try { window.router?.go?.("simulados"); } catch {}
+      window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
+    });
+
     const btnReviewNow = screen.querySelector("[data-action='dashReviewNow']");
     btnReviewNow?.addEventListener("click", () => {
-      try {
-        localStorage.setItem("liora_review_start", "1");
-      } catch {}
+      try { localStorage.setItem("liora_review_start", "1"); } catch {}
+      try { window.router?.go?.("simulados"); } catch {}
       window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
     });
 
     const btnClearReview = screen.querySelector("[data-action='dashClearReview']");
     btnClearReview?.addEventListener("click", () => {
-      try {
-        localStorage.setItem("liora_review_queue:v1", JSON.stringify({ items: [] }));
-      } catch {}
+      this.reviewClearQueue();
       window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
       this.render();
     });
- 
   },
 
+  // -----------------------------
+  // Mock
+  // -----------------------------
   seedMock() {
     const key = "liora_stats:v1";
     const now = Date.now();
@@ -584,6 +532,9 @@ export const dashboard = {
     localStorage.setItem(key, JSON.stringify(sample));
   },
 
+  // -----------------------------
+  // Utils
+  // -----------------------------
   escape(str) {
     return String(str ?? "")
       .replaceAll("&", "&amp;")
