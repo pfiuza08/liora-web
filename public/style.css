@@ -2139,4 +2139,86 @@ html.dark #screen-dashboard .dash-card.ok{
   overflow: hidden;
   white-space: nowrap;
 }
+/* ================================
+   MODAL PREMIUM (Upgrade)
+================================= */
+.liora-modal.hidden{ display:none; }
+
+.liora-modal{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+}
+
+.liora-modal-backdrop{
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(2px);
+}
+
+.liora-modal-card{
+  position: relative;
+  width: min(560px, calc(100vw - 32px));
+  margin: 10vh auto 0 auto;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(20,20,24,.92);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  padding: 14px;
+}
+
+html.light .liora-modal-card{
+  background: rgba(255,255,255,.95);
+  border-color: rgba(0,0,0,.12);
+}
+
+.liora-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.liora-modal-title{
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.liora-modal-sub{
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.liora-modal-body{
+  margin-top: 10px;
+}
+
+.liora-modal-list{
+  margin: 0;
+  padding-left: 18px;
+}
+
+.liora-modal-list li{
+  margin: 8px 0;
+}
+
+.liora-modal-note{
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: .85;
+}
+
+.liora-modal-actions{
+  margin-top: 14px;
+  display:flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* impede scroll do fundo quando modal abre */
+body.liora-modal-open{
+  overflow: hidden;
+}
 
