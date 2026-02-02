@@ -566,6 +566,50 @@ export const simulados = {
 
   const res = this.computeResult();
   this.persistResult(res);
+      // ✅ REVIEW QUEUE: empilha erradas + marcadas (OBJ/CE) e marcadas (DISC)
+    try {
+      const cfg = this.STATE._runConfig || this.STATE.config || {};
+      const banca = String(cfg.banca || "—");
+      const tema = String((cfg.tema || "").trim() || "Geral");
+      const mode = String(cfg.mode || "obj");
+
+      for (const d of (res?.detalhes || [])) {
+        const tipo = String(d.tipo || "mcq");
+
+        // decide se entra na fila
+        const flagged = !!this.STATE.respostas.find((x) => x.idx === d.idx)?.flagged;
+        const wrong = tipo !== "disc" ? !d.correta : false;
+
+        const shouldQueue =
+          (tipo === "disc" && flagged) ||
+          (tipo !== "disc" && (wrong || flagged));
+
+        if (!shouldQueue) continue;
+
+        const baseId = `${banca}|${tema}|${tipo}|${this.reviewHash(d.enunciado)}`;
+
+        this.reviewUpsertItem({
+          id: baseId,
+          banca,
+          tema,
+          mode,
+          tipo,
+          enunciado: d.enunciado,
+          alternativas: d.alternativas || [],
+          corretaIndex: Number.isInteger(d.corretaIndex) ? d.corretaIndex : null,
+          explicacao: String(d.explicacao || ""),
+          respostaModelo: String(d.respostaModelo || ""),
+          criterios: Array.isArray(d.criterios) ? d.criterios : [],
+          flagged: true, // entrou por wrong ou flagged
+          source: "simulado"
+        });
+      }
+
+      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    } catch (e) {
+      console.warn("⚠️ Falha ao salvar review queue:", e);
+    }
 
   // ✅ MÉTRICAS (somente se houver questões pontuadas)
   const cfg = this.STATE._runConfig || this.STATE.config;
