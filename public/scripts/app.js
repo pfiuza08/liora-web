@@ -350,6 +350,43 @@ async function loadFeature(path, exportName) {
   // aplica rota inicial
   applyRoute();
 
+  // -------------------------------------------------
+  // ✅ STUDY SESSIONS -> STATS (sessions)
+  // -------------------------------------------------
+  window.addEventListener("liora:study-session-done", (ev) => {
+    const detail = ev?.detail || {};
+    const key = "liora_stats:v1";
+
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : { attempts: [], sessions: [], meta: {} };
+
+      data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
+      data.sessions = Array.isArray(data.sessions) ? data.sessions : [];
+      data.meta = data.meta && typeof data.meta === "object" ? data.meta : {};
+
+      data.sessions.push({
+        ts: Date.now(),
+        date: new Date().toISOString().slice(0, 10),
+        tema: String(detail.tema || "—"),
+        sessao: String(detail.sessao || "—"),
+        timeSec: Number(detail.timeSec || 0),
+        source: String(detail.source || "app")
+      });
+
+      // guarda só as últimas 1200 sessões
+      if (data.sessions.length > 1200) data.sessions = data.sessions.slice(-1200);
+
+      localStorage.setItem(key, JSON.stringify(data));
+
+      // eventos que o dashboard já escuta
+      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "session" } }));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    } catch (e) {
+      console.warn("⚠️ Falha ao salvar session:", e);
+    }
+  });
+
   console.log("✅ LIORA boot ok", {
     route: router.getRouteFromHash(),
     premium: gates.isPremium(),
