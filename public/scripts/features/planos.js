@@ -219,21 +219,58 @@ export const planos = {
     this._setCurrentIndex(this._idxAtual + 1);
   },
 
-  _toggleDoneCurrent() {
-    const sessao = this._sessoes[this._idxAtual];
-    if (!sessao?.id) return;
+ _toggleDoneCurrent() {
+  const sessao = this._sessoes[this._idxAtual];
+  if (!sessao?.id) return;
 
-    const st = this._getState();
-    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+  const st = this._getState();
+  const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
 
-    if (done.has(sessao.id)) done.delete(sessao.id);
-    else done.add(sessao.id);
+  const wasDone = done.has(sessao.id);
 
-    this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
+  if (wasDone) done.delete(sessao.id);
+  else done.add(sessao.id);
 
-    this._refreshListChecks();
-    this.renderSessao(sessao);
-  },
+  const isDoneNow = !wasDone;
+
+  this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
+
+  // ✅ Se acabou de CONCLUIR (e não “desconcluir”), registra stats + refresh dashboard
+  if (isDoneNow) {
+    try {
+      const startTs = Number(this.ctx?.store?.get?.("liora_session_start_ts") || 0);
+      const timeSec = startTs ? Math.max(0, Math.round((Date.now() - startTs) / 1000)) : 0;
+
+      const plano = this.ctx?.store?.get?.("planoTema") || null;
+      const tema =
+        (plano?.tema || "").trim() ||
+        (this.ctx?.store?.get?.("temaAtual") || "").trim() ||
+        "—";
+
+      const sessaoTitle =
+        (sessao?.titulo || sessao?.title || sessao?.nome || "").trim() ||
+        `Sessão ${Number(this._idxAtual || 0) + 1}`;
+
+      // evento canônico (quem ouvir, grava em stats)
+      window.dispatchEvent(
+        new CustomEvent("liora:study-session-done", {
+          detail: { tema, sessao: sessaoTitle, timeSec, source: "planos" }
+        })
+      );
+
+      // força atualizar dashboard imediatamente
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
+      // reinicia relógio da próxima sessão
+      this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
+    } catch (e) {
+      console.warn("⚠️ Falha ao emitir liora:study-session-done", e);
+    }
+  }
+
+  this._refreshListChecks();
+  this.renderSessao(sessao);
+},
 
   _refreshListChecks() {
     const lista = document.getElementById("lista-sessoes");
