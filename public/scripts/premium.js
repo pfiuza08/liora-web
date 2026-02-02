@@ -1,12 +1,10 @@
 // =============================================================
 // 🔐 LIORA — Premium Modal (Upgrade)
-// Versão: v1.0
+// Versão: v1.2
 //
-// Mostra modal quando:
-// - liora:premium-bloqueado
-// - liora:login-required
-//
-// Usa user no store: { name, premium }
+// Abre com:
+// - liora:premium-bloqueado   (detail opcional)
+// - liora:login-required      (detail opcional)
 // =============================================================
 
 export const premium = {
@@ -16,10 +14,9 @@ export const premium = {
     this.ctx = ctx;
     this.ensureModal();
 
-    window.addEventListener("liora:premium-bloqueado", () => this.open("premium"));
-    window.addEventListener("liora:login-required", () => this.open("login"));
+    window.addEventListener("liora:premium-bloqueado", (ev) => this.open("premium", ev?.detail));
+    window.addEventListener("liora:login-required", (ev) => this.open("login", ev?.detail));
 
-    // close actions
     document.addEventListener("click", (ev) => {
       const modal = document.getElementById("liora-premium");
       if (!modal || modal.classList.contains("hidden")) return;
@@ -28,16 +25,23 @@ export const premium = {
       if (!a) return;
 
       const act = a.getAttribute("data-premium-action");
+
       if (act === "close") return this.close();
 
-      if (act === "goPlans") {
-        // aqui você troca por sua URL real de checkout/planos
-        this.toast("🧡 Em breve: página de planos/checkout.");
+      if (act === "login") {
+        this.close();
+        window.dispatchEvent(new Event("liora:open-login"));
         return;
       }
 
-      // DEV: ativar premium no mock
-      if (act === "devPremium") {
+      if (act === "goPlans") {
+        this.close();
+        window.dispatchEvent(new Event("liora:open-plans"));
+        return;
+      }
+
+      // DEV: ativar premium no mock (somente em dev mode)
+      if (act === "devPremium" && this.isDevMode()) {
         this.setPremium(true);
         this.close();
         this.toast("✅ Premium ativado (mock).");
@@ -48,6 +52,15 @@ export const premium = {
     });
 
     console.log("🔐 premium.js iniciado");
+  },
+
+  isDevMode() {
+    try {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("dev") === "1";
+    } catch {
+      return false;
+    }
   },
 
   getUser() {
@@ -85,40 +98,61 @@ export const premium = {
         </div>
 
         <div class="liora-modal-body">
-          <ul class="liora-modal-list">
-            <li>Trava 2: <b>Insights automáticos</b> (melhor banca, próximo foco)</li>
-            <li>Trava 3: <b>Detalhes por banca</b> e ranking</li>
-            <li>Trava 4: <b>Histórico completo</b> + recomendações</li>
-          </ul>
-
-          <div class="liora-modal-note muted">
+          <div class="liora-modal-note muted" id="liora-premium-note">
             Você pode começar no gratuito e evoluir quando quiser.
           </div>
+
+          <ul class="liora-modal-list">
+            <li><b>Insights automáticos</b> (melhor banca, próximo foco)</li>
+            <li><b>Detalhes por banca</b> e ranking</li>
+            <li><b>Histórico completo</b> + recomendações</li>
+          </ul>
         </div>
 
-        <div class="liora-modal-actions">
+        <div class="liora-modal-actions" id="liora-premium-actions">
           <button class="btn-secondary" data-premium-action="goPlans">Ver planos</button>
-          <button class="btn-primary" data-premium-action="devPremium">Ativar Premium (mock)</button>
+          <button class="btn-primary" data-premium-action="devPremium" id="liora-dev-premium">Ativar Premium (mock)</button>
+          <button class="btn-primary hidden" data-premium-action="login" id="liora-login-btn">Entrar</button>
         </div>
       </div>
     `;
-
     document.body.appendChild(el);
   },
 
-  open(kind = "premium") {
+  open(kind = "premium", detail = null) {
     const modal = document.getElementById("liora-premium");
     if (!modal) return;
 
     const title = modal.querySelector("#liora-premium-title");
     const sub = modal.querySelector("#liora-premium-sub");
+    const note = modal.querySelector("#liora-premium-note");
+    const devBtn = modal.querySelector("#liora-dev-premium");
+    const loginBtn = modal.querySelector("#liora-login-btn");
+
+    // dev button só em dev mode
+    if (devBtn) devBtn.classList.toggle("hidden", !this.isDevMode());
 
     if (kind === "login") {
       if (title) title.textContent = "Entrar para continuar";
       if (sub) sub.textContent = "Faça login para acessar este recurso.";
+      if (note) note.textContent = "Seu progresso fica salvo e sincronizado quando você estiver logada.";
+
+      if (loginBtn) loginBtn.classList.remove("hidden");
     } else {
       if (title) title.textContent = "Desbloquear Premium";
       if (sub) sub.textContent = "Mais métricas, insights e recomendações.";
+      if (note) {
+        // se veio de limite free, mostra contexto
+        const used = detail?.used;
+        const limit = detail?.limit;
+        if (typeof used === "number" && typeof limit === "number") {
+          note.textContent = `Limite do plano gratuito: ${used}/${limit} simulados hoje.`;
+        } else {
+          note.textContent = "Você pode começar no gratuito e evoluir quando quiser.";
+        }
+      }
+
+      if (loginBtn) loginBtn.classList.add("hidden");
     }
 
     modal.classList.remove("hidden");
