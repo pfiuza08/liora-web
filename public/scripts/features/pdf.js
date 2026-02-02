@@ -327,61 +327,56 @@ export const pdf = {
     this._setCurrentIndex(this._idxAtual + 1);
   },
 
-    _toggleDoneCurrent() {
-    const sessao = this._sessoes[this._idxAtual];
-    if (!sessao?.id) return;
+  _toggleDoneCurrent() {
+  const sessao = this._sessoes[this._idxAtual];
+  if (!sessao?.id) return;
 
-    const st = this._getState();
-    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+  const st = this._getState();
+  const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
 
-    const wasDone = done.has(sessao.id);
+  const wasDone = done.has(sessao.id);
 
-    if (wasDone) done.delete(sessao.id);
-    else done.add(sessao.id);
+  if (wasDone) done.delete(sessao.id);
+  else done.add(sessao.id);
 
-    const isDoneNow = !wasDone;
+  const isDoneNow = !wasDone;
 
-    this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
+  this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
 
-    // ✅ Se acabou de CONCLUIR (e não “desconcluir”), registra stats + refresh dashboard
-    if (isDoneNow) {
-      try {
-        const startTs = Number(this.ctx?.store?.get?.("liora_session_start_ts") || 0);
-        const timeSec = startTs ? Math.max(0, Math.round((Date.now() - startTs) / 1000)) : 0;
+  // ✅ Se acabou de CONCLUIR, registra stats + atualiza dashboard
+  if (isDoneNow) {
+    try {
+      const startTs = Number(this.ctx?.store?.get?.("liora_session_start_ts") || 0);
+      const timeSec = startTs ? Math.max(0, Math.round((Date.now() - startTs) / 1000)) : 0;
 
-        // tema do PDF (pega do meta do plano)
-        const plano = this.ctx?.store?.get?.("planoPdf") || null;
-        const tema =
-          (plano?.meta?.tema || "").trim() ||
-          (this._plano?.meta?.tema || "").trim() ||
-          "PDF";
+      const plano = this.ctx?.store?.get?.("planoPdf") || null;
+      const tema =
+        (plano?.meta?.tema || "").trim() ||
+        (plano?.tema || "").trim() ||
+        "—";
 
-        const sessaoTitle =
-          (sessao?.titulo || sessao?.title || sessao?.nome || "").trim() ||
-          `Sessão ${Number(this._idxAtual || 0) + 1}`;
+      const sessaoTitle =
+        (sessao?.titulo || sessao?.title || sessao?.nome || "").trim() ||
+        `Sessão ${Number(this._idxAtual || 0) + 1}`;
 
-        // evento canônico (quem ouvir, grava em stats)
-        window.dispatchEvent(
-          new CustomEvent("liora:study-session-done", {
-            detail: { tema, sessao: sessaoTitle, timeSec, source: "pdf" }
-          })
-        );
+      window.dispatchEvent(
+        new CustomEvent("liora:study-session-done", {
+          detail: { tema, sessao: sessaoTitle, timeSec, source: "pdf" }
+        })
+      );
 
-        // refresh imediato do dashboard
-        window.dispatchEvent(new Event("liora:dashboard-refresh"));
-        // (opcional, mas ajuda outros ouvintes)
-        window.dispatchEvent(new Event("liora:stats-changed"));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
-        // reinicia relógio para a próxima sessão
-        this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
-      } catch (e) {
-        console.warn("⚠️ Falha ao emitir liora:study-session-done (pdf)", e);
-      }
+      // reinicia relógio
+      this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
+    } catch (e) {
+      console.warn("⚠️ Falha ao emitir liora:study-session-done (pdf)", e);
     }
+  }
 
-    this._refreshListChecks();
-    this.renderSessao(sessao);
-  },
+  this._refreshListChecks();
+  this.renderSessao(sessao);
+},
 
 
   _refreshListChecks() {
