@@ -1,477 +1,425 @@
-// ==========================================================
-// 📊 LIORA — DASHBOARD (MVP Local)
-// - Salva tentativas (simulados) em localStorage
-// - Calcula KPIs e insights
-// - Bloqueia cards PREMIUM no modo free
-// ==========================================================
-
-const LS_KEY = "lioraMetrics:v1";
-
-function qs(id) {
-  return document.getElementById(id);
-}
-
-function pct(n) {
-  return `${Math.round(n * 100)}%`;
-}
-
-function todayISO(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function loadStore() {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY)) || { attempts: [] };
-  } catch {
-    return { attempts: [] };
-  }
-}
-
-function saveStore(data) {
-  localStorage.setItem(LS_KEY, JSON.stringify(data));
-}
-
-// attempt schema:
-// {
-//   ts: number,
-//   date: "yyyy-mm-dd",
-//   banca: string,
-//   tema: string,
-//   dificuldade: string,
-//   total: number,
-//   correct: number,
-//   timeSec: number,
-//   mode: "obj" | "disc"
-// }
-function recordAttempt(attempt) {
-  const total = Number(attempt?.total || 0);
-  if (total <= 0) return;
-
-  const data = loadStore();
-
-  data.attempts.push({
-    ts: Date.now(),
-    date: todayISO(),
-    banca: attempt?.banca || "—",
-    tema: (attempt?.tema || "").trim() || "Geral",
-    dificuldade: attempt?.dificuldade || "misturado",
-    total,
-    correct: Number(attempt?.correct || 0),
-    timeSec: Number(attempt?.timeSec || 0),
-    mode: String(attempt?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
-  });
-
-  if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-  saveStore(data);
-}
-
-function computeStats(attempts) {
-  const totalAttempts = attempts.length;
-  const totalQ = attempts.reduce((s, a) => s + (a.total || 0), 0);
-  const totalC = attempts.reduce((s, a) => s + (a.correct || 0), 0);
-  const totalTime = attempts.reduce((s, a) => s + (a.timeSec || 0), 0);
-
-  const acc = totalQ ? totalC / totalQ : 0;
-  const avgSec = totalQ ? totalTime / totalQ : 0;
-
-  // streak: dias consecutivos com pelo menos 1 tentativa
-  const days = new Set(attempts.map((a) => a.date).filter(Boolean));
-  const dayList = Array.from(days).sort();
-  let streak = 0;
-
-  if (dayList.length) {
-    const set = new Set(dayList);
-    let d = new Date(dayList[dayList.length - 1] + "T00:00:00");
-    while (true) {
-      const key = todayISO(d);
-      if (!set.has(key)) break;
-      streak++;
-      d.setDate(d.getDate() - 1);
-    }
-  }
-
-  const byKey = (keyFn) => {
-    const m = new Map();
-    for (const a of attempts) {
-      const k = keyFn(a);
-      const cur = m.get(k) || { total: 0, correct: 0, timeSec: 0, attempts: 0 };
-      cur.total += a.total || 0;
-      cur.correct += a.correct || 0;
-      cur.timeSec += a.timeSec || 0;
-      cur.attempts += 1;
-      m.set(k, cur);
-    }
-    return m;
-  };
-
-  const byBanca = byKey((a) => a.banca || "—");
-  const byTema = byKey((a) => a.tema || "Geral");
-  const byDif = byKey((a) => a.dificuldade || "misturado");
-
-  function windowStats(daysBack) {
-    const cutoff = Date.now() - daysBack * 24 * 3600 * 1000;
-    const w = attempts.filter((a) => (a.ts || 0) >= cutoff);
-    const q = w.reduce((s, a) => s + (a.total || 0), 0);
-    const c = w.reduce((s, a) => s + (a.correct || 0), 0);
-    return { attempts: w.length, q, c, acc: q ? c / q : 0 };
-  }
-
-  const w7 = windowStats(7);
-  const w30 = windowStats(30);
-
-  const weaknesses = Array.from(byTema.entries())
-    .map(([tema, v]) => ({ tema, total: v.total, acc: v.total ? v.correct / v.total : 0 }))
-    .filter((x) => x.total >= 15)
-    .sort((a, b) => a.acc - b.acc)
-    .slice(0, 5);
-
-  return {
-    totalAttempts,
-    totalQ,
-    totalC,
-    totalTime,
-    acc,
-    avgSec,
-    streak,
-    byBanca,
-    byTema,
-    byDif,
-    w7,
-    w30,
-    weaknesses
-  };
-}
-
-function cardKPI({ title, value, sub = "", tone = "" }) {
-  return `
-    <div class="dash-card ${tone}">
-      <div class="dash-title">${title}</div>
-      <div class="dash-value">${value}</div>
-      ${sub ? `<div class="dash-sub muted">${sub}</div>` : ""}
-    </div>
-  `;
-}
-
-function cardLocked({ title, teaser = "Disponível no plano Premium" }) {
-  return `
-    <div class="dash-card dash-locked">
-      <div class="dash-lock">🔒 Premium</div>
-      <div class="dash-title">${title}</div>
-      <div class="dash-sub muted">${teaser}</div>
-    </div>
-  `;
-}
-
-function miniTable(title, rows) {
-  const body = rows?.length
-    ? rows.map((r) => `
-        <div class="dash-row">
-          <div class="dash-row-left">
-            <div class="dash-row-title">${r.name}</div>
-            <div class="dash-row-sub muted">${r.sub || ""}</div>
-          </div>
-          <div class="dash-row-right">
-            <div class="dash-row-metric">${r.metric}</div>
-          </div>
-        </div>
-      `).join("")
-    : `<div class="muted">Sem dados suficientes.</div>`;
-
-  return `
-    <div class="dash-card">
-      <div class="dash-title">${title}</div>
-      <div class="dash-list">${body}</div>
-    </div>
-  `;
-}
-
-function topN(map, n = 5) {
-  return Array.from(map.entries())
-    .map(([name, v]) => ({
-      name,
-      total: v.total,
-      acc: v.total ? v.correct / v.total : 0,
-      attempts: v.attempts,
-      avgSec: v.total ? v.timeSec / v.total : 0,
-    }))
-    .filter((x) => x.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, n);
-}
-
-function renderDashboard({ isPremium = false } = {}) {
-  const attempts = loadStore().attempts || [];
-
-  const empty = qs("dash-empty");
-  const kpis = qs("dash-kpis");
-  const insights = qs("dash-insights");
-  const tables = qs("dash-tables");
-
-  if (!kpis || !insights || !tables) return;
-
-  if (!attempts.length) {
-    if (empty) empty.classList.remove("hidden");
-    kpis.innerHTML = "";
-    insights.innerHTML = "";
-    tables.innerHTML = "";
-    return;
-  } else {
-    if (empty) empty.classList.add("hidden");
-  }
-
-  const s = computeStats(attempts);
-
-  const fmtLast = (ts) => {
-    if (!ts) return "—";
-    const d = new Date(ts);
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mi = String(d.getMinutes()).padStart(2, "0");
-    return `${dd}/${mm} ${hh}:${mi}`;
-  };
-
-  const getMode = (a) => (String(a?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj");
-  const objCount = attempts.filter((a) => getMode(a) === "obj").length;
-  const discCount = attempts.filter((a) => getMode(a) === "disc").length;
-
-  const last = attempts[attempts.length - 1];
-
-  // KPIs (FREE) — 3 colunas preenchido com 3×2 + 1 “Tipos”
-  kpis.innerHTML = [
-    cardKPI({
-      title: "Acerto geral",
-      value: s.totalQ ? pct(s.acc) : "—",
-      sub: `${s.totalC}/${s.totalQ} questões`,
-      tone: s.acc >= 0.75 ? "good" : s.acc >= 0.6 ? "ok" : "warn",
-    }),
-    cardKPI({ title: "Questões", value: String(s.totalQ), sub: "Respondidas" }),
-    cardKPI({ title: "Simulados", value: String(s.totalAttempts), sub: "Total feitos" }),
-
-    cardKPI({
-      title: "Tempo / questão",
-      value: s.totalQ ? `${Math.round(s.avgSec)}s` : "—",
-      sub: "Média geral",
-    }),
-    cardKPI({ title: "Streak", value: `${s.streak} dia(s)`, sub: "Sequência ativa" }),
-    cardKPI({
-      title: "Último simulado",
-      value: fmtLast(last?.ts),
-      sub: `${(last?.banca || "—")} · ${(last?.tema || "Geral")}`,
-    }),
-
-    cardKPI({
-      title: "Tipos",
-      value: `${objCount} OBJ`,
-      sub: `${discCount} DISC`,
-    })
-  ].join("");
-
-  // FREE: foco atual (tema mais praticado)
-  const topTema = topN(s.byTema, 1)[0];
-  const focoAtualCard = cardKPI({
-    title: "Foco atual",
-    value: topTema?.name || "—",
-    sub: topTema ? `${topTema.total} questões` : "Sem dados",
-    tone: "ok",
-  });
-
-  // INSIGHTS (premium travado)
-  const w7txt = s.w7.q ? `${pct(s.w7.acc)} em ${s.w7.q} questões` : "Sem dados";
-  const w30txt = s.w30.q ? `${pct(s.w30.acc)} em ${s.w30.q} questões` : "Sem dados";
-
-  insights.innerHTML = [
-    focoAtualCard, // livre
-
-    isPremium
-      ? cardKPI({ title: "Últimos 7 dias", value: w7txt, sub: `Simulados: ${s.w7.attempts}` })
-      : cardLocked({ title: "Últimos 7 dias", teaser: "Evolução semanal (acertos e volume)" }),
-
-    isPremium
-      ? cardKPI({ title: "Últimos 30 dias", value: w30txt, sub: `Simulados: ${s.w30.attempts}` })
-      : cardLocked({ title: "Últimos 30 dias", teaser: "Evolução mensal e tendência" }),
-
-    isPremium
-      ? (() => {
-          const weak = s.weaknesses[0];
-          return weak
-            ? cardKPI({
-                title: "Ponto fraco #1",
-                value: weak.tema,
-                sub: `${pct(weak.acc)} em ${weak.total} questões`,
-                tone: "warn",
-              })
-            : cardKPI({ title: "Pontos fracos", value: "—", sub: "Ainda não há dados" });
-        })()
-      : cardLocked({ title: "Pontos fracos", teaser: "Top temas com menor acerto" }),
-
-    isPremium
-      ? cardKPI({
-          title: "Recomendação",
-          value: "Próximo passo",
-          sub: s.weaknesses.length
-            ? `Revisar "${s.weaknesses[0].tema}" e fazer 10 questões`
-            : "Faça mais 1 simulado para gerar recomendações",
-        })
-      : cardLocked({ title: "Recomendação", teaser: "Ações automáticas para subir seu acerto" }),
-  ].join("");
-
-  // Tabelas
-  const bancaTop = topN(s.byBanca, 5).map((x) => ({
-    name: x.name,
-    sub: `${x.total} questões`,
-    metric: pct(x.acc),
-  }));
-
-  const temaTop = topN(s.byTema, 5).map((x) => ({
-    name: x.name,
-    sub: `${x.total} questões`,
-    metric: pct(x.acc),
-  }));
-
-  const difTop = topN(s.byDif, 5).map((x) => ({
-    name: x.name,
-    sub: `${x.total} questões • ${Math.round(x.avgSec)}s/q`,
-    metric: pct(x.acc),
-  }));
-
-  tables.innerHTML = [
-    isPremium ? miniTable("Por banca (top 5)", bancaTop) : cardLocked({ title: "Por banca", teaser: "Acerto e volume por banca" }),
-    isPremium ? miniTable("Por tema (top 5)", temaTop) : cardLocked({ title: "Por tema", teaser: "Acerto e volume por tema" }),
-    miniTable("Por dificuldade", difTop),
-  ].join("");
-}
+// =============================================================
+// 📊 LIORA — DASHBOARD (MVP local, de verdade)
+// Versão: v1.2 (stats v1 + travas 2/3/4 + render automático)
+//
+// Fonte: localStorage "liora_stats:v1"
+// - attempts: { ts, date, banca, tema, dificuldade, mode, total, correct, timeSec }
+// - sessions: (fica para Tema/PDF depois)
+//
+// Eventos que atualizam:
+// - liora:dashboard-refresh
+// - liora:stats-changed
+// =============================================================
 
 export const dashboard = {
   ctx: null,
+
+  init(ctx) {
+    this.ctx = ctx;
+
+    // render quando pedirem refresh
+    window.addEventListener("liora:dashboard-refresh", () => this.render());
+
+    // render quando stats mudarem (simulados/tarefas)
+    window.addEventListener("liora:stats-changed", () => this.render());
+
+    // render quando entrar na tela (se você disparar esse evento)
+    window.addEventListener("liora:open-dashboard", () => {
+      this.showScreen();
+      this.render();
+    });
+
+    // render inicial leve (não força trocar de screen)
+    this.ensureShell();
+    console.log("📊 dashboard.js iniciado (MVP local de verdade)");
+  },
 
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-dashboard")?.classList.add("active");
   },
 
-  init(ctx) {
-    this.ctx = ctx;
+  // -----------------------------
+  // Data
+  // -----------------------------
+  statsGet() {
+    const key = "liora_stats:v1";
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : {};
+      return {
+        attempts: Array.isArray(data.attempts) ? data.attempts : [],
+        sessions: Array.isArray(data.sessions) ? data.sessions : [],
+        meta: data.meta && typeof data.meta === "object" ? data.meta : {}
+      };
+    } catch {
+      return { attempts: [], sessions: [], meta: {} };
+    }
+  },
 
-    if (window.__lioraDashboardInited) return;
-    window.__lioraDashboardInited = true;
+  getUser() {
+    // tenta alguns padrões comuns
+    try {
+      const u =
+        this.ctx?.store?.get?.("user") ||
+        this.ctx?.store?.get?.("liora_user") ||
+        null;
+      return u && typeof u === "object" ? u : null;
+    } catch {
+      return null;
+    }
+  },
 
-    console.log("📊 dashboard.js iniciado (MVP local)");
+  isPremium() {
+    const u = this.getUser();
+    return !!u?.premium;
+  },
 
-    // expõe API global (usada pelo simulados)
-    window.lioraMetrics = window.lioraMetrics || {};
-    window.lioraMetrics.recordAttempt = recordAttempt;
-    window.lioraMetrics.renderDashboard = (opts = {}) => {
-      const isPremium = !!this.ctx?.store?.get?.("user")?.premium;
-      renderDashboard({ isPremium, ...opts });
+  // -----------------------------
+  // Compute KPIs
+  // -----------------------------
+  compute() {
+    const { attempts } = this.statsGet();
+
+    const scored = attempts.filter((a) => Number(a.total || 0) > 0);
+    const totalAttempts = scored.length;
+
+    const sumTotal = scored.reduce((acc, a) => acc + Number(a.total || 0), 0);
+    const sumCorrect = scored.reduce((acc, a) => acc + Number(a.correct || 0), 0);
+    const pct = sumTotal ? Math.round((sumCorrect / sumTotal) * 100) : 0;
+
+    const byBanca = new Map();
+    const byMode = new Map();
+    const byTema = new Map();
+
+    for (const a of scored) {
+      const banca = String(a.banca || "—");
+      const mode = String(a.mode || "obj");
+      const tema = String(a.tema || "Geral");
+
+      // banca
+      const b = byBanca.get(banca) || { banca, total: 0, correct: 0, qs: 0 };
+      b.total += 1;
+      b.correct += Number(a.correct || 0);
+      b.qs += Number(a.total || 0);
+      byBanca.set(banca, b);
+
+      // mode
+      const m = byMode.get(mode) || { mode, total: 0 };
+      m.total += 1;
+      byMode.set(mode, m);
+
+      // tema
+      const t = byTema.get(tema) || { tema, total: 0, correct: 0, qs: 0 };
+      t.total += 1;
+      t.correct += Number(a.correct || 0);
+      t.qs += Number(a.total || 0);
+      byTema.set(tema, t);
+    }
+
+    const bancaRank = [...byBanca.values()]
+      .map((x) => ({ ...x, pct: x.qs ? Math.round((x.correct / x.qs) * 100) : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+
+    const bestBanca = bancaRank[0]?.banca || "—";
+
+    const modeRank = [...byMode.values()].sort((a, b) => b.total - a.total);
+    const topMode = modeRank[0]?.mode || "obj";
+
+    const temaRank = [...byTema.values()]
+      .map((x) => ({ ...x, pct: x.qs ? Math.round((x.correct / x.qs) * 100) : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+
+    const focoAtual = temaRank[0]?.tema || "Geral";
+
+    const last5 = scored
+      .slice()
+      .sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))
+      .slice(0, 5);
+
+    return {
+      totalAttempts,
+      sumTotal,
+      sumCorrect,
+      pct,
+      bestBanca,
+      topMode,
+      focoAtual,
+      bancaRank,
+      temaRank,
+      last5
     };
-    window.lioraMetrics._load = () => window.lioraMetrics.renderDashboard();
+  },
 
-    // modal upgrade (front-only)
-    const ensureUpgradeModal = () => {
-      if (document.getElementById("premium-modal")) return;
+  // -----------------------------
+  // Render
+  // -----------------------------
+  ensureShell() {
+    const screen = document.getElementById("screen-dashboard");
+    if (!screen) return;
 
-      const el = document.createElement("div");
-      el.id = "premium-modal";
-      el.className = "liora-modal hidden";
-      el.setAttribute("aria-hidden", "true");
+    // se você já tem um HTML próprio, ok.
+    // mas se não tiver #dash-body, criamos um container seguro.
+    if (!screen.querySelector("#dash-body")) {
+      const wrap = document.createElement("div");
+      wrap.id = "dash-body";
+      screen.appendChild(wrap);
+    }
+  },
 
-      el.innerHTML = `
-        <div class="liora-modal-backdrop" data-close="1"></div>
-        <div class="liora-modal-card" role="dialog" aria-modal="true" aria-label="Liora Premium">
-          <div class="liora-modal-head">
-            <div>
-              <div class="liora-modal-title">Desbloquear Premium</div>
-              <div class="liora-modal-sub muted">Insights avançados e recomendações automáticas.</div>
+  render() {
+    const screen = document.getElementById("screen-dashboard");
+    if (!screen) return;
+
+    this.ensureShell();
+
+    const wrap = screen.querySelector("#dash-body");
+    if (!wrap) return;
+
+    const premium = this.isPremium();
+    const u = this.getUser();
+
+    const k = this.compute();
+
+    // helpers de UI
+    const chipMode = (m) => (String(m) === "disc" ? "DISC" : "OBJ");
+    const fmtTime = (sec) => {
+      const s = Math.max(0, Number(sec || 0));
+      const mm = Math.floor(s / 60);
+      const ss = s % 60;
+      return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+    };
+
+    const locked = (html) => `
+      <div class="dash-card dash-locked">
+        <div class="dash-lock">Premium</div>
+        ${html}
+      </div>
+    `;
+
+    const emptyState = `
+      <div class="panel">
+        <div class="card-title">Ainda sem dados</div>
+        <div class="muted">Faça um simulado para o dashboard começar a contar sua evolução.</div>
+        <div class="actions-row">
+          <button class="btn-primary" data-nav="simulados">Ir para Simulados</button>
+          <button class="btn-secondary" data-action="dashMock">Gerar exemplo</button>
+        </div>
+      </div>
+    `;
+
+    // Se não tiver tentativas ainda:
+    if (!k.totalAttempts) {
+      wrap.innerHTML = emptyState;
+      this.bindDashActions();
+      return;
+    }
+
+    // Cards base (sempre liberados)
+    const kpiHtml = `
+      <div class="dash-grid" id="dash-kpis">
+        <div class="dash-card good">
+          <div class="dash-title">Acurácia geral</div>
+          <div class="dash-value">${k.pct}%</div>
+          <div class="dash-sub">${k.sumCorrect} acertos / ${k.sumTotal} questões</div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-title">Simulados concluídos</div>
+          <div class="dash-value">${k.totalAttempts}</div>
+          <div class="dash-sub">com questões pontuadas</div>
+        </div>
+
+        <div class="dash-card ok">
+          <div class="dash-title">Foco atual</div>
+          <div class="dash-value">${this.escape(k.focoAtual)}</div>
+          <div class="dash-sub">tema com melhor desempenho</div>
+        </div>
+
+        ${
+          premium
+            ? `
+              <div class="dash-card dash-kpi-types">
+                <div class="dash-title">Tipos</div>
+                <div class="dash-value">${chipMode(k.topMode)}</div>
+                <div class="dash-sub">modo mais usado</div>
+              </div>
+            `
+            : locked(`
+                <div class="dash-title">Tipos</div>
+                <div class="dash-value">Premium</div>
+                <div class="dash-sub">OBJ/DISC mais usado</div>
+              `)
+        }
+      </div>
+    `;
+
+    // Trava 2 (Insights)
+    const insightsHtml = premium
+      ? `
+        <div class="panel">
+          <div class="card-title">Insights</div>
+          <div class="muted">Análises e recomendações</div>
+          <div class="dash-list">
+            <div class="dash-row">
+              <div>
+                <div class="dash-row-title">Melhor banca</div>
+                <div class="dash-row-sub">maior acurácia acumulada</div>
+              </div>
+              <div class="dash-row-metric">${this.escape(k.bestBanca)}</div>
             </div>
-            <button class="btn-link" data-close="1" aria-label="Fechar">✕</button>
-          </div>
 
-          <div class="liora-modal-body">
-            <ul class="liora-modal-list">
-              <li><b>Evolução 7 e 30 dias</b> (tendência real de melhora)</li>
-              <li><b>Pontos fracos</b> por tema/banca (onde você mais erra)</li>
-              <li><b>Recomendações</b> do próximo passo (ação prática)</li>
-            </ul>
-
-            <div class="liora-modal-note muted">
-              MVP: por enquanto o Premium ainda está em implantação.
+            <div class="dash-row">
+              <div>
+                <div class="dash-row-title">Próximo passo sugerido</div>
+                <div class="dash-row-sub">reforço do foco atual</div>
+              </div>
+              <div class="dash-row-metric">${this.escape(k.focoAtual)}</div>
             </div>
           </div>
-
-          <div class="liora-modal-actions">
-            <button class="btn-secondary" data-close="1">Agora não</button>
-            <button class="btn-primary" id="btn-upgrade-premium">Quero Premium</button>
-          </div>
+        </div>
+      `
+      : `
+        <div class="panel">
+          <div class="card-title">Insights</div>
+          <div class="muted">Análises e recomendações</div>
+          ${locked(`<div class="dash-sub">Desbloqueie para ver insights automáticos.</div>`)}
         </div>
       `;
 
-      document.body.appendChild(el);
+    // Trava 3/4 (Detalhes + Histórico)
+    const detailsHtml = premium
+      ? `
+        <div class="panel">
+          <div class="card-title">Detalhes</div>
+          <div class="muted">Onde você mais ganha pontos</div>
 
-      el.addEventListener("click", (ev) => {
-        const t = ev.target;
-        if (t?.closest?.("[data-close='1']")) closeUpgrade();
+          <div class="dash-list">
+            ${k.bancaRank.slice(0, 6).map((b) => `
+              <div class="dash-row">
+                <div>
+                  <div class="dash-row-title">${this.escape(b.banca)}</div>
+                  <div class="dash-row-sub">${b.total} simulados · ${b.qs} questões</div>
+                </div>
+                <div class="dash-row-metric">${b.pct}%</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="card-title">Histórico recente</div>
+          <div class="muted">Últimos 5 simulados</div>
+
+          <div class="dash-list">
+            ${k.last5.map((a) => `
+              <div class="dash-row">
+                <div>
+                  <div class="dash-row-title">${this.escape(a.banca)} · ${this.escape(a.tema)}</div>
+                  <div class="dash-row-sub">${a.date} · ${chipMode(a.mode)} · ${fmtTime(a.timeSec)} </div>
+                </div>
+                <div class="dash-row-metric">${Math.round((a.correct / a.total) * 100)}%</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `
+      : `
+        <div class="panel">
+          <div class="card-title">Detalhes</div>
+          <div class="muted">Onde você mais ganha pontos</div>
+          ${locked(`<div class="dash-sub">Breakdown por banca e histórico detalhado (Travas 3 e 4).</div>`)}
+        </div>
+      `;
+
+    // header pequeno (mostra login/premium)
+    const userLine = (() => {
+      if (!u) return `<span class="pill pill-base">visitante</span>`;
+      if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
+      return `<span class="pill pill-upload">free</span>`;
+    })();
+
+    wrap.innerHTML = `
+      <div class="panel" style="margin-bottom:12px;">
+        <div class="card-title">Resumo</div>
+        <div class="muted">Dados locais · atualiza automaticamente</div>
+        <div style="margin-top:10px;">${userLine}</div>
+
+        <div class="actions-row">
+          <button class="btn-secondary" data-action="dashRefresh">Atualizar</button>
+          ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
+        </div>
+      </div>
+
+      ${kpiHtml}
+      ${insightsHtml}
+      ${detailsHtml}
+    `;
+
+    this.bindDashActions();
+  },
+
+  bindDashActions() {
+    const screen = document.getElementById("screen-dashboard");
+    if (!screen) return;
+
+    // navegação a partir do empty-state (data-nav) ou botões internos
+    screen.querySelectorAll("[data-nav]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const to = el.getAttribute("data-nav");
+        if (!to) return;
+        // tenta usar router se existir no window
+        try {
+          window.router?.go?.(to);
+        } catch {}
+        // fallback: evento canônico
+        window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to } }));
       });
-
-      el.querySelector("#btn-upgrade-premium")?.addEventListener("click", () => {
-        this.ctx?.ui?.toast?.("✨ Premium em breve. (Hook pronto para checkout)");
-        closeUpgrade();
-        window.dispatchEvent(new Event("liora:premium-click"));
-      });
-    };
-
-    const openUpgrade = (origin = "dashboard") => {
-      ensureUpgradeModal();
-      const modal = document.getElementById("premium-modal");
-      if (!modal) return;
-
-      modal.classList.remove("hidden");
-      modal.setAttribute("aria-hidden", "false");
-      document.body.classList.add("liora-modal-open");
-      modal.dataset.origin = origin;
-
-      const onEsc = (e) => {
-        if (e.key === "Escape") closeUpgrade();
-      };
-      window.addEventListener("keydown", onEsc, { once: true });
-
-      window.dispatchEvent(new CustomEvent("liora:upgrade-open", { detail: { origin } }));
-    };
-
-    const closeUpgrade = () => {
-      const modal = document.getElementById("premium-modal");
-      if (!modal) return;
-
-      modal.classList.add("hidden");
-      modal.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("liora-modal-open");
-      window.dispatchEvent(new Event("liora:upgrade-close"));
-    };
-
-    document.addEventListener("click", (ev) => {
-      const t = ev.target;
-      if (!t) return;
-      if (!t.closest?.("#screen-dashboard")) return;
-
-      const locked = t.closest?.(".dash-card.dash-locked");
-      if (locked) {
-        ev.preventDefault();
-        openUpgrade("dashboard-locked-card");
-      }
     });
 
-    window.addEventListener("liora:open-upgrade", () => openUpgrade("event"));
+    const btnRefresh = screen.querySelector("[data-action='dashRefresh']");
+    btnRefresh?.addEventListener("click", () => this.render());
 
-    window.addEventListener("liora:open-dashboard", () => {
-      this.showScreen();
-      window.lioraMetrics.renderDashboard();
+    const btnUpgrade = screen.querySelector("[data-action='dashUpgrade']");
+    btnUpgrade?.addEventListener("click", () => {
+      window.dispatchEvent(new Event("liora:premium-bloqueado"));
     });
 
-    window.addEventListener("liora:dashboard-refresh", () => {
-      window.lioraMetrics.renderDashboard();
+    const btnMock = screen.querySelector("[data-action='dashMock']");
+    btnMock?.addEventListener("click", () => {
+      this.seedMock();
+      this.render();
+      window.dispatchEvent(new CustomEvent("liora:stats-changed"));
     });
+  },
+
+  seedMock() {
+    const key = "liora_stats:v1";
+    const now = Date.now();
+    const pad = (n) => String(n).padStart(2, "0");
+    const iso = (ts) => {
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
+    const sample = {
+      attempts: [
+        { ts: now - 1 * 86400000, date: iso(now - 1 * 86400000), banca: "FGV", tema: "Direito Adm", dificuldade: "médio", mode: "obj", total: 10, correct: 8, timeSec: 780 },
+        { ts: now - 2 * 86400000, date: iso(now - 2 * 86400000), banca: "CESPE", tema: "Constitucional", dificuldade: "misturado", mode: "obj", total: 12, correct: 7, timeSec: 920 },
+        { ts: now - 3 * 86400000, date: iso(now - 3 * 86400000), banca: "FGV", tema: "Direito Adm", dificuldade: "fácil", mode: "obj", total: 8, correct: 7, timeSec: 610 }
+      ],
+      sessions: [],
+      meta: {}
+    };
+
+    localStorage.setItem(key, JSON.stringify(sample));
+  },
+
+  escape(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
   }
 };
