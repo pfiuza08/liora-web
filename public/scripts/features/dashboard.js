@@ -384,162 +384,160 @@ function isUserPremium() {
 // ==========================================================
 // EXPORT
 // ==========================================================
-export const dashboard = {
-  ctx: null,
-
-  showScreen() {
-    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-    document.getElementById("screen-dashboard")?.classList.add("active");
-  },
-
-  init(ctx) {
-  this.ctx = ctx;
-
-  // anti-init duplicado
-  if (window.__lioraDashboardInited) return;
-  window.__lioraDashboardInited = true;
-
-  console.log("📊 dashboard.js iniciado (MVP local)");
-
-  // -----------------------------
-  // MODAL PREMIUM (front-only)
-  // -----------------------------
-  const ensureUpgradeModal = () => {
-    if (document.getElementById("premium-modal")) return;
-
-    const el = document.createElement("div");
-    el.id = "premium-modal";
-    el.className = "liora-modal hidden";
-    el.setAttribute("aria-hidden", "true");
-
-    el.innerHTML = `
-      <div class="liora-modal-backdrop" data-close="1"></div>
-
-      <div class="liora-modal-card" role="dialog" aria-modal="true" aria-label="Liora Premium">
-        <div class="liora-modal-head">
-          <div>
-            <div class="liora-modal-title">Desbloquear Premium</div>
-            <div class="liora-modal-sub muted">Insights avançados e recomendações automáticas.</div>
-          </div>
-          <button class="btn-link" data-close="1" aria-label="Fechar">✕</button>
-        </div>
-
-        <div class="liora-modal-body">
-          <ul class="liora-modal-list">
-            <li><b>Evolução 7 e 30 dias</b> (tendência real de melhora)</li>
-            <li><b>Pontos fracos</b> por tema/banca (onde você mais erra)</li>
-            <li><b>Recomendações</b> do próximo passo (ação prática)</li>
-          </ul>
-
-          <div class="liora-modal-note muted">
-            MVP: por enquanto o Premium ainda está em implantação.
-          </div>
-        </div>
-
-        <div class="liora-modal-actions">
-          <button class="btn-secondary" data-close="1">Agora não</button>
-          <button class="btn-primary" id="btn-upgrade-premium">Quero Premium</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(el);
-
-    // close handlers (delegado)
-    el.addEventListener("click", (ev) => {
-      const t = ev.target;
-      if (t?.closest?.("[data-close='1']")) closeUpgrade();
-    });
-
-    // CTA handler
-    el.querySelector("#btn-upgrade-premium")?.addEventListener("click", () => {
-      // hook futuro: checkout / tela de planos
-      this.ctx?.ui?.toast?.("✨ Premium em breve. (Hook pronto para checkout)");
-      closeUpgrade();
-      window.dispatchEvent(new Event("liora:premium-click"));
-    });
-  };
-
-  const openUpgrade = (origin = "dashboard") => {
-    ensureUpgradeModal();
-    const modal = document.getElementById("premium-modal");
-    if (!modal) return;
-
-    modal.classList.remove("hidden");
-    modal.setAttribute("aria-hidden", "false");
-    document.body.classList.add("liora-modal-open");
-
-    // guarda origem (opcional)
-    modal.dataset.origin = origin;
-
-    // ESC fecha
-    const onEsc = (e) => {
-      if (e.key === "Escape") closeUpgrade();
+    export const dashboard = {
+      ctx: null,
+    
+      showScreen() {
+        document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+        document.getElementById("screen-dashboard")?.classList.add("active");
+      },
+    
+      init(ctx) {
+        this.ctx = ctx;
+    
+        // anti-init duplicado
+        if (window.__lioraDashboardInited) return;
+        window.__lioraDashboardInited = true;
+    
+        console.log("📊 dashboard.js iniciado (MVP local)");
+    
+        // -----------------------------
+        // MODAL PREMIUM (front-only)
+        // -----------------------------
+        const closeUpgrade = () => {
+          const modal = document.getElementById("premium-modal");
+          if (!modal) return;
+    
+          modal.classList.add("hidden");
+          modal.setAttribute("aria-hidden", "true");
+          document.body.classList.remove("liora-modal-open");
+    
+          window.dispatchEvent(new Event("liora:upgrade-close"));
+        };
+    
+        const ensureUpgradeModal = () => {
+          if (document.getElementById("premium-modal")) return;
+    
+          const el = document.createElement("div");
+          el.id = "premium-modal";
+          el.className = "liora-modal hidden";
+          el.setAttribute("aria-hidden", "true");
+    
+          el.innerHTML = `
+            <div class="liora-modal-backdrop" data-close="1"></div>
+    
+            <div class="liora-modal-card" role="dialog" aria-modal="true" aria-label="Liora Premium">
+              <div class="liora-modal-head">
+                <div>
+                  <div class="liora-modal-title">Desbloquear Premium</div>
+                  <div class="liora-modal-sub muted">Insights avançados e recomendações automáticas.</div>
+                </div>
+                <button class="btn-link" data-close="1" aria-label="Fechar">✕</button>
+              </div>
+    
+              <div class="liora-modal-body">
+                <ul class="liora-modal-list">
+                  <li><b>Evolução 7 e 30 dias</b> (tendência real de melhora)</li>
+                  <li><b>Pontos fracos</b> por tema/banca (onde você mais erra)</li>
+                  <li><b>Recomendações</b> do próximo passo (ação prática)</li>
+                </ul>
+    
+                <div class="liora-modal-note muted">
+                  MVP: por enquanto o Premium ainda está em implantação.
+                </div>
+              </div>
+    
+              <div class="liora-modal-actions">
+                <button class="btn-secondary" data-close="1">Agora não</button>
+                <button class="btn-primary" id="btn-upgrade-premium">Quero Premium</button>
+              </div>
+            </div>
+          `;
+    
+          document.body.appendChild(el);
+    
+          // close handlers (delegado)
+          el.addEventListener("click", (ev) => {
+            const t = ev.target;
+            if (t?.closest?.("[data-close='1']")) closeUpgrade();
+          });
+    
+          // CTA handler
+          el.querySelector("#btn-upgrade-premium")?.addEventListener("click", () => {
+            this.ctx?.ui?.toast?.("✨ Premium em breve. (Hook pronto para checkout)");
+            closeUpgrade();
+            window.dispatchEvent(new Event("liora:premium-click"));
+          });
+        };
+    
+        const openUpgrade = (origin = "dashboard") => {
+          ensureUpgradeModal();
+          const modal = document.getElementById("premium-modal");
+          if (!modal) return;
+    
+          modal.classList.remove("hidden");
+          modal.setAttribute("aria-hidden", "false");
+          document.body.classList.add("liora-modal-open");
+    
+          modal.dataset.origin = origin;
+    
+          // ESC fecha
+          const onEsc = (e) => {
+            if (e.key === "Escape") closeUpgrade();
+          };
+          window.addEventListener("keydown", onEsc, { once: true });
+    
+          window.dispatchEvent(new CustomEvent("liora:upgrade-open", { detail: { origin } }));
+        };
+    
+        // -----------------------------
+        // CLIQUE EM CARD PREMIUM (locked) -> abre modal
+        // -----------------------------
+        document.addEventListener("click", (ev) => {
+          const t = ev.target;
+          if (!t) return;
+    
+          // só dentro da tela do dashboard
+          if (!t.closest?.("#screen-dashboard")) return;
+    
+          const locked = t.closest?.(".dash-card.dash-locked");
+          if (locked) {
+            ev.preventDefault();
+            openUpgrade("dashboard-locked-card");
+            return;
+          }
+    
+          const up = t.closest?.("[data-upgrade='premium']");
+          if (up) {
+            ev.preventDefault();
+            openUpgrade("dashboard-upgrade-link");
+            return;
+          }
+        });
+    
+        // evento global opcional (para abrir modal de qualquer lugar)
+        window.addEventListener("liora:open-upgrade", () => openUpgrade("event"));
+    
+        // -----------------------------
+        // ABRIR DASHBOARD
+        // -----------------------------
+        window.addEventListener("liora:open-dashboard", () => {
+          this.showScreen();
+    
+          if (typeof window.lioraMetrics?.renderDashboard === "function") {
+            window.lioraMetrics.renderDashboard();
+          } else {
+            window.dispatchEvent(new Event("liora:dashboard-refresh"));
+          }
+        });
+    
+        // refresh único (sem duplicar e sem quebrar)
+        window.addEventListener("liora:dashboard-refresh", () => {
+          window.lioraMetrics?.renderDashboard?.();
+        });
+      },
     };
-    window.addEventListener("keydown", onEsc, { once: true });
 
-    window.dispatchEvent(new CustomEvent("liora:upgrade-open", { detail: { origin } }));
-  };
-
-  const closeUpgrade = () => {
-    const modal = document.getElementById("premium-modal");
-    if (!modal) return;
-
-    modal.classList.add("hidden");
-    modal.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("liora-modal-open");
-
-    window.dispatchEvent(new Event("liora:upgrade-close"));
-  };
-
-  // -----------------------------
-  // CLIQUE EM CARD PREMIUM (locked) -> abre modal
-  // -----------------------------
-  document.addEventListener("click", (ev) => {
-    const t = ev.target;
-    if (!t) return;
-
-    // só dentro da tela do dashboard
-    if (!t.closest?.("#screen-dashboard")) return;
-
-    // clicou em card travado?
-    const locked = t.closest?.(".dash-card.dash-locked");
-    if (locked) {
-      ev.preventDefault();
-      openUpgrade("dashboard-locked-card");
-      return;
-    }
-
-    // opcional: qualquer elemento com data-upgrade
-    const up = t.closest?.("[data-upgrade='premium']");
-    if (up) {
-      ev.preventDefault();
-      openUpgrade("dashboard-upgrade-link");
-      return;
-    }
-  });
-
-  // evento global opcional (para abrir modal de qualquer lugar)
-  window.addEventListener("liora:open-upgrade", () => openUpgrade("event"));
-
-  // -----------------------------
-  // ABRIR DASHBOARD
-  // -----------------------------
-  window.addEventListener("liora:open-dashboard", () => {
-    this.showScreen();
-
-    // renderiza se a função estiver exposta
-    if (typeof window.lioraMetrics?.renderDashboard === "function") {
-      window.lioraMetrics.renderDashboard();
-    } else {
-      window.dispatchEvent(new Event("liora:dashboard-refresh"));
-    }
-  });
-
-  window.addEventListener("liora:dashboard-refresh", () => {
-    window.lioraMetrics?.renderDashboard?.();
-  });
-}
 
     // opcional: refresh manual
     window.addEventListener("liora:dashboard-refresh", () => {
