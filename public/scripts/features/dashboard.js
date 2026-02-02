@@ -37,6 +37,51 @@ export const dashboard = {
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-dashboard")?.classList.add("active");
+    // se o dashboard pediu para iniciar revisão da fila
+    try {
+      const flag = localStorage.getItem("liora_review_start");
+      if (flag === "1") {
+        localStorage.removeItem("liora_review_start");
+
+        const raw = localStorage.getItem("liora_review_queue:v1");
+        const data = raw ? JSON.parse(raw) : { items: [] };
+        const items = Array.isArray(data.items) ? data.items : [];
+
+        if (items.length) {
+          const first = items[0];
+
+          // cria um "simulado" de 1 questão para revisão
+          this.STATE.running = true;
+          this.STATE.atual = 0;
+          this.STATE.respostas = [];
+          this.STATE.questoes = [
+            first.tipo === "disc"
+              ? {
+                  tipo: "disc",
+                  enunciado: first.enunciado,
+                  respostaModelo: first.respostaModelo || "",
+                  criterios: Array.isArray(first.criterios) ? first.criterios : []
+                }
+              : {
+                  tipo: first.tipo === "ce" ? "ce" : "mcq",
+                  enunciado: first.enunciado,
+                  alternativas: Array.isArray(first.alternativas) && first.alternativas.length ? first.alternativas : ["Certo", "Errado"],
+                  corretaIndex: Number.isInteger(first.corretaIndex) ? first.corretaIndex : 0,
+                  explicacao: String(first.explicacao || "")
+                }
+          ];
+
+          this.stopTimer();
+          this.STATE.timer.totalSec = 0;
+          this.STATE.timer.leftSec = 0;
+
+          this.renderRunning();
+          this.renderQuestion();
+          this.setHint("Revisão rápida: responda e finalize.");
+        }
+      }
+    } catch {}
+  
   },
 
   // -----------------------------
@@ -422,6 +467,23 @@ export const dashboard = {
           ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
         </div>
       </div>
+            <div class="panel" style="margin-bottom:12px;">
+        <div class="card-title">Revisões pendentes</div>
+        <div class="muted">Erradas e marcadas</div>
+
+        <div class="dash-grid" style="margin-top:10px;">
+          <div class="dash-card">
+            <div class="dash-title">Na fila</div>
+            <div class="dash-value">${reviewCount}</div>
+            <div class="dash-sub">itens para revisar</div>
+          </div>
+        </div>
+
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-primary" data-action="dashReviewNow" ${reviewCount ? "" : "disabled"}>Revisar agora</button>
+          <button class="btn-secondary" data-action="dashClearReview" ${reviewCount ? "" : "disabled"}>Limpar fila</button>
+        </div>
+      </div>
 
       ${lastResultHtml}
 
@@ -480,6 +542,24 @@ export const dashboard = {
       this.render();
       window.dispatchEvent(new CustomEvent("liora:stats-changed"));
     });
+
+    const btnReviewNow = screen.querySelector("[data-action='dashReviewNow']");
+    btnReviewNow?.addEventListener("click", () => {
+      try {
+        localStorage.setItem("liora_review_start", "1");
+      } catch {}
+      window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
+    });
+
+    const btnClearReview = screen.querySelector("[data-action='dashClearReview']");
+    btnClearReview?.addEventListener("click", () => {
+      try {
+        localStorage.setItem("liora_review_queue:v1", JSON.stringify({ items: [] }));
+      } catch {}
+      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+      this.render();
+    });
+ 
   },
 
   seedMock() {
