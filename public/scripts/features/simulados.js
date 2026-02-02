@@ -308,6 +308,8 @@ export const simulados = {
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
+    this.STATE._finishedOnce = false;
+
 
     // timer
     if (this.STATE.timer.enabled) {
@@ -361,6 +363,7 @@ export const simulados = {
     }
 
     this.STATE.running = true;
+    this.STATE._finishedOnce = false;
     this.STATE.config = run.config || this.STATE.config;
 
     // garante _runConfig pra não “mudar modo” no meio do run
@@ -385,23 +388,28 @@ export const simulados = {
     this.renderButtonsState();
   },
 
-  discardRun() {
-    this.stopTimer();
-    this.clearRun();
-    this.STATE._savedRun = null;
+ discardRun() {
+  this.stopTimer();
+  this.clearRun();
+  this.STATE._savedRun = null;
 
-    this.STATE.running = false;
-    this.STATE.questoes = [];
-    this.STATE.atual = 0;
-    this.STATE.respostas = [];
-    this.STATE.timer.totalSec = 0;
-    this.STATE.timer.leftSec = 0;
-    this.STATE._runConfig = null;
+  this.STATE.running = false;
 
-    this.closeConfig();
-    this.renderIdle();
-    this.toast("Simulado descartado.");
-  },
+  // ✅ reset do guard anti-duplo-finish
+  this.STATE._finishedOnce = false;
+
+  this.STATE.questoes = [];
+  this.STATE.atual = 0;
+  this.STATE.respostas = [];
+  this.STATE.timer.totalSec = 0;
+  this.STATE.timer.leftSec = 0;
+  this.STATE._runConfig = null;
+
+  this.closeConfig();
+  this.renderIdle();
+  this.toast("Simulado descartado.");
+},
+
 
   // -----------------------------
   // ANSWERS
@@ -516,86 +524,102 @@ export const simulados = {
   },
 
   finish() {
-    if (!this.STATE.running) return;
+  // ✅ evita gravar duas vezes (timer + clique, spam click etc.)
+  if (this.STATE._finishedOnce) return;
+  this.STATE._finishedOnce = true;
 
-    this.STATE.running = false;
-    this.stopTimer();
+  if (!this.STATE.running) return;
 
-    const res = this.computeResult();
-    this.persistResult(res);
+  // UX: desabilita botão Finalizar imediatamente
+  const btnFinish = document.getElementById("btn-finish");
+  if (btnFinish) btnFinish.disabled = true;
 
-    // ✅ MÉTRICAS (somente se houver questões pontuadas)
-    const cfg = this.STATE._runConfig || this.STATE.config;
+  this.STATE.running = false;
+  this.stopTimer();
 
-    const timeSpentSec =
-      this.STATE.timer.enabled && this.STATE.timer.totalSec
-        ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
-        : 0;
+  const res = this.computeResult();
+  this.persistResult(res);
 
-    const todayISO = (d = new Date()) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    };
+  // ✅ MÉTRICAS (somente se houver questões pontuadas)
+  const cfg = this.STATE._runConfig || this.STATE.config;
 
-    const attempt = {
-      ts: Date.now(),
-      date: todayISO(),
-      banca: cfg?.banca || "—",
-      tema: (cfg?.tema || "").trim() || "Geral",
-      dificuldade: cfg?.dificuldade || "misturado",
-      mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
-      total: Number(res?.totalScored || 0),
-      correct: Number(res?.acertos || 0),
-      timeSec: Number(timeSpentSec || 0)
-    };
+  const timeSpentSec =
+    this.STATE.timer.enabled && this.STATE.timer.totalSec
+      ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
+      : 0;
 
-    if (attempt.total > 0) {
-      this.statsRecordAttempt(attempt);
-      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "attempt", attempt } }));
-      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  const todayISO = (d = new Date()) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
-    } else {
-      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva pura). Não registra métricas.");
-    }
+  const attempt = {
+    ts: Date.now(),
+    date: todayISO(),
+    banca: cfg?.banca || "—",
+    tema: (cfg?.tema || "").trim() || "Geral",
+    dificuldade: cfg?.dificuldade || "misturado",
+    mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+    total: Number(res?.totalScored || 0),
+    correct: Number(res?.acertos || 0),
+    timeSec: Number(timeSpentSec || 0)
+  };
 
-    window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
+  if (attempt.total > 0) {
+    this.statsRecordAttempt(attempt);
+    window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "attempt", attempt } }));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  } else {
+    console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva pura). Não registra métricas.");
+  }
 
-    this.closeConfig();
-    this.renderResult(res);
-  },
+  window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
 
-  cancel() {
-    this.closeConfig();
+  this.closeConfig();
+  this.renderResult(res);
+}
 
-    if (!this.STATE.running) {
-      this.renderIdle();
-      return;
-    }
+cancel() {
+  this.closeConfig();
 
-    this.STATE.running = false;
-    this.stopTimer();
-    this.clearRun();
-    this.STATE._runConfig = null;
-
-    window.dispatchEvent(new Event("liora:simulado-cancel"));
-
+  if (!this.STATE.running) {
     this.renderIdle();
-    this.toast("Simulado cancelado.");
-  },
+    return;
+  }
 
-  restart() {
-    this.closeConfig();
-    this.clearRun();
-    this.STATE.running = false;
-    this.stopTimer();
-    this.STATE._runConfig = null;
+  this.STATE.running = false;
 
-    window.dispatchEvent(new Event("liora:simulado-restart"));
+  // ✅ reset do guard anti-duplo-finish
+  this.STATE._finishedOnce = false;
 
-    this.renderIdle();
-  },
+  this.stopTimer();
+  this.clearRun();
+  this.STATE._runConfig = null;
+
+  window.dispatchEvent(new Event("liora:simulado-cancel"));
+
+  this.renderIdle();
+  this.toast("Simulado cancelado.");
+},
+
+restart() {
+  this.closeConfig();
+  this.clearRun();
+  this.STATE.running = false;
+
+  // ✅ reset do guard anti-duplo-finish
+  this.STATE._finishedOnce = false;
+
+  this.stopTimer();
+  this.STATE._runConfig = null;
+
+  window.dispatchEvent(new Event("liora:simulado-restart"));
+
+  this.renderIdle();
+},
+
 
   // -----------------------------
   // TIMER
