@@ -1,12 +1,10 @@
-// ==========================================================
-// 🟢 LIORA — app.js (Deluxe + Nav Active)
-// - Router Deluxe (hash/deep-link + route-changed)
-// - Theme toggle + persist
-// - Auth mock via user.js + eventos canônicos
-// - Nav inteligente (allowlist) + “em breve” só fora da allowlist
-// - Nav ativo (is-active + aria-current)
-// - Refresh do dashboard quando user muda
-// ==========================================================
+// app.js — LIORA Projeto Zero (de luxe)
+// ✔ boot robusto (DOM pronto ou não)
+// ✔ tema dark/light persistido
+// ✔ auth mock (login/logout) + evento canonical
+// ✔ navegação por delegação (data-nav)
+// ✔ bloqueio de rotas "em breve" via data-soon="1" ou pill "em breve"
+// ✔ init de features + refresh do dashboard ao trocar usuário
 
 import { router } from "./router.js";
 import { store } from "./store.js";
@@ -21,9 +19,6 @@ import { dashboard } from "./features/dashboard.js";
 
 console.log("🟢 Liora Projeto Zero — app.js carregado");
 
-// ----------------------------------------------------------
-// THEME
-// ----------------------------------------------------------
 function setupTheme() {
   const btn = document.getElementById("btn-theme");
 
@@ -45,9 +40,6 @@ function setupTheme() {
   console.log("🌗 Tema ligado");
 }
 
-// ----------------------------------------------------------
-// AUTH MOCK (via user.js)
-// ----------------------------------------------------------
 function setupAuthMock() {
   const btnLogin = document.getElementById("btn-login");
   const btnLogout = document.getElementById("btn-logout");
@@ -57,6 +49,7 @@ function setupAuthMock() {
     btnLogout?.classList.toggle("hidden", !isLogged);
   }
 
+  // estado inicial
   const u = user.get(store);
   setLogged(!!u);
 
@@ -75,100 +68,77 @@ function setupAuthMock() {
   });
 }
 
-// ----------------------------------------------------------
-// NAV (click + active state)
-// ----------------------------------------------------------
 function setupNav() {
-  const ALWAYS_ALLOWED = new Set(["home", "tema", "pdf", "simulados", "dashboard"]);
+  // ✅ Delegação: funciona para header, home cards, qualquer elemento com data-nav
+  document.addEventListener("click", (ev) => {
+    const el = ev.target?.closest?.("[data-nav]");
+    if (!el) return;
 
-  // marca item ativo no menu
-  const setNavActive = (route) => {
-    const r = String(route || "home").trim().toLowerCase();
+    const to = (el.getAttribute("data-nav") || "").trim();
+    if (!to) return;
 
-    document.querySelectorAll("[data-nav]").forEach((el) => {
-      const to = String(el.getAttribute("data-nav") || "").trim().toLowerCase();
-      const active = to === r;
+    // se for <a>, evita navegação padrão
+    if (el.tagName === "A") ev.preventDefault();
 
-      el.classList.toggle("is-active", active);
+    // ✅ bloqueio "em breve"
+    const isSoon = el.getAttribute("data-soon") === "1";
 
-      // acessibilidade: indica página atual
-      if (active) el.setAttribute("aria-current", "page");
-      else el.removeAttribute("aria-current");
-    });
-  };
+    const pill = el.querySelector?.(".pill");
+    const pillText = (pill?.innerText || "").toLowerCase().trim();
+    const pillSaysSoon = pillText.includes("em breve");
 
-  // click handler
-  document.querySelectorAll("[data-nav]").forEach((el) => {
-    el.addEventListener("click", (ev) => {
-      const to = String(el.getAttribute("data-nav") || "").trim().toLowerCase();
-      if (!to) return;
-
-      const isSoon = el.getAttribute("data-soon") === "1";
-      const pill = el.querySelector(".pill");
-      const pillText = (pill?.innerText || "").toLowerCase().trim();
-      const pillSaysSoon = pillText.includes("em breve");
-
-      if (!ALWAYS_ALLOWED.has(to) && (isSoon || pillSaysSoon)) {
-        ev.preventDefault();
-        ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
-        return;
-      }
-
+    if (isSoon || pillSaysSoon) {
       ev.preventDefault();
-      router.go(to);
+      ui.toast?.("🧪 Em breve! Estamos fechando Tema primeiro 🙂");
+      return;
+    }
 
-      // feedback instantâneo (antes mesmo do event route-changed)
-      setNavActive(to);
-    });
+    router.go(to);
+
+    // opcional: volta pro topo quando trocar de tela
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
   });
-
-  // quando rota mudar por hash/back/forward/router.init
-  window.addEventListener("liora:route-changed", (e) => {
-    setNavActive(e?.detail?.route || "home");
-  });
-
-  // primeira marcação (caso a tela inicial venha do hash)
-  const initialFromHash = () => {
-    const raw = (location.hash || "").replace("#", "").trim().toLowerCase();
-    return raw || "home";
-  };
-  setNavActive(initialFromHash());
-
-  // devolve helper se você quiser usar fora
-  return { setNavActive };
 }
 
-// ----------------------------------------------------------
-// BOOT
-// ----------------------------------------------------------
 function boot() {
-  // Router Deluxe: hash + deep-link
-  router.init({ useHash: true, defaultRoute: "home" });
+  // router (marca active + suporta hash se você colou o router de luxe)
+  router.init();
 
   setupTheme();
   setupAuthMock();
+  setupNav();
 
-  const nav = setupNav(); // ✅ agora o nav acompanha as rotas
-
-  // expõe helpers pro console
+  // helpers no console
   user.installWindow(store);
 
-  // init features
+  // init features (cada uma usa { router, store, gates, ui })
   const ctx = { router, store, gates, ui };
-  planos.init(ctx);
-  pdf.init(ctx);
-  simulados.init(ctx);
-  dashboard.init(ctx);
 
-  // quando usuário mudar (login/logout/premium): refresca dashboard
+  try { planos.init(ctx); } catch (e) { console.warn("⚠️ planos.init falhou:", e); }
+  try { pdf.init(ctx); } catch (e) { console.warn("⚠️ pdf.init falhou:", e); }
+  try { simulados.init(ctx); } catch (e) { console.warn("⚠️ simulados.init falhou:", e); }
+  try { dashboard.init(ctx); } catch (e) { console.warn("⚠️ dashboard.init falhou:", e); }
+
+  // quando usuário mudar: refresca dashboard
   window.addEventListener("liora:user-changed", () => {
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   });
 
-  // opcional: se você quiser forçar nav ativo após init (depende do seu router)
-  // window.addEventListener("liora:route-changed", (e) => nav.setNavActive(e.detail.route));
+  // rota inicial:
+  // - se o router de luxe tiver hash, ele já abriu no init()
+  // - se não tiver, cai aqui
+  if (!location.hash) router.go("home");
 
   console.log("✅ Projeto Zero pronto");
 }
 
-document.addEventListener("DOMContentLoaded", boot);
+// ✅ Boot robusto: se o DOM já estiver pronto, roda já; se não, espera.
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
