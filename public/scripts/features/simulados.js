@@ -178,8 +178,15 @@ export const simulados = {
     this.setValue("sim-tema", c.tema);
     this.setValue("sim-tempo", c.tempo);
 
-    // timer
-    this.setValue("sim-timer-mode", this.STATE.timer.enabled ? "on" : "off");
+    // timer (FREE: sem timer)
+    const premium = this.isPremium();
+    this.setValue("sim-timer-mode", premium && this.STATE.timer.enabled ? "on" : "off");
+
+    const timerSel = document.getElementById("sim-timer-mode");
+    if (timerSel) {
+      timerSel.disabled = !premium;
+      if (!premium) timerSel.value = "off";
+    }
 
     // ✅ modo
     this.setValue("sim-kind", c.mode || "obj");
@@ -239,14 +246,20 @@ export const simulados = {
     const tema = (this.getValue("sim-tema") || "").trim();
     const tempo = Number(this.getValue("sim-tempo") || 20);
 
-    const timerMode = this.getValue("sim-timer-mode") || "on";
+        const timerMode = this.getValue("sim-timer-mode") || "on";
     const mode = this.getModeFromUI();
+    const premium = this.isPremium();
 
-    // ✅ clamp muda conforme o modo
-    const qtd =
+    // clamp muda conforme o modo
+    let qtd =
       mode === "disc"
-        ? this.clamp(qtdRaw, 1, 10)   // discursivas
-        : this.clamp(qtdRaw, 3, 30);  // objetivas
+        ? this.clamp(qtdRaw, 1, 10)    // discursivas
+        : this.clamp(qtdRaw, 3, 30);   // objetivas
+
+    // ✅ TRAVA 2: FREE = no máximo 10 questões OBJ
+    if (!premium && mode !== "disc") {
+      qtd = this.clamp(qtd, 3, 10);
+    }
 
     this.STATE.config = {
       ...this.STATE.config,
@@ -258,7 +271,14 @@ export const simulados = {
       mode
     };
 
-    this.STATE.timer.enabled = timerMode === "on";
+    // ✅ TRAVA 3: FREE = sem timer
+    if (!premium) {
+      this.STATE.timer.enabled = false;
+      this.setValue("sim-timer-mode", "off");
+      this.toast("⏱️ Timer é Premium. No FREE, seguimos sem timer.");
+    } else {
+      this.STATE.timer.enabled = timerMode === "on";
+    }
 
     this.persistConfig();
     this.toast("Configurações salvas.");
@@ -271,27 +291,39 @@ export const simulados = {
   // -----------------------------
   async start() {
     if (this.STATE.running) return;
-
+  
     this.closeConfig();
-
+  
     // ✅ snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
     runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+  
+    // ✅ TRAVA 2 (FREE): OBJ no máximo 10 questões (DISC já é 1..10)
+    const premium = this.isPremium?.() === true;
+    if (!premium && runConfig.mode !== "disc") {
+      runConfig.qtd = this.clamp(Number(runConfig.qtd || 5), 3, 10);
+    }
+  
     this.STATE._runConfig = runConfig;
-
+  
     console.log("🚦 START snapshot mode =", runConfig.mode, runConfig);
-
-    window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...runConfig } }));
-
+  
+    window.dispatchEvent(
+      new CustomEvent("liora:simulado-start", { detail: { ...runConfig } })
+    );
+  
     // reset runtime
     this.STATE.running = true;
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
-
+  
+    // ✅ TRAVA 3 (blindada): FREE nunca liga timer
+    if (!premium) this.STATE.timer.enabled = false;
+  
     // timer
     if (this.STATE.timer.enabled) {
-      this.STATE.timer.totalSec = runConfig.tempo * 60;
+      this.STATE.timer.totalSec = Number(runConfig.tempo || 0) * 60;
       this.STATE.timer.leftSec = this.STATE.timer.totalSec;
       this.startTimer();
     } else {
@@ -299,24 +331,27 @@ export const simulados = {
       this.STATE.timer.totalSec = 0;
       this.STATE.timer.leftSec = 0;
     }
-
+  
     this.renderRunning();
     this.setText("sim-enunciado", "Gerando questões...");
-    this.setHTML("sim-alts", `<div class="muted small">Isso pode levar alguns segundos.</div>`);
+    this.setHTML(
+      "sim-alts",
+      `<div class="muted small">Isso pode levar alguns segundos.</div>`
+    );
     this.setHint("Carregando questões...");
     this.renderButtonsState();
-
+  
     try {
-      const questoes = await this.fetchQuestoesAPI(runConfig);
+      const questoes = await this.fetchQuestoesAPI(runConfig); // ✅ usa snapshot (já travado)
       if (!questoes?.length) throw new Error("API retornou vazio.");
       this.STATE.questoes = questoes;
     } catch (err) {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
       this.toast("Não foi possível gerar agora. Usando modo offline.");
-      this.STATE.questoes = this.buildMockQuestions(runConfig);
+      this.STATE.questoes = this.buildMockQuestions(runConfig); // ✅ usa snapshot (já travado)
     }
-
-    this.persistRun();
+  
+    this.persistRun(); // persistRun salva _runConfig
     this.renderQuestion();
   },
 
@@ -1392,6 +1427,19 @@ export const simulados = {
     return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
   },
 
+    // -----------------------------
+    // ACCESS HELPERS (FREE vs PREMIUM)
+    // -----------------------------
+    isPremium() {
+      try {
+        return !!this.ctx?.store?.get?.("user")?.premium;
+      } catch {
+        return false;
+      }
+    },
+
+
+  
   toast(msg) {
     try {
       this.ctx?.ui?.toast?.(msg);
