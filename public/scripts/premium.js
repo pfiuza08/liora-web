@@ -1,7 +1,6 @@
 // =============================================================
 // 🔐 LIORA — Premium Modal (Upgrade)
-// Versão: v1.2
-//
+// Versão: v1.2 (user-changed + dashboard-refresh centralizados)
 // Abre com:
 // - liora:premium-bloqueado   (detail opcional)
 // - liora:login-required      (detail opcional)
@@ -42,11 +41,9 @@ export const premium = {
 
       // DEV: ativar premium no mock (somente em dev mode)
       if (act === "devPremium" && this.isDevMode()) {
-        this.setPremium(true);
+        this.setPremium(true); // ✅ já dispara user-changed + dashboard-refresh
         this.close();
         this.toast("✅ Premium ativado (mock).");
-        window.dispatchEvent(new Event("liora:user-changed"));
-        window.dispatchEvent(new Event("liora:dashboard-refresh"));
         return;
       }
     });
@@ -65,18 +62,25 @@ export const premium = {
 
   getUser() {
     try {
-      const u = this.ctx?.store?.get?.("user") || null;
+      const u =
+        this.ctx?.store?.get?.("user") ||
+        this.ctx?.store?.get?.("liora_user") ||
+        null;
       return u && typeof u === "object" ? u : null;
     } catch {
       return null;
     }
   },
 
+  // ✅ CENTRAL: toda mudança no status do usuário notifica o app
   setPremium(on) {
     try {
       const u = this.getUser() || { name: "Usuário", premium: false };
       u.premium = !!on;
       this.ctx?.store?.set?.("user", u);
+
+      window.dispatchEvent(new Event("liora:user-changed"));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
     } catch {}
   },
 
@@ -142,7 +146,6 @@ export const premium = {
       if (title) title.textContent = "Desbloquear Premium";
       if (sub) sub.textContent = "Mais métricas, insights e recomendações.";
       if (note) {
-        // se veio de limite free, mostra contexto
         const used = detail?.used;
         const limit = detail?.limit;
         if (typeof used === "number" && typeof limit === "number") {
