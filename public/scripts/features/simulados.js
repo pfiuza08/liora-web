@@ -269,6 +269,31 @@ export const simulados = {
 
     this.closeConfig();
 
+    // -----------------------------
+    // 🔒 GATES: limite free / premium (sem import)
+    // -----------------------------
+    try {
+      const g = this.getGates();
+      if (g?.canStartSimulado) {
+        const check = g.canStartSimulado(this.ctx?.store);
+
+        if (!check?.ok) {
+          if (check.reason === "login") {
+            window.dispatchEvent(new CustomEvent("liora:login-required", { detail: check }));
+            return;
+          }
+          if (check.reason === "limit") {
+            window.dispatchEvent(new CustomEvent("liora:premium-bloqueado", { detail: check }));
+            return;
+          }
+        }
+      } else {
+        console.warn("⚠️ lioraGates não disponível. (start simulado) seguindo sem trava.");
+      }
+    } catch (e) {
+      console.warn("⚠️ Gates falhou (start simulado):", e);
+    }
+    
     // snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
     runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
@@ -529,6 +554,8 @@ export const simulados = {
     if (attempt.total > 0) {
       this.statsRecordAttempt(attempt);
       window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "attempt", attempt } }));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
     } else {
       console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva pura). Não registra métricas.");
     }
@@ -1387,4 +1414,15 @@ export const simulados = {
     } catch {}
     console.log("🔔", msg);
   }
+  // -----------------------------
+  // GATES (global)
+  // -----------------------------
+  getGates() {
+    try {
+      return window.lioraGates || null;
+    } catch {
+      return null;
+    }
+  },
+
 };
