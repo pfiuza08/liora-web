@@ -2221,4 +2221,9 @@ html.light .liora-modal-card{
 body.liora-modal-open{
   overflow: hidden;
 }
+/* NAV ativo */
+[data-nav].is-active {
+  outline: 2px solid rgba(196, 75, 4, 0.55);
+  border-radius: 12px;
+}
 
