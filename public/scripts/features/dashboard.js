@@ -1,24 +1,27 @@
 // =============================================================
 // 📊 LIORA — DASHBOARD (MVP local, de verdade)
-// Versão: v1.3 (stats v1 + travas 2/3/4 + último resultado + fila revisão)
+// Versão: v1.3 (compatível com HTML estático do dashboard)
+//
+// HTML esperado em #screen-dashboard:
+// - #dash-kpis       (grid de KPIs)
+// - #dash-insights   (grid 2 colunas)
+// - #dash-tables     (grid 2 colunas)
+// - #dash-empty      (panel hidden)
+// Opcional (JS cria se não existir):
+// - #dash-top        (painéis extras: resumo, revisões, último resultado)
 //
 // Fonte: localStorage "liora_stats:v1"
 // - attempts: { ts, date, banca, tema, dificuldade, mode, total, correct, timeSec }
 // - sessions: (fica para Tema/PDF depois)
 //
-// Revisões (fila):
-// - localStorage "liora_review_queue:v1" => { items: [...] }
-//
-// Último resultado:
-// - localStorage "liora_sim_last_result"
-//
-// Eventos que atualizam:
-// - liora:dashboard-refresh
-// - liora:stats-changed
+// Extras:
+// - revisão pendente: localStorage "liora_review_queue:v1" { items: [] }
+// - último resultado: localStorage "liora_sim_last_result"
 // =============================================================
 
 export const dashboard = {
   ctx: null,
+  _bound: false,
 
   init(ctx) {
     this.ctx = ctx;
@@ -31,14 +34,40 @@ export const dashboard = {
       this.render();
     });
 
-    // render inicial leve (não força trocar de screen)
     this.ensureShell();
-    console.log("📊 dashboard.js iniciado (MVP local de verdade)");
+    this.bindOnce();
+    console.log("📊 dashboard.js iniciado (v1.3 compat HTML)");
   },
 
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-dashboard")?.classList.add("active");
+  },
+
+  // -----------------------------
+  // DOM helpers (usa HTML existente)
+  // -----------------------------
+  ensureShell() {
+    const screen = document.getElementById("screen-dashboard");
+    if (!screen) return;
+
+    // cria um topo opcional para painéis extras
+    if (!screen.querySelector("#dash-top")) {
+      const top = document.createElement("div");
+      top.id = "dash-top";
+
+      // coloca logo depois do header do dashboard, antes dos panels
+      const head = screen.querySelector(".screen-head");
+      if (head && head.nextSibling) {
+        screen.insertBefore(top, head.nextSibling);
+      } else {
+        screen.prepend(top);
+      }
+    }
+  },
+
+  qs(id) {
+    return document.getElementById(id);
   },
 
   // -----------------------------
@@ -64,23 +93,12 @@ export const dashboard = {
     try {
       const raw = localStorage.getItem(key);
       const data = raw ? JSON.parse(raw) : {};
-      const items = Array.isArray(data.items) ? data.items : [];
-      return items;
+      return Array.isArray(data.items) ? data.items : [];
     } catch {
       return [];
     }
   },
 
-  reviewClearQueue() {
-    const key = "liora_review_queue:v1";
-    try {
-      localStorage.setItem(key, JSON.stringify({ items: [] }));
-    } catch {}
-  },
-
-  // -----------------------------
-  // Last result (simulados)
-  // -----------------------------
   getLastResult() {
     const key = "liora_sim_last_result";
     try {
@@ -92,52 +110,6 @@ export const dashboard = {
     }
   },
 
-  buildLastResultCard() {
-    const r = this.getLastResult();
-    if (!r) return "";
-
-    const totalScored = Number(r.totalScored || 0);
-    const acertos = Number(r.acertos || 0);
-    const pct =
-      Number.isFinite(Number(r.pct))
-        ? Number(r.pct)
-        : (totalScored ? Math.round((acertos / totalScored) * 100) : 0);
-
-    const banca = String(r?.config?.banca || "—");
-    const tema = String(r?.config?.tema || "Geral");
-    const mode = String(r?.config?.mode || "obj");
-    const modeLabel = mode === "disc" ? "DISC" : "OBJ";
-
-    return `
-      <div class="panel" style="margin:12px 0;">
-        <div class="card-title">Último resultado</div>
-        <div class="muted">${this.escape(banca)} · ${this.escape(tema)} · <b>${this.escape(modeLabel)}</b></div>
-
-        <div class="dash-grid" style="margin-top:10px;">
-          <div class="dash-card good">
-            <div class="dash-title">Acurácia</div>
-            <div class="dash-value">${pct}%</div>
-            <div class="dash-sub">${acertos} acertos / ${totalScored} objetivas</div>
-          </div>
-
-          <div class="dash-card">
-            <div class="dash-title">Total de itens</div>
-            <div class="dash-value">${Number(r.total || 0)}</div>
-            <div class="dash-sub">inclui discursivas</div>
-          </div>
-        </div>
-
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-secondary" data-nav="simulados">Ir para simulados</button>
-          <button class="btn-primary" data-action="dashOpenLastReview">Ver revisão</button>
-        </div>
-      </div>
-    `;
-  },
-
-  // -----------------------------
-  // User / Premium
-  // -----------------------------
   getUser() {
     try {
       const u =
@@ -229,37 +201,42 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Render (modo "wrap")
+  // Render (preenche placeholders do HTML)
   // -----------------------------
-  ensureShell() {
-    const screen = document.getElementById("screen-dashboard");
-    if (!screen) return;
-
-    // Se você já tem HTML fixo com ids, pode remover #dash-body e adaptar depois.
-    // Para o seu código atual (que usa wrap.innerHTML), garantimos um container.
-    if (!screen.querySelector("#dash-body")) {
-      const wrap = document.createElement("div");
-      wrap.id = "dash-body";
-      screen.appendChild(wrap);
-    }
-  },
-
   render() {
-    const screen = document.getElementById("screen-dashboard");
-    if (!screen) return;
-
     this.ensureShell();
 
-    const wrap = screen.querySelector("#dash-body");
-    if (!wrap) return;
+    const elTop = this.qs("dash-top");
+    const elKpis = this.qs("dash-kpis");
+    const elInsights = this.qs("dash-insights");
+    const elTables = this.qs("dash-tables");
+    const elEmpty = this.qs("dash-empty");
 
-    const premium = this.isPremium();
+    if (!elKpis || !elInsights || !elTables || !elEmpty) {
+      console.warn("⚠️ Dashboard HTML não tem containers esperados.");
+      return;
+    }
+
     const u = this.getUser();
-
+    const premium = this.isPremium();
     const k = this.compute();
-    const reviewItems = this.reviewGetQueue();
-    const reviewCount = reviewItems.length;
 
+    const reviewCount = this.reviewGetQueue().length;
+    const last = this.getLastResult();
+
+    // empty state
+    if (!k.totalAttempts) {
+      elEmpty.classList.remove("hidden");
+      elKpis.innerHTML = "";
+      elInsights.innerHTML = "";
+      elTables.innerHTML = "";
+      if (elTop) elTop.innerHTML = "";
+      return;
+    }
+
+    elEmpty.classList.add("hidden");
+
+    // helpers
     const chipMode = (m) => (String(m) === "disc" ? "DISC" : "OBJ");
     const fmtTime = (sec) => {
       const s = Math.max(0, Number(sec || 0));
@@ -268,107 +245,168 @@ export const dashboard = {
       return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
     };
 
-    const locked = (html) => `
-      <div class="dash-card dash-locked">
-        <div class="dash-lock">Premium</div>
-        ${html}
-      </div>
-    `;
+    // topo (Resumo + Revisões + Último resultado)
+    if (elTop) {
+      const userLine = (() => {
+        if (!u) return `<span class="pill pill-base">visitante</span>`;
+        if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
+        return `<span class="pill pill-upload">free</span>`;
+      })();
 
-    const emptyState = `
-      <div class="panel">
-        <div class="card-title">Ainda sem dados</div>
-        <div class="muted">Faça um simulado para o dashboard começar a contar sua evolução.</div>
-        <div class="actions-row">
-          <button class="btn-primary" data-nav="simulados">Ir para Simulados</button>
-          <button class="btn-secondary" data-action="dashMock">Gerar exemplo</button>
-        </div>
-      </div>
-    `;
+      const resumoHtml = `
+        <div class="panel" style="margin-bottom:12px;">
+          <div class="card-title">Resumo</div>
+          <div class="muted">Dados locais · atualiza automaticamente</div>
+          <div style="margin-top:10px;">${userLine}</div>
 
-    if (!k.totalAttempts) {
-      wrap.innerHTML = emptyState;
-      this.bindDashActions();
-      return;
-    }
-
-    const kpiHtml = `
-      <div class="dash-grid" id="dash-kpis">
-        <div class="dash-card good">
-          <div class="dash-title">Acurácia geral</div>
-          <div class="dash-value">${k.pct}%</div>
-          <div class="dash-sub">${k.sumCorrect} acertos / ${k.sumTotal} questões</div>
-        </div>
-
-        <div class="dash-card">
-          <div class="dash-title">Simulados concluídos</div>
-          <div class="dash-value">${k.totalAttempts}</div>
-          <div class="dash-sub">com questões pontuadas</div>
-        </div>
-
-        <div class="dash-card ok">
-          <div class="dash-title">Foco atual</div>
-          <div class="dash-value">${this.escape(k.focoAtual)}</div>
-          <div class="dash-sub">tema com melhor desempenho</div>
-        </div>
-
-        ${
-          premium
-            ? `
-              <div class="dash-card dash-kpi-types">
-                <div class="dash-title">Tipos</div>
-                <div class="dash-value">${chipMode(k.topMode)}</div>
-                <div class="dash-sub">modo mais usado</div>
-              </div>
-            `
-            : locked(`
-                <div class="dash-title">Tipos</div>
-                <div class="dash-value">Premium</div>
-                <div class="dash-sub">OBJ/DISC mais usado</div>
-              `)
-        }
-      </div>
-    `;
-
-    const insightsHtml = premium
-      ? `
-        <div class="panel">
-          <div class="card-title">Insights</div>
-          <div class="muted">Análises e recomendações</div>
-          <div class="dash-list">
-            <div class="dash-row">
-              <div>
-                <div class="dash-row-title">Melhor banca</div>
-                <div class="dash-row-sub">maior acurácia acumulada</div>
-              </div>
-              <div class="dash-row-metric">${this.escape(k.bestBanca)}</div>
-            </div>
-
-            <div class="dash-row">
-              <div>
-                <div class="dash-row-title">Próximo passo sugerido</div>
-                <div class="dash-row-sub">reforço do foco atual</div>
-              </div>
-              <div class="dash-row-metric">${this.escape(k.focoAtual)}</div>
-            </div>
+          <div class="actions-row" style="margin-top:12px;">
+            <button class="btn-secondary" data-action="dashRefresh">Atualizar</button>
+            ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
+            <button class="btn-secondary" data-action="dashMock">Gerar exemplo</button>
           </div>
-        </div>
-      `
-      : `
-        <div class="panel">
-          <div class="card-title">Insights</div>
-          <div class="muted">Análises e recomendações</div>
-          ${locked(`<div class="dash-sub">Desbloqueie para ver insights automáticos.</div>`)}
         </div>
       `;
 
-    const detailsHtml = premium
-      ? `
-        <div class="panel">
-          <div class="card-title">Detalhes</div>
-          <div class="muted">Onde você mais ganha pontos</div>
+      const reviewHtml = `
+        <div class="panel" style="margin-bottom:12px;">
+          <div class="card-title">Revisões pendentes</div>
+          <div class="muted">Erradas e marcadas</div>
 
-          <div class="dash-list">
+          <div class="dash-grid" style="margin-top:10px;">
+            <div class="dash-card">
+              <div class="dash-title">Na fila</div>
+              <div class="dash-value">${reviewCount}</div>
+              <div class="dash-sub">itens para revisar</div>
+            </div>
+          </div>
+
+          <div class="actions-row" style="margin-top:12px;">
+            <button class="btn-primary" data-action="dashReviewNow" ${reviewCount ? "" : "disabled"}>Revisar agora</button>
+            <button class="btn-secondary" data-action="dashClearReview" ${reviewCount ? "" : "disabled"}>Limpar fila</button>
+          </div>
+        </div>
+      `;
+
+      const lastHtml = (() => {
+        if (!last) return "";
+        const totalScored = Number(last.totalScored || 0);
+        const acertos = Number(last.acertos || 0);
+        const pct = Number.isFinite(Number(last.pct))
+          ? Number(last.pct)
+          : (totalScored ? Math.round((acertos / totalScored) * 100) : 0);
+
+        const banca = String(last?.config?.banca || "—");
+        const tema = String(last?.config?.tema || "Geral");
+        const mode = String(last?.config?.mode || "obj");
+        const modeLabel = mode === "disc" ? "DISC" : "OBJ";
+
+        return `
+          <div class="panel" style="margin-bottom:12px;">
+            <div class="card-title">Último resultado</div>
+            <div class="muted">${this.escape(banca)} · ${this.escape(tema)} · <b>${this.escape(modeLabel)}</b></div>
+
+            <div class="dash-grid" style="margin-top:10px;">
+              <div class="dash-card good">
+                <div class="dash-title">Acurácia</div>
+                <div class="dash-value">${pct}%</div>
+                <div class="dash-sub">${acertos} acertos / ${totalScored} objetivas</div>
+              </div>
+
+              <div class="dash-card">
+                <div class="dash-title">Total de itens</div>
+                <div class="dash-value">${Number(last.total || 0)}</div>
+                <div class="dash-sub">inclui discursivas</div>
+              </div>
+            </div>
+
+            <div class="actions-row" style="margin-top:12px;">
+              <button class="btn-secondary" data-nav="simulados">Ir para simulados</button>
+              <button class="btn-primary" data-action="dashOpenLastReview">Ver revisão</button>
+            </div>
+          </div>
+        `;
+      })();
+
+      elTop.innerHTML = `${resumoHtml}${reviewHtml}${lastHtml}`;
+    }
+
+    // KPIs (preenche apenas o grid)
+    elKpis.innerHTML = `
+      <div class="dash-card good">
+        <div class="dash-title">Acurácia geral</div>
+        <div class="dash-value">${k.pct}%</div>
+        <div class="dash-sub">${k.sumCorrect} acertos / ${k.sumTotal} questões</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-title">Simulados concluídos</div>
+        <div class="dash-value">${k.totalAttempts}</div>
+        <div class="dash-sub">com questões pontuadas</div>
+      </div>
+
+      <div class="dash-card ok">
+        <div class="dash-title">Foco atual</div>
+        <div class="dash-value">${this.escape(k.focoAtual)}</div>
+        <div class="dash-sub">tema com melhor desempenho</div>
+      </div>
+
+      ${
+        premium
+          ? `
+            <div class="dash-card dash-kpi-types">
+              <div class="dash-title">Tipos</div>
+              <div class="dash-value">${chipMode(k.topMode)}</div>
+              <div class="dash-sub">modo mais usado</div>
+            </div>
+          `
+          : `
+            <div class="dash-card dash-locked">
+              <div class="dash-lock">Premium</div>
+              <div class="dash-title">Tipos</div>
+              <div class="dash-value">Premium</div>
+              <div class="dash-sub">OBJ/DISC mais usado</div>
+            </div>
+          `
+      }
+    `;
+
+    // Insights (2 colunas dentro do container)
+    elInsights.innerHTML = premium
+      ? `
+        <div class="dash-card">
+          <div class="dash-title">Melhor banca</div>
+          <div class="dash-value">${this.escape(k.bestBanca)}</div>
+          <div class="dash-sub">maior acurácia acumulada</div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-title">Próximo passo sugerido</div>
+          <div class="dash-value">${this.escape(k.focoAtual)}</div>
+          <div class="dash-sub">reforço do foco atual</div>
+        </div>
+      `
+      : `
+        <div class="dash-card dash-locked">
+          <div class="dash-lock">Premium</div>
+          <div class="dash-title">Insights</div>
+          <div class="dash-value">Bloqueado</div>
+          <div class="dash-sub">Desbloqueie para recomendações automáticas.</div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-title">Dica</div>
+          <div class="dash-value">${this.escape(k.focoAtual)}</div>
+          <div class="dash-sub">Seu foco atual (free) pelo melhor desempenho.</div>
+        </div>
+      `;
+
+    // Tabelas (2 colunas: bancaRank + last5)
+    elTables.innerHTML = premium
+      ? `
+        <div class="dash-card">
+          <div class="dash-title">Detalhes por banca</div>
+          <div class="dash-sub">Onde você mais ganha pontos</div>
+          <div class="dash-list" style="margin-top:10px;">
             ${k.bancaRank.slice(0, 6).map((b) => `
               <div class="dash-row">
                 <div>
@@ -381,11 +419,10 @@ export const dashboard = {
           </div>
         </div>
 
-        <div class="panel">
-          <div class="card-title">Histórico recente</div>
-          <div class="muted">Últimos 5 simulados</div>
-
-          <div class="dash-list">
+        <div class="dash-card">
+          <div class="dash-title">Histórico recente</div>
+          <div class="dash-sub">Últimos 5 simulados</div>
+          <div class="dash-list" style="margin-top:10px;">
             ${k.last5.map((a) => `
               <div class="dash-row">
                 <div>
@@ -399,112 +436,81 @@ export const dashboard = {
         </div>
       `
       : `
-        <div class="panel">
-          <div class="card-title">Detalhes</div>
-          <div class="muted">Onde você mais ganha pontos</div>
-          ${locked(`<div class="dash-sub">Breakdown por banca e histórico detalhado (Travas 3 e 4).</div>`)}
+        <div class="dash-card dash-locked">
+          <div class="dash-lock">Premium</div>
+          <div class="dash-title">Detalhes</div>
+          <div class="dash-value">Bloqueado</div>
+          <div class="dash-sub">Breakdown por banca e histórico detalhado.</div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-title">Histórico (resumo)</div>
+          <div class="dash-value">${k.totalAttempts}</div>
+          <div class="dash-sub">simulados com pontuação registrada</div>
         </div>
       `;
-
-    const userLine = (() => {
-      if (!u) return `<span class="pill pill-base">visitante</span>`;
-      if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
-      return `<span class="pill pill-upload">free</span>`;
-    })();
-
-    const lastResultHtml = this.buildLastResultCard();
-
-    wrap.innerHTML = `
-      <div class="panel" style="margin-bottom:12px;">
-        <div class="card-title">Resumo</div>
-        <div class="muted">Dados locais · atualiza automaticamente</div>
-        <div style="margin-top:10px;">${userLine}</div>
-
-        <div class="actions-row">
-          <button class="btn-secondary" data-action="dashRefresh">Atualizar</button>
-          ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
-        </div>
-      </div>
-
-      <div class="panel" style="margin-bottom:12px;">
-        <div class="card-title">Revisões pendentes</div>
-        <div class="muted">Erradas e marcadas</div>
-
-        <div class="dash-grid" style="margin-top:10px;">
-          <div class="dash-card">
-            <div class="dash-title">Na fila</div>
-            <div class="dash-value">${reviewCount}</div>
-            <div class="dash-sub">itens para revisar</div>
-          </div>
-        </div>
-
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-primary" data-action="dashReviewNow" ${reviewCount ? "" : "disabled"}>Revisar agora</button>
-          <button class="btn-secondary" data-action="dashClearReview" ${reviewCount ? "" : "disabled"}>Limpar fila</button>
-        </div>
-      </div>
-
-      ${lastResultHtml}
-      ${kpiHtml}
-      ${insightsHtml}
-      ${detailsHtml}
-    `;
-
-    this.bindDashActions();
   },
 
   // -----------------------------
-  // Actions
+  // Events (bind uma vez, sem duplicar listeners)
   // -----------------------------
-  bindDashActions() {
+  bindOnce() {
+    if (this._bound) return;
+    this._bound = true;
+
     const screen = document.getElementById("screen-dashboard");
     if (!screen) return;
 
-    // data-nav
-    screen.querySelectorAll("[data-nav]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const to = el.getAttribute("data-nav");
-        if (!to) return;
-        try { window.router?.go?.(to); } catch {}
-        window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to } }));
-      });
-    });
+    screen.addEventListener("click", (ev) => {
+      const nav = ev.target.closest("[data-nav]");
+      if (nav) {
+        const to = nav.getAttribute("data-nav");
+        if (to) this.nav(to);
+        return;
+      }
 
-    const btnRefresh = screen.querySelector("[data-action='dashRefresh']");
-    btnRefresh?.addEventListener("click", () => this.render());
+      const btn = ev.target.closest("[data-action]");
+      if (!btn) return;
+      const act = btn.getAttribute("data-action");
 
-    const btnUpgrade = screen.querySelector("[data-action='dashUpgrade']");
-    btnUpgrade?.addEventListener("click", () => {
-      window.dispatchEvent(new Event("liora:premium-bloqueado"));
-    });
+      if (act === "dashRefresh") return this.render();
+      if (act === "dashUpgrade") return window.dispatchEvent(new Event("liora:premium-bloqueado"));
 
-    const btnMock = screen.querySelector("[data-action='dashMock']");
-    btnMock?.addEventListener("click", () => {
-      this.seedMock();
-      this.render();
-      window.dispatchEvent(new CustomEvent("liora:stats-changed"));
-    });
+      if (act === "dashMock") {
+        this.seedMock();
+        window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "mock" } }));
+        return this.render();
+      }
 
-    const btnLastReview = screen.querySelector("[data-action='dashOpenLastReview']");
-    btnLastReview?.addEventListener("click", () => {
-      try { localStorage.setItem("liora_sim_open_review", "1"); } catch {}
-      try { window.router?.go?.("simulados"); } catch {}
-      window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
-    });
+      if (act === "dashOpenLastReview") {
+        try { localStorage.setItem("liora_sim_open_review", "1"); } catch {}
+        return this.nav("simulados");
+      }
 
-    const btnReviewNow = screen.querySelector("[data-action='dashReviewNow']");
-    btnReviewNow?.addEventListener("click", () => {
-      try { localStorage.setItem("liora_review_start", "1"); } catch {}
-      try { window.router?.go?.("simulados"); } catch {}
-      window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
-    });
+      if (act === "dashReviewNow") {
+        try { localStorage.setItem("liora_review_start", "1"); } catch {}
+        return this.nav("simulados");
+      }
 
-    const btnClearReview = screen.querySelector("[data-action='dashClearReview']");
-    btnClearReview?.addEventListener("click", () => {
-      this.reviewClearQueue();
-      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
-      this.render();
+      if (act === "dashClearReview") {
+        try { localStorage.setItem("liora_review_queue:v1", JSON.stringify({ items: [] })); } catch {}
+        window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+        return this.render();
+      }
+
+      // botão do seu empty state no HTML: data-action="startSimulado"
+      if (act === "startSimulado") {
+        this.nav("simulados");
+        // pede start direto (simulados já escuta)
+        window.dispatchEvent(new Event("liora:start-simulado"));
+        return;
+      }
     });
+  },
+
+  nav(to) {
+    try { window.router?.go?.(to); } catch {}
+    window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to } }));
   },
 
   // -----------------------------
@@ -532,9 +538,6 @@ export const dashboard = {
     localStorage.setItem(key, JSON.stringify(sample));
   },
 
-  // -----------------------------
-  // Utils
-  // -----------------------------
   escape(str) {
     return String(str ?? "")
       .replaceAll("&", "&amp;")
