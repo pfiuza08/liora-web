@@ -215,6 +215,9 @@ export const planos = {
       this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
     }
 
+    // ✅ start timer da sessão (para stats)
+    try { this.ctx?.store?.set?.("liora_session_start_ts", Date.now()); } catch {}
+   
     this.renderSessao(sessao);
 
     if (!opts.silentSave) {
