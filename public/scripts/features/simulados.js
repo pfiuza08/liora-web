@@ -6,7 +6,95 @@
 // ✔ MODAL apenas para configuração (robusto por JS)
 // ✔ Idle mostra Continuar/Descartar quando existir run salvo
 // ✔ Próxima só habilita após responder (hint contextual)
-// ✔ Timer + progresso + resultado + revisão com explicação
+// ✔ Timer + progresso + resultado + revisão com explicaçãofinish() {
+  if (!this.STATE.running) return;
+
+  this.STATE.running = false;
+  this.stopTimer();
+
+  const res = this.computeResult();
+
+  // -----------------------------
+  // ✅ DASH METRICS (1x + fallback)
+  // -----------------------------
+  const cfg = this.STATE._runConfig || this.STATE.config;
+
+  // tempo gasto real (se timer ligado)
+  const timeSpentSec =
+    this.STATE.timer.enabled && this.STATE.timer.totalSec
+      ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
+      : 0;
+
+  // helper yyyy-mm-dd
+  const todayISO = (d = new Date()) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  // tentativa: só pontua OBJ/CE/MCQ (disc não entra no acerto agora)
+  const attempt = {
+    ts: Date.now(),
+    date: todayISO(),
+    banca: cfg?.banca || "—",
+    tema: (cfg?.tema || "").trim() || "Geral",
+    dificuldade: cfg?.dificuldade || "misturado",
+    mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+    total: Number(res?.totalScored || 0),
+    correct: Number(res?.acertos || 0),
+    timeSec: Number(timeSpentSec || 0),
+  };
+
+  // ✅ só registra se tiver questões pontuadas (evita “disc” poluir)
+  if (attempt.total > 0) {
+    // 1) tenta via API global do dashboard
+    let saved = false;
+    try {
+      if (typeof window.lioraMetrics?.recordAttempt === "function") {
+        window.lioraMetrics.recordAttempt(attempt);
+        saved = true;
+      }
+    } catch (e) {
+      console.warn("⚠️ recordAttempt falhou:", e);
+    }
+
+    // 2) fallback: grava direto no localStorage (garantia)
+    if (!saved) {
+      try {
+        const key = "lioraMetrics:v1";
+        const raw = localStorage.getItem(key);
+        const data = raw ? JSON.parse(raw) : { attempts: [] };
+
+        data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
+        data.attempts.push(attempt);
+
+        if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
+
+        localStorage.setItem(key, JSON.stringify(data));
+        console.log("✅ Métrica salva (fallback):", attempt);
+      } catch (e) {
+        console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
+      }
+    }
+
+    // ✅ refresh do dashboard (se estiver aberto ou quando abrir)
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  } else {
+    console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
+  }
+
+  // -----------------------------
+  // fluxo original
+  // -----------------------------
+  this.persistResult(res);
+
+  window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
+
+  this.closeConfig();
+  this.renderResult(res);
+}
+
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
 // ✔ Suporta:
 //    - OBJ: MCQ (4) + CE (2)
@@ -490,99 +578,95 @@ export const simulados = {
     }
   },
 
-  finish() {
-    if (!this.STATE.running) return;
-  
-    this.STATE.running = false;
-    this.stopTimer();
-  
-    const res = this.computeResult();
-  
-    // -----------------------------
-    // ✅ DASH METRICS (GRAVAÇÃO GARANTIDA)
-    // -----------------------------
-    const cfg = this.STATE._runConfig || this.STATE.config;
-  
-    // tempo gasto real (se timer ligado)
-    const timeSpentSec =
-      this.STATE.timer.enabled && this.STATE.timer.totalSec
-        ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
-        : 0;
-  
-    // helper yyyy-mm-dd
-    const todayISO = (d = new Date()) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    };
-  
-    // Monta tentativa (OBJ/CE/MCQ)
-    // Discursivas não entram em acerto por enquanto (para não zerar sua taxa).
-    const attempt = {
-      ts: Date.now(),
-      date: todayISO(),
-      banca: cfg?.banca || "—",
-      tema: (cfg?.tema || "").trim() || "Geral",
-      dificuldade: cfg?.dificuldade || "misturado",
+     finish() {
+      if (!this.STATE.running) return;
     
-      // ✅ novo: modo do simulado (obj/disc)
-      mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+      this.STATE.running = false;
+      this.stopTimer();
     
-      // ✅ usa totalScored (MCQ/CE apenas)
-      total: Number(res?.totalScored || 0),
-      correct: Number(res?.acertos || 0),
-      timeSec: Number(timeSpentSec || 0),
-    };
-
-  
-    // 1) tenta via API do dashboard (se existir)
-    try {
-      window.lioraMetrics?.recordAttempt?.(attempt);
-    } catch (e) {
-      console.warn("⚠️ recordAttempt falhou:", e);
-    }
-  
-    // ✅ Não registra tentativa sem questões pontuadas (evita “disc” poluir)
-    if (attempt.total <= 0) {
-      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
-    } else {
-      // 1) tenta via API do dashboard (se existir)
-      try {
-        window.lioraMetrics?.recordAttempt?.(attempt);
-      } catch (e) {
-        console.warn("⚠️ recordAttempt falhou:", e);
+      const res = this.computeResult();
+    
+      // -----------------------------
+      // ✅ DASH METRICS (1x + fallback)
+      // -----------------------------
+      const cfg = this.STATE._runConfig || this.STATE.config;
+    
+      // tempo gasto real (se timer ligado)
+      const timeSpentSec =
+        this.STATE.timer.enabled && this.STATE.timer.totalSec
+          ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
+          : 0;
+    
+      // helper yyyy-mm-dd
+      const todayISO = (d = new Date()) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
+    
+      // tentativa: só pontua OBJ/CE/MCQ (disc não entra no acerto agora)
+      const attempt = {
+        ts: Date.now(),
+        date: todayISO(),
+        banca: cfg?.banca || "—",
+        tema: (cfg?.tema || "").trim() || "Geral",
+        dificuldade: cfg?.dificuldade || "misturado",
+        mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+        total: Number(res?.totalScored || 0),
+        correct: Number(res?.acertos || 0),
+        timeSec: Number(timeSpentSec || 0),
+      };
+    
+      // ✅ só registra se tiver questões pontuadas (evita “disc” poluir)
+      if (attempt.total > 0) {
+        // 1) tenta via API global do dashboard
+        let saved = false;
+        try {
+          if (typeof window.lioraMetrics?.recordAttempt === "function") {
+            window.lioraMetrics.recordAttempt(attempt);
+            saved = true;
+          }
+        } catch (e) {
+          console.warn("⚠️ recordAttempt falhou:", e);
+        }
+    
+        // 2) fallback: grava direto no localStorage (garantia)
+        if (!saved) {
+          try {
+            const key = "lioraMetrics:v1";
+            const raw = localStorage.getItem(key);
+            const data = raw ? JSON.parse(raw) : { attempts: [] };
+    
+            data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
+            data.attempts.push(attempt);
+    
+            if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
+    
+            localStorage.setItem(key, JSON.stringify(data));
+            console.log("✅ Métrica salva (fallback):", attempt);
+          } catch (e) {
+            console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
+          }
+        }
+    
+        // ✅ refresh do dashboard (se estiver aberto ou quando abrir)
+        window.dispatchEvent(new Event("liora:dashboard-refresh"));
+      } else {
+        console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva). Não registra métricas.");
       }
     
-      // 2) fallback: grava direto no localStorage (garantia)
-      try {
-        const key = "lioraMetrics:v1";
-        const raw = localStorage.getItem(key);
-        const data = raw ? JSON.parse(raw) : { attempts: [] };
+      // -----------------------------
+      // fluxo original
+      // -----------------------------
+      this.persistResult(res);
     
-        data.attempts = Array.isArray(data.attempts) ? data.attempts : [];
-        data.attempts.push(attempt);
+      window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
     
-        if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-    
-        localStorage.setItem(key, JSON.stringify(data));
-        console.log("✅ Métrica salva:", attempt);
-      } catch (e) {
-        console.warn("⚠️ Falha ao salvar métricas no localStorage:", e);
-      }
+      this.closeConfig();
+      this.renderResult(res);
     }
 
-  
-    // -----------------------------
-    // fluxo original
-    // -----------------------------
-    this.persistResult(res);
-  
-    window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
-  
-    this.closeConfig();
-    this.renderResult(res);
-  },
 
   cancel() {
     this.closeConfig();
