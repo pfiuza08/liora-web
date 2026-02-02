@@ -386,11 +386,11 @@ async function loadFeature(path, exportName) {
       console.warn("⚠️ Falha ao salvar session:", e);
     }
   });
- // ✅ stats (dashboard real)
+
+    // ✅ stats (dashboard real)
    try {
-     // se você já carrega features via loader/import, garanta que stats esteja carregado.
-     // Aqui assumo que "stats" já está no escopo do boot (mesmo padrão de dashboard/planos/pdf).
-     stats?.init?.(ctx);
+     const statsMod = window.lioraStats || window.stats || null;
+     statsMod?.init?.(ctx);
    
      // render inicial do dashboard (mesmo sem dados, ele monta o shell)
      window.dispatchEvent(new Event("liora:dashboard-refresh"));
@@ -398,7 +398,6 @@ async function loadFeature(path, exportName) {
      console.warn("⚠️ stats init falhou", e);
    }
 
- 
   console.log("✅ LIORA boot ok", {
     route: router.getRouteFromHash(),
     premium: gates.isPremium(),
