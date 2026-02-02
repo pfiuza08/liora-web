@@ -1,3 +1,12 @@
+// ==========================================================
+// 🟢 LIORA — app.js (Deluxe-ready)
+// - Router Deluxe (hash/deep-link + eventos open-*)
+// - Theme toggle + persist
+// - Auth mock via user.js + eventos canônicos
+// - Nav inteligente (allowlist) + “em breve” só fora da allowlist
+// - Refresh do dashboard quando user muda
+// ==========================================================
+
 import { router } from "./router.js";
 import { store } from "./store.js";
 import { gates } from "./gates.js";
@@ -11,13 +20,17 @@ import { dashboard } from "./features/dashboard.js";
 
 console.log("🟢 Liora Projeto Zero — app.js carregado");
 
+// ----------------------------------------------------------
+// THEME
+// ----------------------------------------------------------
 function setupTheme() {
   const btn = document.getElementById("btn-theme");
 
   function apply(th) {
-    document.documentElement.classList.toggle("light", th === "light");
-    document.documentElement.classList.toggle("dark", th === "dark");
-    store.set("theme", th);
+    const theme = th === "light" ? "light" : "dark";
+    document.documentElement.classList.toggle("light", theme === "light");
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    store.set("theme", theme);
   }
 
   const saved = store.get("theme") || "dark";
@@ -31,6 +44,9 @@ function setupTheme() {
   console.log("🌗 Tema ligado");
 }
 
+// ----------------------------------------------------------
+// AUTH MOCK (via user.js)
+// ----------------------------------------------------------
 function setupAuthMock() {
   const btnLogin = document.getElementById("btn-login");
   const btnLogout = document.getElementById("btn-logout");
@@ -59,16 +75,18 @@ function setupAuthMock() {
   });
 }
 
+// ----------------------------------------------------------
+// NAV
+// ----------------------------------------------------------
 function setupNav() {
+  const ALWAYS_ALLOWED = new Set(["home", "tema", "pdf", "simulados", "dashboard"]);
+
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.addEventListener("click", (ev) => {
-      const to = el.getAttribute("data-nav");
+      const to = String(el.getAttribute("data-nav") || "").trim().toLowerCase();
       if (!to) return;
 
-      // ✅ rotas sempre liberadas
-      const ALWAYS_ALLOWED = new Set(["home", "tema", "pdf", "simulados", "dashboard"]);
-
-      // ✅ só bloqueia "em breve" se NÃO estiver na allowlist
+      // bloqueia "em breve" somente se NÃO estiver na allowlist
       const isSoon = el.getAttribute("data-soon") === "1";
       const pill = el.querySelector(".pill");
       const pillText = (pill?.innerText || "").toLowerCase().trim();
@@ -80,14 +98,21 @@ function setupNav() {
         return;
       }
 
+      // evita scroll/topo estranho em links
+      ev.preventDefault();
+
       router.go(to);
     });
   });
 }
 
-
+// ----------------------------------------------------------
+// BOOT
+// ----------------------------------------------------------
 function boot() {
-  router.init();
+  // ✅ Router Deluxe: hash + deep-link
+  router.init({ useHash: true, defaultRoute: "home" });
+
   setupTheme();
   setupAuthMock();
   setupNav();
@@ -95,17 +120,24 @@ function boot() {
   // expõe helpers pro console
   user.installWindow(store);
 
-  planos.init({ router, store, gates, ui });
-  pdf.init({ router, store, gates, ui });
-  simulados.init({ router, store, gates, ui });
-  dashboard.init({ router, store, gates, ui });
+  // init features
+  const ctx = { router, store, gates, ui };
+
+  planos.init(ctx);
+  pdf.init(ctx);
+  simulados.init(ctx);
+  dashboard.init(ctx);
 
   // quando usuário mudar (login/logout/premium): refresca dashboard
   window.addEventListener("liora:user-changed", () => {
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   });
 
-  router.go("home");
+  // debug opcional (rota mudou)
+  window.addEventListener("liora:route-changed", (e) => {
+    // console.log("🔁 route-changed:", e?.detail?.route);
+  });
+
   console.log("✅ Projeto Zero pronto");
 }
 
