@@ -283,11 +283,14 @@ function renderDashboard({ isPremium = false } = {}) {
     }),
   
     // Linha 3 (compacta): Tipos como mini-card, mas ainda em 3 colunas
-    cardKPI({
+    (() => {
+    const html = cardKPI({
       title: "Tipos",
       value: `${objCount} OBJ`,
       sub: `${discCount} DISC`,
-    }),
+    });
+    return html.replace('class="dash-card', 'class="dash-card dash-kpi-types');
+  })(),
     // dois "spacers" invisíveis para fechar 3 colunas sem buracos feios
     `<div class="dash-spacer"></div>`,
     `<div class="dash-spacer"></div>`,
