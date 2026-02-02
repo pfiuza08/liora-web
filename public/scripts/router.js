@@ -15,5 +15,19 @@ export const router = {
     });
 
     console.log("🧭 Router →", route);
+
+    // ✅ HOOKS POR ROTA (telas que precisam "renderizar" ao abrir)
+    // Usa requestAnimationFrame para garantir que a troca de screen já aconteceu no DOM
+    if (route === "dashboard") {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("liora:open-dashboard"));
+      });
+    }
+
+    if (route === "simulados") {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("liora:open-simulados"));
+      });
+    }
   }
 };
