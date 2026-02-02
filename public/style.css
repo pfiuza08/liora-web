@@ -2265,4 +2265,60 @@ body.liora-modal-open{
 .card-btn{
   position: relative;
 }
+/* =========================================================
+   HOME CARDS — DE LUXE (override mínimo)
+   Cole no FINAL do CSS
+========================================================= */
+
+.card-btn{
+  transition:
+    transform .14s ease,
+    box-shadow .14s ease,
+    border-color .14s ease,
+    background .14s ease,
+    opacity .14s ease;
+}
+
+/* hover: um pouco mais “vivo” */
+.card-btn:hover{
+  transform: translateY(-2px);
+  opacity: 1;
+  border-color: rgba(255,255,255,.18);
+  background: color-mix(in srgb, var(--card) 92%, white 8%);
+  box-shadow: 0 14px 40px rgba(0,0,0,.26);
+}
+
+:root.light .card-btn:hover{
+  border-color: rgba(0,0,0,.16);
+  background: color-mix(in srgb, var(--card) 92%, black 8%);
+  box-shadow: 0 14px 34px rgba(0,0,0,.10);
+}
+
+/* foco teclado: acessível e bonito */
+.card-btn:focus-visible{
+  outline: none;
+  border-color: rgba(196,75,4,.55);
+  box-shadow:
+    0 0 0 3px rgba(196,75,4,.18),
+    var(--shadow);
+}
+
+/* active (rota atual) */
+.card-btn.is-active,
+.card-btn[aria-current="page"]{
+  border-color: rgba(196,75,4,.55);
+  background: color-mix(in srgb, var(--card) 90%, var(--brand) 10%);
+  box-shadow:
+    0 0 0 3px rgba(196,75,4,.12),
+    0 18px 54px rgba(0,0,0,.34);
+  transform: translateY(-1px);
+}
+
+/* active reforça pill */
+.card-btn.is-active .pill,
+.card-btn[aria-current="page"] .pill{
+  border-color: rgba(196,75,4,.45);
+  background: rgba(196,75,4,.14);
+  color: rgba(196,75,4,.95);
+}
 
