@@ -57,6 +57,61 @@ export const dashboard = {
     }
   },
 
+  // -----------------------------
+  // Last result (simulados)
+  // -----------------------------
+  getLastResult() {
+    const key = "liora_sim_last_result";
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : null;
+      return data && typeof data === "object" ? data : null;
+    } catch {
+      return null;
+    }
+  },
+
+  buildLastResultCard() {
+    const r = this.getLastResult();
+    if (!r) return "";
+
+    const totalScored = Number(r.totalScored || 0);
+    const acertos = Number(r.acertos || 0);
+    const pct = Number.isFinite(Number(r.pct)) ? Number(r.pct) : (totalScored ? Math.round((acertos / totalScored) * 100) : 0);
+
+    const banca = String(r?.config?.banca || "—");
+    const tema = String(r?.config?.tema || "Geral");
+    const mode = String(r?.config?.mode || "obj");
+    const modeLabel = mode === "disc" ? "DISC" : "OBJ";
+
+    // se quiser mostrar data/hora: r.config não tem ts; então fica só “último”
+    return `
+      <div class="panel" style="margin:12px 0;">
+        <div class="card-title">Último resultado</div>
+        <div class="muted">${this.escape(banca)} · ${this.escape(tema)} · <b>${this.escape(modeLabel)}</b></div>
+
+        <div class="dash-grid" style="margin-top:10px;">
+          <div class="dash-card good">
+            <div class="dash-title">Acurácia</div>
+            <div class="dash-value">${pct}%</div>
+            <div class="dash-sub">${acertos} acertos / ${totalScored} objetivas</div>
+          </div>
+
+          <div class="dash-card">
+            <div class="dash-title">Total de itens</div>
+            <div class="dash-value">${Number(r.total || 0)}</div>
+            <div class="dash-sub">inclui discursivas</div>
+          </div>
+        </div>
+
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-secondary" data-nav="simulados">Ir para simulados</button>
+          <button class="btn-primary" data-action="dashOpenLastReview">Ver revisão</button>
+        </div>
+      </div>
+    `;
+  },
+  
   getUser() {
     // tenta alguns padrões comuns
     try {
@@ -339,6 +394,8 @@ export const dashboard = {
       return `<span class="pill pill-upload">free</span>`;
     })();
 
+        const lastResultHtml = this.buildLastResultCard();
+
     wrap.innerHTML = `
       <div class="panel" style="margin-bottom:12px;">
         <div class="card-title">Resumo</div>
@@ -350,6 +407,8 @@ export const dashboard = {
           ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
         </div>
       </div>
+
+      ${lastResultHtml}
 
       ${kpiHtml}
       ${insightsHtml}
@@ -380,11 +439,26 @@ export const dashboard = {
     const btnRefresh = screen.querySelector("[data-action='dashRefresh']");
     btnRefresh?.addEventListener("click", () => this.render());
 
+    const btnLastReview = screen.querySelector("[data-action='dashOpenLastReview']");
+    btnLastReview?.addEventListener("click", () => {
+      // marca intenção de abrir revisão ao entrar em simulados
+      try {
+        localStorage.setItem("liora_sim_open_review", "1");
+      } catch {}
+      // navega para simulados
+      try {
+        window.router?.go?.("simulados");
+      } catch {}
+      window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: "simulados" } }));
+    });
+
+    
     const btnUpgrade = screen.querySelector("[data-action='dashUpgrade']");
     btnUpgrade?.addEventListener("click", () => {
       window.dispatchEvent(new Event("liora:premium-bloqueado"));
     });
 
+     
     const btnMock = screen.querySelector("[data-action='dashMock']");
     btnMock?.addEventListener("click", () => {
       this.seedMock();
