@@ -3,6 +3,7 @@
 // - Salva tentativas (simulados) em localStorage
 // - Calcula KPIs e insights
 // - Bloqueia cards PREMIUM no modo free
+// - Modal de upgrade ao clicar em cards travados
 // ==========================================================
 
 const LS_KEY = "lioraMetrics:v1";
@@ -34,19 +35,20 @@ function saveStore(data) {
   localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
-// attempt schema:
-// {
-//   ts: number,
-//   date: "yyyy-mm-dd",
-//   banca: string,
-//   tema: string,
-//   dificuldade: string,
-//   total: number,
-//   correct: number,
-//   timeSec: number,
-//   mode: "obj" | "disc"
-
-// }
+/**
+ * attempt schema:
+ * {
+ *   ts: number,
+ *   date: "yyyy-mm-dd",
+ *   banca: string,
+ *   tema: string,
+ *   dificuldade: string,
+ *   total: number,
+ *   correct: number,
+ *   timeSec: number,
+ *   mode: "obj" | "disc"
+ * }
+ */
 function recordAttempt(attempt) {
   // ✅ trava: não salva tentativa sem questões pontuadas (evita poluir com discursivas/vazio)
   const total = Number(attempt?.total || 0);
@@ -63,8 +65,6 @@ function recordAttempt(attempt) {
     total,
     correct: Number(attempt?.correct || 0),
     timeSec: Number(attempt?.timeSec || 0),
-
-    // ✅ novo: modo do simulado (compatível com histórico antigo)
     mode: String(attempt?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
   });
 
@@ -73,7 +73,6 @@ function recordAttempt(attempt) {
 
   saveStore(data);
 }
-
 
 function computeStats(attempts) {
   const totalAttempts = attempts.length;
@@ -84,9 +83,9 @@ function computeStats(attempts) {
   const acc = totalQ ? totalC / totalQ : 0;
   const avgSec = totalQ ? totalTime / totalQ : 0;
 
-  // streak (sequência de dias com pelo menos 1 simulado)
+  // streak (sequência de dias com pelo menos 1 simulado pontuado)
   const days = new Set(attempts.map((a) => a.date).filter(Boolean));
-  const dayList = Array.from(days).sort(); // yyyy-mm-dd ordena ok
+  const dayList = Array.from(days).sort();
   let streak = 0;
   if (dayList.length) {
     const set = new Set(dayList);
@@ -220,7 +219,7 @@ function topN(map, n = 5) {
 function renderDashboard({ isPremium = false } = {}) {
   const attempts = loadStore().attempts || [];
 
-  const empty = qs("dash-empty"); // opcional
+  const empty = qs("dash-empty");
   const kpis = qs("dash-kpis");
   const insights = qs("dash-insights");
   const tables = qs("dash-tables");
@@ -239,7 +238,6 @@ function renderDashboard({ isPremium = false } = {}) {
 
   const s = computeStats(attempts);
 
-  // helpers locais
   const fmtLast = (ts) => {
     if (!ts) return "—";
     const d = new Date(ts);
@@ -253,11 +251,9 @@ function renderDashboard({ isPremium = false } = {}) {
   const getMode = (a) => (String(a?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj");
   const objCount = attempts.filter((a) => getMode(a) === "obj").length;
   const discCount = attempts.filter((a) => getMode(a) === "disc").length;
-
   const last = attempts[attempts.length - 1];
 
- 
-    // KPIs (FREE) — layout 3 colunas (desktop) preenchido (3×2)
+  // KPIs (FREE) — 3 colunas (desktop) preenchido (sem buracos)
   kpis.innerHTML = [
     // Linha 1
     cardKPI({
@@ -268,7 +264,7 @@ function renderDashboard({ isPremium = false } = {}) {
     }),
     cardKPI({ title: "Questões", value: String(s.totalQ), sub: "Respondidas" }),
     cardKPI({ title: "Simulados", value: String(s.totalAttempts), sub: "Total feitos" }),
-  
+
     // Linha 2
     cardKPI({
       title: "Tempo / questão",
@@ -281,22 +277,21 @@ function renderDashboard({ isPremium = false } = {}) {
       value: fmtLast(last?.ts),
       sub: `${(last?.banca || "—")} · ${(last?.tema || "Geral")}`,
     }),
-  
-    // Linha 3 (compacta): Tipos como mini-card, mas ainda em 3 colunas
+
+    // Linha 3: Tipos (mini-card) + spacers invisíveis
     (() => {
-    const html = cardKPI({
-      title: "Tipos",
-      value: `${objCount} OBJ`,
-      sub: `${discCount} DISC`,
-    });
-    return html.replace('class="dash-card', 'class="dash-card dash-kpi-types');
-  })(),
-    // dois "spacers" invisíveis para fechar 3 colunas sem buracos feios
+      const html = cardKPI({
+        title: "Tipos",
+        value: `${objCount} OBJ`,
+        sub: `${discCount} DISC`,
+      });
+      return html.replace('class="dash-card', 'class="dash-card dash-kpi-types');
+    })(),
     `<div class="dash-spacer"></div>`,
     `<div class="dash-spacer"></div>`,
   ].join("");
 
-  // ✅ novo (FREE): foco atual (tema mais praticado)
+  // FREE: foco atual (tema mais praticado)
   const topTema = topN(s.byTema, 1)[0];
   const focoAtualCard = cardKPI({
     title: "Foco atual",
@@ -310,7 +305,7 @@ function renderDashboard({ isPremium = false } = {}) {
   const w30txt = s.w30.q ? `${pct(s.w30.acc)} em ${s.w30.q} questões` : "Sem dados";
 
   insights.innerHTML = [
-    focoAtualCard, // ✅ livre
+    focoAtualCard,
 
     isPremium
       ? cardKPI({ title: "Últimos 7 dias", value: w7txt, sub: `Simulados: ${s.w7.attempts}` })
@@ -321,7 +316,7 @@ function renderDashboard({ isPremium = false } = {}) {
       : cardLocked({ title: "Últimos 30 dias", teaser: "Evolução mensal e tendência" }),
 
     isPremium
-      ? (function () {
+      ? (() => {
           const weak = s.weaknesses[0];
           return weak
             ? cardKPI({
@@ -345,7 +340,7 @@ function renderDashboard({ isPremium = false } = {}) {
       : cardLocked({ title: "Recomendação", teaser: "Ações automáticas para subir seu acerto" }),
   ].join("");
 
-  // Tabelas
+  // TABELAS
   const bancaTop = topN(s.byBanca, 5).map((x) => ({
     name: x.name,
     sub: `${x.total} questões`,
@@ -365,183 +360,146 @@ function renderDashboard({ isPremium = false } = {}) {
   }));
 
   tables.innerHTML = [
-    isPremium
-      ? miniTable("Por banca (top 5)", bancaTop)
-      : cardLocked({ title: "Por banca", teaser: "Acerto e volume por banca" }),
-    isPremium
-      ? miniTable("Por tema (top 5)", temaTop)
-      : cardLocked({ title: "Por tema", teaser: "Acerto e volume por tema" }),
+    isPremium ? miniTable("Por banca (top 5)", bancaTop) : cardLocked({ title: "Por banca", teaser: "Acerto e volume por banca" }),
+    isPremium ? miniTable("Por tema (top 5)", temaTop) : cardLocked({ title: "Por tema", teaser: "Acerto e volume por tema" }),
     miniTable("Por dificuldade", difTop),
   ].join("");
 }
 
 function isUserPremium() {
-  // MVP: tudo free.
-  // Depois você troca pelo seu gate real (auth/assinatura).
+  // MVP: tudo free. Depois você troca pelo gate real.
   return false;
 }
 
 // ==========================================================
-// EXPORT
+// Expor API global (debug + integração)
 // ==========================================================
-    export const dashboard = {
-      ctx: null,
-    
-      showScreen() {
-        document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-        document.getElementById("screen-dashboard")?.classList.add("active");
-      },
-    
-      init(ctx) {
-        this.ctx = ctx;
-    
-        // anti-init duplicado
-        if (window.__lioraDashboardInited) return;
-        window.__lioraDashboardInited = true;
-    
-        console.log("📊 dashboard.js iniciado (MVP local)");
-    
-        // -----------------------------
-        // MODAL PREMIUM (front-only)
-        // -----------------------------
-        const closeUpgrade = () => {
-          const modal = document.getElementById("premium-modal");
-          if (!modal) return;
-    
-          modal.classList.add("hidden");
-          modal.setAttribute("aria-hidden", "true");
-          document.body.classList.remove("liora-modal-open");
-    
-          window.dispatchEvent(new Event("liora:upgrade-close"));
-        };
-    
-        const ensureUpgradeModal = () => {
-          if (document.getElementById("premium-modal")) return;
-    
-          const el = document.createElement("div");
-          el.id = "premium-modal";
-          el.className = "liora-modal hidden";
-          el.setAttribute("aria-hidden", "true");
-    
-          el.innerHTML = `
-            <div class="liora-modal-backdrop" data-close="1"></div>
-    
-            <div class="liora-modal-card" role="dialog" aria-modal="true" aria-label="Liora Premium">
-              <div class="liora-modal-head">
-                <div>
-                  <div class="liora-modal-title">Desbloquear Premium</div>
-                  <div class="liora-modal-sub muted">Insights avançados e recomendações automáticas.</div>
-                </div>
-                <button class="btn-link" data-close="1" aria-label="Fechar">✕</button>
-              </div>
-    
-              <div class="liora-modal-body">
-                <ul class="liora-modal-list">
-                  <li><b>Evolução 7 e 30 dias</b> (tendência real de melhora)</li>
-                  <li><b>Pontos fracos</b> por tema/banca (onde você mais erra)</li>
-                  <li><b>Recomendações</b> do próximo passo (ação prática)</li>
-                </ul>
-    
-                <div class="liora-modal-note muted">
-                  MVP: por enquanto o Premium ainda está em implantação.
-                </div>
-              </div>
-    
-              <div class="liora-modal-actions">
-                <button class="btn-secondary" data-close="1">Agora não</button>
-                <button class="btn-primary" id="btn-upgrade-premium">Quero Premium</button>
-              </div>
-            </div>
-          `;
-    
-          document.body.appendChild(el);
-    
-          // close handlers (delegado)
-          el.addEventListener("click", (ev) => {
-            const t = ev.target;
-            if (t?.closest?.("[data-close='1']")) closeUpgrade();
-          });
-    
-          // CTA handler
-          el.querySelector("#btn-upgrade-premium")?.addEventListener("click", () => {
-            this.ctx?.ui?.toast?.("✨ Premium em breve. (Hook pronto para checkout)");
-            closeUpgrade();
-            window.dispatchEvent(new Event("liora:premium-click"));
-          });
-        };
-    
-        const openUpgrade = (origin = "dashboard") => {
-          ensureUpgradeModal();
-          const modal = document.getElementById("premium-modal");
-          if (!modal) return;
-    
-          modal.classList.remove("hidden");
-          modal.setAttribute("aria-hidden", "false");
-          document.body.classList.add("liora-modal-open");
-    
-          modal.dataset.origin = origin;
-    
-          // ESC fecha
-          const onEsc = (e) => {
-            if (e.key === "Escape") closeUpgrade();
-          };
-          window.addEventListener("keydown", onEsc, { once: true });
-    
-          window.dispatchEvent(new CustomEvent("liora:upgrade-open", { detail: { origin } }));
-        };
-    
-        // -----------------------------
-        // CLIQUE EM CARD PREMIUM (locked) -> abre modal
-        // -----------------------------
-        document.addEventListener("click", (ev) => {
-          const t = ev.target;
-          if (!t) return;
-    
-          // só dentro da tela do dashboard
-          if (!t.closest?.("#screen-dashboard")) return;
-    
-          const locked = t.closest?.(".dash-card.dash-locked");
-          if (locked) {
-            ev.preventDefault();
-            openUpgrade("dashboard-locked-card");
-            return;
-          }
-    
-          const up = t.closest?.("[data-upgrade='premium']");
-          if (up) {
-            ev.preventDefault();
-            openUpgrade("dashboard-upgrade-link");
-            return;
-          }
-        });
-    
-        // evento global opcional (para abrir modal de qualquer lugar)
-        window.addEventListener("liora:open-upgrade", () => openUpgrade("event"));
-    
-        // -----------------------------
-        // ABRIR DASHBOARD
-        // -----------------------------
-        window.addEventListener("liora:open-dashboard", () => {
-          this.showScreen();
-    
-          if (typeof window.lioraMetrics?.renderDashboard === "function") {
-            window.lioraMetrics.renderDashboard();
-          } else {
-            window.dispatchEvent(new Event("liora:dashboard-refresh"));
-          }
-        });
-    
-        // refresh único (sem duplicar e sem quebrar)
-        window.addEventListener("liora:dashboard-refresh", () => {
-          window.lioraMetrics?.renderDashboard?.();
-        });
-      },
+window.lioraMetrics = window.lioraMetrics || {};
+window.lioraMetrics._load = () => renderDashboard({ isPremium: isUserPremium() });
+window.lioraMetrics.renderDashboard = () => renderDashboard({ isPremium: isUserPremium() });
+window.lioraMetrics.recordAttempt = recordAttempt;
+window.lioraMetrics.loadStore = loadStore;
+
+// ==========================================================
+// EXPORT FEATURE (screen + modal upgrade)
+// ==========================================================
+export const dashboard = {
+  ctx: null,
+
+  showScreen() {
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    document.getElementById("screen-dashboard")?.classList.add("active");
+  },
+
+  init(ctx) {
+    this.ctx = ctx;
+
+    if (window.__lioraDashboardInited) return;
+    window.__lioraDashboardInited = true;
+
+    console.log("📊 dashboard.js iniciado (MVP local)");
+
+    // ---------- modal helpers ----------
+    const closeUpgrade = () => {
+      const modal = document.getElementById("premium-modal");
+      if (!modal) return;
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("liora-modal-open");
+      window.dispatchEvent(new Event("liora:upgrade-close"));
     };
 
+    const ensureUpgradeModal = () => {
+      if (document.getElementById("premium-modal")) return;
 
-    // opcional: refresh manual
+      const el = document.createElement("div");
+      el.id = "premium-modal";
+      el.className = "liora-modal hidden";
+      el.setAttribute("aria-hidden", "true");
+
+      el.innerHTML = `
+        <div class="liora-modal-backdrop" data-close="1"></div>
+
+        <div class="liora-modal-card" role="dialog" aria-modal="true" aria-label="Liora Premium">
+          <div class="liora-modal-head">
+            <div>
+              <div class="liora-modal-title">Desbloquear Premium</div>
+              <div class="liora-modal-sub muted">Insights avançados e recomendações automáticas.</div>
+            </div>
+            <button class="btn-link" data-close="1" aria-label="Fechar">✕</button>
+          </div>
+
+          <div class="liora-modal-body">
+            <ul class="liora-modal-list">
+              <li><b>Evolução 7 e 30 dias</b> (tendência real de melhora)</li>
+              <li><b>Pontos fracos</b> por tema/banca (onde você mais erra)</li>
+              <li><b>Recomendações</b> do próximo passo (ação prática)</li>
+            </ul>
+            <div class="liora-modal-note muted">MVP: Premium em implantação.</div>
+          </div>
+
+          <div class="liora-modal-actions">
+            <button class="btn-secondary" data-close="1">Agora não</button>
+            <button class="btn-primary" id="btn-upgrade-premium">Quero Premium</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(el);
+
+      el.addEventListener("click", (ev) => {
+        const t = ev.target;
+        if (t?.closest?.("[data-close='1']")) closeUpgrade();
+      });
+
+      el.querySelector("#btn-upgrade-premium")?.addEventListener("click", () => {
+        this.ctx?.ui?.toast?.("✨ Premium em breve. (Hook pronto para checkout)");
+        closeUpgrade();
+        window.dispatchEvent(new Event("liora:premium-click"));
+      });
+    };
+
+    const openUpgrade = (origin = "dashboard") => {
+      ensureUpgradeModal();
+      const modal = document.getElementById("premium-modal");
+      if (!modal) return;
+
+      modal.classList.remove("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.classList.add("liora-modal-open");
+      modal.dataset.origin = origin;
+
+      const onEsc = (e) => {
+        if (e.key === "Escape") closeUpgrade();
+      };
+      window.addEventListener("keydown", onEsc, { once: true });
+
+      window.dispatchEvent(new CustomEvent("liora:upgrade-open", { detail: { origin } }));
+    };
+
+    // Clique em card travado -> abre modal
+    document.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!t?.closest) return;
+
+      if (!t.closest("#screen-dashboard")) return;
+
+      const locked = t.closest(".dash-card.dash-locked");
+      if (locked) {
+        ev.preventDefault();
+        openUpgrade("dashboard-locked-card");
+      }
+    });
+
+    // Abrir dashboard
+    window.addEventListener("liora:open-dashboard", () => {
+      this.showScreen();
+      window.lioraMetrics?.renderDashboard?.();
+    });
+
+    // Refresh (único)
     window.addEventListener("liora:dashboard-refresh", () => {
-      window.lioraMetrics.renderDashboard();
+      window.lioraMetrics?.renderDashboard?.();
     });
   },
 };
