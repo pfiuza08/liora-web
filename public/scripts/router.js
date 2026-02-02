@@ -1,82 +1,64 @@
-// router.js — v2 (de luxe)
-// ✔ troca telas
-// ✔ marca [data-nav] ativo
-// ✔ marca card-btn ativo (home) quando existir
-// ✔ aria-current="page" para acessibilidade
-// ✔ opcional: suporta #rota na URL (sem quebrar nada)
-
+// router.js — v2 (hash + nav ativo + evento canônico)
 export const router = {
   screens: ["home", "tema", "pdf", "simulados", "dashboard"],
-  current: "home",
 
   init() {
-    // ✅ se tiver hash, tenta abrir nele
-    const fromHash = this._routeFromHash();
-    if (fromHash) this.go(fromHash, { silentHash: true });
-
-    // ✅ se usuário mudar o hash manualmente
+    // reage a mudanças de hash (ex: /#dashboard)
     window.addEventListener("hashchange", () => {
-      const r = this._routeFromHash();
-      if (r) this.go(r, { silentHash: true });
+      const r = this.getInitialRoute();
+      this.go(r, { pushHash: false });
     });
   },
 
-  go(route, opts = {}) {
-    const { silentHash = false } = opts;
+  normalize(route) {
+    const r = String(route || "").trim().toLowerCase();
+    return this.screens.includes(r) ? r : "home";
+  },
 
-    if (!this.screens.includes(route)) route = "home";
-    this.current = route;
+  getInitialRoute() {
+    const h = (location.hash || "").replace("#", "").trim().toLowerCase();
+    return this.normalize(h || "home");
+  },
 
-    // 1) telas
+  setActiveScreen(route) {
     this.screens.forEach((r) => {
       const el = document.getElementById(`screen-${r}`);
       if (!el) return;
       el.classList.toggle("active", r === route);
     });
-
-    // 2) marca nav ativo (header, menu, qualquer coisa com data-nav)
-    this._markNavActive(route);
-
-    // 3) atualiza hash (opcional)
-    if (!silentHash) this._setHash(route);
-
-    console.log("🧭 Router →", route);
   },
 
-  // -----------------------------
-  // Helpers
-  // -----------------------------
-  _markNavActive(route) {
+  setActiveNav(route) {
+    // marca qualquer elemento com data-nav
     document.querySelectorAll("[data-nav]").forEach((el) => {
-      const to = el.getAttribute("data-nav");
-      const isActive = to === route;
+      const to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
+      const active = to === route;
 
-      // classe visual (seu CSS já tem [data-nav].is-active e card-btn.is-active)
-      el.classList.toggle("is-active", isActive);
-      el.classList.toggle("is-active", isActive); // redundante ok, mantém compat
-
-      // ✅ se for card da home (card-btn), também marca
-      if (el.classList.contains("card-btn")) {
-        el.classList.toggle("is-active", isActive);
-      }
-
-      // acessibilidade
-      if (isActive) el.setAttribute("aria-current", "page");
+      el.classList.toggle("is-active", active);
+      if (active) el.setAttribute("aria-current", "page");
       else el.removeAttribute("aria-current");
     });
   },
 
-  _routeFromHash() {
-    const raw = String(location.hash || "").replace("#", "").trim();
-    if (!raw) return null;
-    const r = raw.toLowerCase();
-    return this.screens.includes(r) ? r : null;
-  },
+  go(route, opts = {}) {
+    const { pushHash = true } = opts;
+    const r = this.normalize(route);
 
-  _setHash(route) {
-    // evita scroll jump (alguns browsers fazem isso com hash)
-    const newHash = `#${route}`;
-    if (location.hash === newHash) return;
-    history.replaceState(null, "", newHash);
+    // troca tela
+    this.setActiveScreen(r);
+
+    // marca nav ativo
+    this.setActiveNav(r);
+
+    // atualiza URL (sem recarregar)
+    if (pushHash) {
+      const next = `#${r}`;
+      if (location.hash !== next) history.pushState(null, "", next);
+    }
+
+    // ✅ evento canônico para features reagirem
+    window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route: r } }));
+
+    console.log("🧭 Router →", r);
   }
 };
