@@ -492,6 +492,8 @@ export const simulados = {
     };
 
 
+
+
     if (existing) Object.assign(existing, payload);
     else this.STATE.respostas.push(payload);
 
