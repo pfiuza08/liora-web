@@ -1413,7 +1413,7 @@ export const simulados = {
       this.ctx?.ui?.toast?.(msg);
     } catch {}
     console.log("🔔", msg);
-  }
+  },
   // -----------------------------
   // GATES (global)
   // -----------------------------
