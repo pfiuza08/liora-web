@@ -3,7 +3,6 @@
 // - Salva tentativas (simulados) em localStorage
 // - Calcula KPIs e insights
 // - Bloqueia cards PREMIUM no modo free
-// - Modal de upgrade ao clicar em cards travados
 // ==========================================================
 
 const LS_KEY = "lioraMetrics:v1";
@@ -35,22 +34,19 @@ function saveStore(data) {
   localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
-/**
- * attempt schema:
- * {
- *   ts: number,
- *   date: "yyyy-mm-dd",
- *   banca: string,
- *   tema: string,
- *   dificuldade: string,
- *   total: number,
- *   correct: number,
- *   timeSec: number,
- *   mode: "obj" | "disc"
- * }
- */
+// attempt schema:
+// {
+//   ts: number,
+//   date: "yyyy-mm-dd",
+//   banca: string,
+//   tema: string,
+//   dificuldade: string,
+//   total: number,
+//   correct: number,
+//   timeSec: number,
+//   mode: "obj" | "disc"
+// }
 function recordAttempt(attempt) {
-  // ✅ trava: não salva tentativa sem questões pontuadas (evita poluir com discursivas/vazio)
   const total = Number(attempt?.total || 0);
   if (total <= 0) return;
 
@@ -68,9 +64,7 @@ function recordAttempt(attempt) {
     mode: String(attempt?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
   });
 
-  // cap de histórico (evitar localStorage gigante)
   if (data.attempts.length > 500) data.attempts = data.attempts.slice(-500);
-
   saveStore(data);
 }
 
@@ -83,10 +77,11 @@ function computeStats(attempts) {
   const acc = totalQ ? totalC / totalQ : 0;
   const avgSec = totalQ ? totalTime / totalQ : 0;
 
-  // streak (sequência de dias com pelo menos 1 simulado pontuado)
+  // streak: dias consecutivos com pelo menos 1 tentativa
   const days = new Set(attempts.map((a) => a.date).filter(Boolean));
   const dayList = Array.from(days).sort();
   let streak = 0;
+
   if (dayList.length) {
     const set = new Set(dayList);
     let d = new Date(dayList[dayList.length - 1] + "T00:00:00");
@@ -127,13 +122,8 @@ function computeStats(attempts) {
   const w7 = windowStats(7);
   const w30 = windowStats(30);
 
-  // pontos fracos: temas com >= 15 questões e acerto < 65%
   const weaknesses = Array.from(byTema.entries())
-    .map(([tema, v]) => ({
-      tema,
-      total: v.total,
-      acc: v.total ? v.correct / v.total : 0,
-    }))
+    .map(([tema, v]) => ({ tema, total: v.total, acc: v.total ? v.correct / v.total : 0 }))
     .filter((x) => x.total >= 15)
     .sort((a, b) => a.acc - b.acc)
     .slice(0, 5);
@@ -151,7 +141,7 @@ function computeStats(attempts) {
     byDif,
     w7,
     w30,
-    weaknesses,
+    weaknesses
   };
 }
 
@@ -177,21 +167,17 @@ function cardLocked({ title, teaser = "Disponível no plano Premium" }) {
 
 function miniTable(title, rows) {
   const body = rows?.length
-    ? rows
-        .map(
-          (r) => `
-          <div class="dash-row">
-            <div class="dash-row-left">
-              <div class="dash-row-title">${r.name}</div>
-              <div class="dash-row-sub muted">${r.sub || ""}</div>
-            </div>
-            <div class="dash-row-right">
-              <div class="dash-row-metric">${r.metric}</div>
-            </div>
+    ? rows.map((r) => `
+        <div class="dash-row">
+          <div class="dash-row-left">
+            <div class="dash-row-title">${r.name}</div>
+            <div class="dash-row-sub muted">${r.sub || ""}</div>
           </div>
-        `
-        )
-        .join("")
+          <div class="dash-row-right">
+            <div class="dash-row-metric">${r.metric}</div>
+          </div>
+        </div>
+      `).join("")
     : `<div class="muted">Sem dados suficientes.</div>`;
 
   return `
@@ -251,11 +237,11 @@ function renderDashboard({ isPremium = false } = {}) {
   const getMode = (a) => (String(a?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj");
   const objCount = attempts.filter((a) => getMode(a) === "obj").length;
   const discCount = attempts.filter((a) => getMode(a) === "disc").length;
+
   const last = attempts[attempts.length - 1];
 
-  // KPIs (FREE) — 3 colunas (desktop) preenchido (sem buracos)
+  // KPIs (FREE) — 3 colunas preenchido com 3×2 + 1 “Tipos”
   kpis.innerHTML = [
-    // Linha 1
     cardKPI({
       title: "Acerto geral",
       value: s.totalQ ? pct(s.acc) : "—",
@@ -265,7 +251,6 @@ function renderDashboard({ isPremium = false } = {}) {
     cardKPI({ title: "Questões", value: String(s.totalQ), sub: "Respondidas" }),
     cardKPI({ title: "Simulados", value: String(s.totalAttempts), sub: "Total feitos" }),
 
-    // Linha 2
     cardKPI({
       title: "Tempo / questão",
       value: s.totalQ ? `${Math.round(s.avgSec)}s` : "—",
@@ -278,17 +263,11 @@ function renderDashboard({ isPremium = false } = {}) {
       sub: `${(last?.banca || "—")} · ${(last?.tema || "Geral")}`,
     }),
 
-    // Linha 3: Tipos (mini-card) + spacers invisíveis
-    (() => {
-      const html = cardKPI({
-        title: "Tipos",
-        value: `${objCount} OBJ`,
-        sub: `${discCount} DISC`,
-      });
-      return html.replace('class="dash-card', 'class="dash-card dash-kpi-types');
-    })(),
-    `<div class="dash-spacer"></div>`,
-    `<div class="dash-spacer"></div>`,
+    cardKPI({
+      title: "Tipos",
+      value: `${objCount} OBJ`,
+      sub: `${discCount} DISC`,
+    })
   ].join("");
 
   // FREE: foco atual (tema mais praticado)
@@ -300,12 +279,12 @@ function renderDashboard({ isPremium = false } = {}) {
     tone: "ok",
   });
 
-  // INSIGHTS
+  // INSIGHTS (premium travado)
   const w7txt = s.w7.q ? `${pct(s.w7.acc)} em ${s.w7.q} questões` : "Sem dados";
   const w30txt = s.w30.q ? `${pct(s.w30.acc)} em ${s.w30.q} questões` : "Sem dados";
 
   insights.innerHTML = [
-    focoAtualCard,
+    focoAtualCard, // livre
 
     isPremium
       ? cardKPI({ title: "Últimos 7 dias", value: w7txt, sub: `Simulados: ${s.w7.attempts}` })
@@ -340,7 +319,7 @@ function renderDashboard({ isPremium = false } = {}) {
       : cardLocked({ title: "Recomendação", teaser: "Ações automáticas para subir seu acerto" }),
   ].join("");
 
-  // TABELAS
+  // Tabelas
   const bancaTop = topN(s.byBanca, 5).map((x) => ({
     name: x.name,
     sub: `${x.total} questões`,
@@ -366,23 +345,6 @@ function renderDashboard({ isPremium = false } = {}) {
   ].join("");
 }
 
-function isUserPremium() {
-  // MVP: tudo free. Depois você troca pelo gate real.
-  return false;
-}
-
-// ==========================================================
-// Expor API global (debug + integração)
-// ==========================================================
-window.lioraMetrics = window.lioraMetrics || {};
-window.lioraMetrics._load = () => renderDashboard({ isPremium: isUserPremium() });
-window.lioraMetrics.renderDashboard = () => renderDashboard({ isPremium: isUserPremium() });
-window.lioraMetrics.recordAttempt = recordAttempt;
-window.lioraMetrics.loadStore = loadStore;
-
-// ==========================================================
-// EXPORT FEATURE (screen + modal upgrade)
-// ==========================================================
 export const dashboard = {
   ctx: null,
 
@@ -399,16 +361,16 @@ export const dashboard = {
 
     console.log("📊 dashboard.js iniciado (MVP local)");
 
-    // ---------- modal helpers ----------
-    const closeUpgrade = () => {
-      const modal = document.getElementById("premium-modal");
-      if (!modal) return;
-      modal.classList.add("hidden");
-      modal.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("liora-modal-open");
-      window.dispatchEvent(new Event("liora:upgrade-close"));
+    // expõe API global (usada pelo simulados)
+    window.lioraMetrics = window.lioraMetrics || {};
+    window.lioraMetrics.recordAttempt = recordAttempt;
+    window.lioraMetrics.renderDashboard = (opts = {}) => {
+      const isPremium = !!this.ctx?.store?.get?.("user")?.premium;
+      renderDashboard({ isPremium, ...opts });
     };
+    window.lioraMetrics._load = () => window.lioraMetrics.renderDashboard();
 
+    // modal upgrade (front-only)
     const ensureUpgradeModal = () => {
       if (document.getElementById("premium-modal")) return;
 
@@ -419,7 +381,6 @@ export const dashboard = {
 
       el.innerHTML = `
         <div class="liora-modal-backdrop" data-close="1"></div>
-
         <div class="liora-modal-card" role="dialog" aria-modal="true" aria-label="Liora Premium">
           <div class="liora-modal-head">
             <div>
@@ -435,7 +396,10 @@ export const dashboard = {
               <li><b>Pontos fracos</b> por tema/banca (onde você mais erra)</li>
               <li><b>Recomendações</b> do próximo passo (ação prática)</li>
             </ul>
-            <div class="liora-modal-note muted">MVP: Premium em implantação.</div>
+
+            <div class="liora-modal-note muted">
+              MVP: por enquanto o Premium ainda está em implantação.
+            </div>
           </div>
 
           <div class="liora-modal-actions">
@@ -477,29 +441,37 @@ export const dashboard = {
       window.dispatchEvent(new CustomEvent("liora:upgrade-open", { detail: { origin } }));
     };
 
-    // Clique em card travado -> abre modal
+    const closeUpgrade = () => {
+      const modal = document.getElementById("premium-modal");
+      if (!modal) return;
+
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("liora-modal-open");
+      window.dispatchEvent(new Event("liora:upgrade-close"));
+    };
+
     document.addEventListener("click", (ev) => {
       const t = ev.target;
-      if (!t?.closest) return;
+      if (!t) return;
+      if (!t.closest?.("#screen-dashboard")) return;
 
-      if (!t.closest("#screen-dashboard")) return;
-
-      const locked = t.closest(".dash-card.dash-locked");
+      const locked = t.closest?.(".dash-card.dash-locked");
       if (locked) {
         ev.preventDefault();
         openUpgrade("dashboard-locked-card");
       }
     });
 
-    // Abrir dashboard
+    window.addEventListener("liora:open-upgrade", () => openUpgrade("event"));
+
     window.addEventListener("liora:open-dashboard", () => {
       this.showScreen();
-      window.lioraMetrics?.renderDashboard?.();
+      window.lioraMetrics.renderDashboard();
     });
 
-    // Refresh (único)
     window.addEventListener("liora:dashboard-refresh", () => {
-      window.lioraMetrics?.renderDashboard?.();
+      window.lioraMetrics.renderDashboard();
     });
-  },
+  }
 };
