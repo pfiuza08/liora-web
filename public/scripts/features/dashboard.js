@@ -539,7 +539,7 @@ export const dashboard = {
   window.addEventListener("liora:dashboard-refresh", () => {
     window.lioraMetrics?.renderDashboard?.();
   });
-}
+},
 
     // opcional: refresh manual
     window.addEventListener("liora:dashboard-refresh", () => {
