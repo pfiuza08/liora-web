@@ -579,7 +579,7 @@ export const simulados = {
 
   this.closeConfig();
   this.renderResult(res);
-}
+},
 
 cancel() {
   this.closeConfig();
@@ -590,13 +590,20 @@ cancel() {
   }
 
   this.STATE.running = false;
+  this.stopTimer();
+  this.clearRun();
 
   // ✅ reset do guard anti-duplo-finish
   this.STATE._finishedOnce = false;
 
-  this.stopTimer();
-  this.clearRun();
   this.STATE._runConfig = null;
+
+  // (opcional, mas bom) limpa runtime para não ficar lixo em memória
+  this.STATE.questoes = [];
+  this.STATE.atual = 0;
+  this.STATE.respostas = [];
+  this.STATE.timer.totalSec = 0;
+  this.STATE.timer.leftSec = 0;
 
   window.dispatchEvent(new Event("liora:simulado-cancel"));
 
@@ -608,18 +615,24 @@ restart() {
   this.closeConfig();
   this.clearRun();
   this.STATE.running = false;
+  this.stopTimer();
 
   // ✅ reset do guard anti-duplo-finish
   this.STATE._finishedOnce = false;
 
-  this.stopTimer();
   this.STATE._runConfig = null;
+
+  // (opcional) limpa runtime
+  this.STATE.questoes = [];
+  this.STATE.atual = 0;
+  this.STATE.respostas = [];
+  this.STATE.timer.totalSec = 0;
+  this.STATE.timer.leftSec = 0;
 
   window.dispatchEvent(new Event("liora:simulado-restart"));
 
   this.renderIdle();
 },
-
 
   // -----------------------------
   // TIMER
