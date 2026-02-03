@@ -39,7 +39,12 @@ export const simulados = {
       leftSec: 0,
       tickId: null
     }
-  },
+     review: {
+      active: false,
+      idx: 0,
+      reveal: false,
+      items: [] // snapshot da fila atual
+    },
 
   // -----------------------------
   // INIT
@@ -117,6 +122,14 @@ export const simulados = {
         case "restartSimulado": return this.restart();
         case "reviewToggle": return this.toggleReview();
         case "toggleFlag": return this.toggleFlag();
+
+        case "reviewQueueReveal": return this.reviewQueueReveal();
+        case "reviewQueueRight": return this.reviewQueueRight();
+        case "reviewQueueWrong": return this.reviewQueueWrong();
+        case "reviewQueueRemove": return this.reviewQueueRemove();
+        case "reviewQueueNext": return this.reviewQueueNext();
+        case "reviewQueueExit": return this.reviewQueueExit();
+  
  
         default:
           return;
@@ -180,8 +193,15 @@ export const simulados = {
           }, 50);
         }
       }
-    } catch {}
- 
+      // ✅ REVIEW MODE (fila 1 por vez) vindo do dashboard
+      try {
+        const start = localStorage.getItem("liora_review_start");
+        if (start === "1") {
+          localStorage.removeItem("liora_review_start");
+          this.startReviewQueue();
+          return;
+        }
+      } catch {}
   },
 
   // -----------------------------
@@ -1516,7 +1536,7 @@ restart() {
       return { items: [] };
     }
   },
-
+  
   reviewSetQueue(next) {
     const key = "liora_review_queue:v1";
     try {
@@ -1525,7 +1545,7 @@ restart() {
       console.warn("⚠️ Falha ao salvar review queue:", e);
     }
   },
-
+  
   reviewHash(str) {
     // hash simples (estável) só para dedup
     const s = String(str || "");
@@ -1536,89 +1556,50 @@ restart() {
     }
     return String(h);
   },
-
+  
   reviewUpsertItem(item) {
     const q = this.reviewGetQueue();
     const items = q.items || [];
-
+  
     const id = String(item.id || "");
+    if (!id) return;
+  
     const idx = items.findIndex((x) => String(x.id) === id);
-
+  
     if (idx >= 0) {
       items[idx] = { ...items[idx], ...item, ts: Date.now() };
     } else {
       items.push({ ...item, ts: Date.now() });
     }
-
+  
     // limita para não crescer infinito
-    const MAX = 60;
-    const sorted = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, MAX);
-
+    const MAX = 200;
+    const sorted = items
+      .sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))
+      .slice(0, MAX);
+  
     this.reviewSetQueue({ items: sorted });
   },
- 
-  statsRecordAttempt(attempt) {
-    const data = this.statsGet();
-    data.attempts.push(attempt);
-
-    // guarda só as últimas 800
-    if (data.attempts.length > 800) data.attempts = data.attempts.slice(-800);
-
-    this.statsSet(data);
+  
+  reviewRemoveItem(id) {
+    const q = this.reviewGetQueue();
+    const items = (q.items || []).filter((x) => String(x.id) !== String(id));
+    this.reviewSetQueue({ items });
   },
-    // -----------------------------
-  // ✅ REVIEW QUEUE (erradas + marcadas)
-  // localStorage: liora_review_queue:v1
-  // -----------------------------
-  reviewGetQueue() {
-    const key = "liora_review_queue:v1";
-    try {
-      const raw = localStorage.getItem(key);
-      const data = raw ? JSON.parse(raw) : {};
-      const items = Array.isArray(data.items) ? data.items : [];
-      return { items };
-    } catch {
-      return { items: [] };
-    }
-  },
-
-  reviewSetQueue(next) {
-    const key = "liora_review_queue:v1";
-    try {
-      localStorage.setItem(key, JSON.stringify(next));
-    } catch (e) {
-      console.warn("⚠️ Falha ao salvar review queue:", e);
-    }
-  },
-
-  reviewHash(str) {
-    // hash simples (estável) só para dedup
-    const s = String(str || "");
-    let h = 0;
-    for (let i = 0; i < s.length; i++) {
-      h = (h << 5) - h + s.charCodeAt(i);
-      h |= 0;
-    }
-    return String(h);
-  },
-
-  reviewUpsertItem(item) {
+  
+  reviewBumpItem(id, patch = {}) {
     const q = this.reviewGetQueue();
     const items = q.items || [];
-
-    const id = String(item.id || "");
-    const idx = items.findIndex((x) => String(x.id) === id);
-
-    if (idx >= 0) {
-      items[idx] = { ...items[idx], ...item, ts: Date.now() };
-    } else {
-      items.push({ ...item, ts: Date.now() });
-    }
-
-    // limita para não crescer infinito
-    const MAX = 60;
-    const sorted = items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, MAX);
-
+    const idx = items.findIndex((x) => String(x.id) === String(id));
+    if (idx < 0) return;
+  
+    items[idx] = { ...items[idx], ...patch, ts: Date.now() };
+  
+    const MAX = 200;
+    const sorted = items
+      .sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))
+      .slice(0, MAX);
+  
     this.reviewSetQueue({ items: sorted });
   },
   
@@ -1689,5 +1670,244 @@ restart() {
       return null;
     }
   },
+// -----------------------------
+// ✅ REVIEW MODE (1 item por vez)
+// -----------------------------
+startReviewQueue() {
+  this.stopTimer();
+  this.closeConfig?.();
+
+  const q = this.reviewGetQueue();
+  const items = (q.items || []).slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+
+  this.STATE.review.active = true;
+  this.STATE.review.idx = 0;
+  this.STATE.review.reveal = false;
+  this.STATE.review.items = items;
+
+  this.renderReviewQueueOne();
+},
+
+getCurrentReviewItem() {
+  if (!this.STATE.review.active) return null;
+  const items = this.STATE.review.items || [];
+  const idx = this.STATE.review.idx || 0;
+  return items[idx] || null;
+},
+
+renderReviewQueueOne() {
+  const el = document.getElementById("sim-body");
+  if (!el) return;
+
+  const items = this.STATE.review.items || [];
+  const idx = this.STATE.review.idx || 0;
+
+  if (!items.length) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-title">Revisão</div>
+        <div class="muted">Fila vazia ✅</div>
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-secondary" data-action="reviewQueueExit">Voltar</button>
+          <button class="btn-primary" data-action="startSimulado">Fazer simulado</button>
+        </div>
+      </div>
+    `;
+    this.renderHeaderState({ mode: "idle" });
+    return;
+  }
+
+  const it = items[idx];
+  const tipo = String(it.tipo || "mcq");
+  const reveal = !!this.STATE.review.reveal;
+
+  const head = `
+    <div class="sim-topbar">
+      <div class="sim-progress">
+        <div class="muted" id="sim-progress-text">Revisão: ${idx + 1} de ${items.length}</div>
+        <div class="sim-bar">
+          <div class="sim-bar-fill" style="width:${Math.round(((idx + 1) / items.length) * 100)}%"></div>
+        </div>
+      </div>
+      <div class="sim-timer-pill"><span>REVISÃO</span></div>
+    </div>
+  `;
+
+  const enun = `<div class="sim-enunciado" style="margin-top:10px;">${this.escape(it.enunciado)}</div>`;
+
+  const body = (() => {
+    if (tipo === "disc") {
+      const modelo = String(it.respostaModelo || "").trim();
+      const criterios = Array.isArray(it.criterios) ? it.criterios : [];
+      return `
+        <div class="card" style="padding:12px; margin-top:10px;">
+          <div class="muted small">Discursiva (autoavaliação)</div>
+
+          <div class="${reveal ? "" : "hidden"}" id="rev-answer" style="margin-top:10px;">
+            ${modelo ? `
+              <div class="muted small"><b>Resposta modelo</b></div>
+              <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
+            ` : `<div class="muted">Sem modelo salvo.</div>`}
+
+            ${criterios.length ? `
+              <div style="margin-top:10px;" class="muted small"><b>Critérios</b></div>
+              <ul style="margin:6px 0 0 18px;">
+                ${criterios.slice(0, 12).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+              </ul>
+            ` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    const alts = Array.isArray(it.alternativas) ? it.alternativas : [];
+    const isCE = tipo === "ce" || alts.length === 2;
+    const letter = (n) => (isCE ? (n === 0 ? "C" : "E") : String.fromCharCode(65 + n));
+    const textChoice = (n) => {
+      if (n == null) return "—";
+      if (isCE) return n === 0 ? "Certo" : "Errado";
+      return this.escape(alts[n] ?? "");
+    };
+
+    const gabarito = reveal
+      ? `
+        <div class="card" style="padding:12px; margin-top:10px;" id="rev-answer">
+          <div class="muted small"><b>Gabarito</b></div>
+          <div style="margin-top:6px;">
+            Correta: <b>${letter(it.corretaIndex)}.</b> ${textChoice(it.corretaIndex)}
+          </div>
+          ${it.explicacao ? `<div class="muted" style="margin-top:8px;"><b>Explicação:</b> ${this.escape(it.explicacao)}</div>` : ""}
+        </div>
+      `
+      : "";
+
+    return `
+      <div class="card" style="padding:12px; margin-top:10px;">
+        <div class="muted small">Objetiva</div>
+        ${alts.length ? `
+          <div style="margin-top:8px;">
+            ${alts.map((a, i) => `<div class="muted small" style="margin-top:6px;"><b>${letter(i)}.</b> ${this.escape(a)}</div>`).join("")}
+          </div>
+        ` : ""}
+      </div>
+      ${gabarito}
+    `;
+  })();
+
+  const actions = `
+    <div class="sim-actions" style="margin-top:12px;">
+      <button class="btn-secondary" data-action="reviewQueueExit">Sair</button>
+
+      <div class="spacer"></div>
+
+      <button class="btn-secondary" data-action="reviewQueueReveal">${reveal ? "Ocultar gabarito" : "Mostrar gabarito"}</button>
+      <button class="btn-secondary" data-action="reviewQueueRemove">Remover</button>
+      <button class="btn-primary" data-action="reviewQueueRight">Acertei</button>
+      <button class="btn-primary" data-action="reviewQueueWrong">Errei</button>
+      <button class="btn-secondary" data-action="reviewQueueNext">Próximo</button>
+    </div>
+  `;
+
+  el.innerHTML = `
+    ${head}
+    <div class="sim-card sim-question">
+      ${enun}
+      ${body}
+      ${actions}
+      <div class="muted small" style="margin-top:10px;">Dica: “Errei” mantém na fila (bump). “Acertei” remove.</div>
+    </div>
+  `;
+
+  this.renderHeaderState({ mode: "running" });
+},
+
+reviewQueueReveal() {
+  if (!this.STATE.review.active) return;
+  this.STATE.review.reveal = !this.STATE.review.reveal;
+  this.renderReviewQueueOne();
+},
+
+reviewQueueRemove() {
+  const it = this.getCurrentReviewItem();
+  if (!it) return;
+
+  this.reviewRemoveItem(it.id);
+  this.toast("Removido da fila.");
+
+  // re-sync snapshot e mantém idx válido
+  const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+  this.STATE.review.items = items;
+
+  if (this.STATE.review.idx >= items.length) this.STATE.review.idx = Math.max(0, items.length - 1);
+  this.STATE.review.reveal = false;
+
+  window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+  window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
+  this.renderReviewQueueOne();
+},
+
+reviewQueueRight() {
+  const it = this.getCurrentReviewItem();
+  if (!it) return;
+
+  // acertou => remove
+  this.reviewRemoveItem(it.id);
+  this.toast("✅ Boa. Removido da fila.");
+
+  const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+  this.STATE.review.items = items;
+  if (this.STATE.review.idx >= items.length) this.STATE.review.idx = Math.max(0, items.length - 1);
+  this.STATE.review.reveal = false;
+
+  window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+  window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
+  this.renderReviewQueueOne();
+},
+
+reviewQueueWrong() {
+  const it = this.getCurrentReviewItem();
+  if (!it) return;
+
+  // errou => bump (fica na fila, sobe ts)
+  const seen = Number(it.seenCount || 0) + 1;
+  this.reviewBumpItem(it.id, { lastOutcome: "wrong", seenCount: seen });
+
+  this.toast("↩️ Mantido na fila (vamos ver de novo).");
+
+  const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+  this.STATE.review.items = items;
+  this.STATE.review.reveal = false;
+
+  window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+  window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
+  // após bump, vai para o próximo (não fica preso no mesmo)
+  this.reviewQueueNext();
+},
+
+reviewQueueNext() {
+  if (!this.STATE.review.active) return;
+
+  const items = this.STATE.review.items || [];
+  if (!items.length) return this.renderReviewQueueOne();
+
+  if (this.STATE.review.idx < items.length - 1) this.STATE.review.idx += 1;
+  else this.STATE.review.idx = 0; // volta ao início
+
+  this.STATE.review.reveal = false;
+  this.renderReviewQueueOne();
+},
+
+reviewQueueExit() {
+  this.STATE.review.active = false;
+  this.STATE.review.items = [];
+  this.STATE.review.idx = 0;
+  this.STATE.review.reveal = false;
+
+  // volta para dashboard (mais útil)
+  window.router?.go?.("dashboard");
+},
 
 };
