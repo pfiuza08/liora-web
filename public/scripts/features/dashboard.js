@@ -1,6 +1,6 @@
 // =============================================================
 // 📊 LIORA — DASHBOARD (MVP local, de verdade)
-// Versão: v1.4 (Resumo sempre aparece + botões inteligentes)
+// Versão: v1.4 (Opção A: demo só no estado inicial; sem "Atualizar" no UI)
 //
 // HTML esperado em #screen-dashboard:
 // - #dash-kpis       (grid de KPIs)
@@ -36,7 +36,7 @@ export const dashboard = {
 
     this.ensureShell();
     this.bindOnce();
-    console.log("📊 dashboard.js iniciado (v1.4)");
+    console.log("📊 dashboard.js iniciado (v1.4 opA)");
   },
 
   showScreen() {
@@ -51,12 +51,10 @@ export const dashboard = {
     const screen = document.getElementById("screen-dashboard");
     if (!screen) return;
 
-    // cria um topo opcional para painéis extras
     if (!screen.querySelector("#dash-top")) {
       const top = document.createElement("div");
       top.id = "dash-top";
 
-      // coloca logo depois do header do dashboard, antes dos panels
       const head = screen.querySelector(".screen-head");
       if (head && head.nextSibling) {
         screen.insertBefore(top, head.nextSibling);
@@ -201,7 +199,7 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Render
+  // Render (preenche placeholders do HTML)
   // -----------------------------
   render() {
     this.ensureShell();
@@ -233,53 +231,51 @@ export const dashboard = {
       return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
     };
 
-    // topo (Resumo sempre aparece: com botões inteligentes)
-    if (elTop) {
-      const userLine = (() => {
-        if (!u) return `<span class="pill pill-base">visitante</span>`;
-        if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
-        return `<span class="pill pill-upload">free</span>`;
-      })();
+    const userLine = (() => {
+      if (!u) return `<span class="pill pill-base">visitante</span>`;
+      if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
+      return `<span class="pill pill-upload">free</span>`;
+    })();
 
-      const hasData = k.totalAttempts > 0;
+    // -----------------------------
+    // EMPTY (Opção A): mostra CTA + demo, sem parecer "botão perdido"
+    // -----------------------------
+    if (!k.totalAttempts) {
+      elEmpty.classList.remove("hidden");
+      elKpis.innerHTML = "";
+      elInsights.innerHTML = "";
+      elTables.innerHTML = "";
 
-      const resumoHtml = `
-        <div class="panel" style="margin-bottom:12px;">
-          <div class="card-title">Resumo</div>
-          <div class="muted">Dados locais · atualiza automaticamente</div>
-          <div style="margin-top:10px;">${userLine}</div>
+      if (elTop) {
+        elTop.innerHTML = `
+          <div class="panel" style="margin-bottom:12px;">
+            <div class="card-title">Resumo</div>
+            <div class="muted">Ainda não há dados de desempenho.</div>
+            <div style="margin-top:10px;">${userLine}</div>
 
-          <div class="actions-row" style="margin-top:12px; flex-wrap:wrap;">
-            <button
-              class="btn-secondary"
-              data-action="dashRefresh"
-              ${hasData ? "" : "disabled"}
-              title="${hasData ? "Recalcular o painel com os dados locais." : "Sem dados ainda. Faça um simulado para começar."}"
-            >
-              Atualizar
-            </button>
+            <div class="actions-row" style="margin-top:12px; flex-wrap:wrap;">
+              <button class="btn-primary" data-action="dashStartFirst">Fazer 1º simulado</button>
+              <button class="btn-secondary" data-action="dashDemo">Ver demonstração</button>
+              ${premium ? "" : `<button class="btn-secondary" data-action="dashUpgrade">Desbloquear Premium</button>`}
+            </div>
 
-            ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
-
-            <button
-              class="btn-secondary"
-              data-action="dashMock"
-              title="Cria dados de demonstração (útil para testar o dashboard)."
-            >
-              Gerar exemplo
-            </button>
-
-            <button
-              class="btn-primary"
-              data-action="dashGoSimulados"
-              title="Começar agora com seu primeiro simulado."
-            >
-              Fazer 1º simulado
-            </button>
+            <div class="muted small" style="margin-top:10px;">
+              Dica: “Ver demonstração” preenche dados fictícios para você avaliar o dashboard.
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      }
 
+      return;
+    }
+
+    // tem dados
+    elEmpty.classList.add("hidden");
+
+    // -----------------------------
+    // TOP (com dados): sem botões de dev
+    // -----------------------------
+    if (elTop) {
       const reviewHtml = `
         <div class="panel" style="margin-bottom:12px;">
           <div class="card-title">Revisões pendentes</div>
@@ -340,19 +336,17 @@ export const dashboard = {
         `;
       })();
 
-      elTop.innerHTML = `${resumoHtml}${reviewHtml}${lastHtml}`;
+      // (sem “Atualizar” e sem “Gerar exemplo”)
+      elTop.innerHTML = `
+        <div class="panel" style="margin-bottom:12px;">
+          <div class="card-title">Resumo</div>
+          <div class="muted">Dados locais · atualiza automaticamente</div>
+          <div style="margin-top:10px;">${userLine}</div>
+        </div>
+        ${reviewHtml}
+        ${lastHtml}
+      `;
     }
-
-    // empty state (sem dados)
-    if (!k.totalAttempts) {
-      elEmpty.classList.remove("hidden");
-      elKpis.innerHTML = "";
-      elInsights.innerHTML = "";
-      elTables.innerHTML = "";
-      return;
-    }
-
-    elEmpty.classList.add("hidden");
 
     // KPIs
     elKpis.innerHTML = `
@@ -424,7 +418,7 @@ export const dashboard = {
         </div>
       `;
 
-    // Tabelas
+    // Tables
     elTables.innerHTML = premium
       ? `
         <div class="dash-card">
@@ -476,7 +470,7 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Events (bind uma vez, sem duplicar listeners)
+  // Events (bind uma vez)
   // -----------------------------
   bindOnce() {
     if (this._bound) return;
@@ -497,36 +491,46 @@ export const dashboard = {
       if (!btn) return;
       const act = btn.getAttribute("data-action");
 
-      if (act === "dashRefresh") return this.render();
-      if (act === "dashUpgrade") return window.dispatchEvent(new Event("liora:premium-bloqueado"));
-
-      if (act === "dashGoSimulados") {
-        return this.nav("simulados");
+      if (act === "dashUpgrade") {
+        window.dispatchEvent(new Event("liora:premium-bloqueado"));
+        return;
       }
 
-      if (act === "dashMock") {
+      // Opção A: demo só no estado inicial
+      if (act === "dashDemo") {
         this.seedMock();
         window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "mock" } }));
-        return this.render();
+        this.render();
+        return;
+      }
+
+      if (act === "dashStartFirst") {
+        this.nav("simulados");
+        // pede start direto (simulados já escuta)
+        window.dispatchEvent(new Event("liora:start-simulado"));
+        return;
       }
 
       if (act === "dashOpenLastReview") {
         try { localStorage.setItem("liora_sim_open_review", "1"); } catch {}
-        return this.nav("simulados");
+        this.nav("simulados");
+        return;
       }
 
       if (act === "dashReviewNow") {
         try { localStorage.setItem("liora_review_start", "1"); } catch {}
-        return this.nav("simulados");
+        this.nav("simulados");
+        return;
       }
 
       if (act === "dashClearReview") {
         try { localStorage.setItem("liora_review_queue:v1", JSON.stringify({ items: [] })); } catch {}
         window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
-        return this.render();
+        this.render();
+        return;
       }
 
-      // botão do seu empty state no HTML: data-action="startSimulado"
+      // botão do seu empty state antigo no HTML: data-action="startSimulado"
       if (act === "startSimulado") {
         this.nav("simulados");
         window.dispatchEvent(new Event("liora:start-simulado"));
@@ -541,7 +545,7 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Mock
+  // Mock (demo)
   // -----------------------------
   seedMock() {
     const key = "liora_stats:v1";
@@ -562,7 +566,11 @@ export const dashboard = {
       meta: {}
     };
 
-    localStorage.setItem(key, JSON.stringify(sample));
+    try {
+      localStorage.setItem(key, JSON.stringify(sample));
+    } catch (e) {
+      console.warn("⚠️ seedMock falhou:", e);
+    }
   },
 
   escape(str) {
