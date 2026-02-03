@@ -166,12 +166,12 @@ export const simulados = {
 
     // Eventos canônicos
     window.addEventListener("liora:open-simulados", () => {
-      this.showScreen();
+      this.;
       // não inicia automaticamente
     });
 
     window.addEventListener("liora:start-simulado", () => {
-      this.showScreen();
+      this.;
       this.start();
     });
   },
@@ -180,39 +180,54 @@ export const simulados = {
   // SCREEN CONTROL
   // -----------------------------
   showScreen() {
-    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-    document.getElementById("screen-simulados")?.classList.add("active");
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  document.getElementById("screen-simulados")?.classList.add("active");
 
-    // se o dashboard pediu para abrir revisão do último resultado
-    try {
-      const flag = localStorage.getItem("liora_sim_open_review");
-      if (flag === "1") {
-        localStorage.removeItem("liora_sim_open_review");
+  try {
+    // (A) pedido do dashboard: abrir revisão do último resultado
+    const flag = localStorage.getItem("liora_sim_open_review");
+    if (flag === "1") {
+      localStorage.removeItem("liora_sim_open_review");
 
-        const last = JSON.parse(localStorage.getItem("liora_sim_last_result") || "null");
-        if (last && typeof last === "object") {
-          this.closeConfig?.();
-          this.renderResult(last);
+      const last = JSON.parse(localStorage.getItem("liora_sim_last_result") || "null");
+      if (last && typeof last === "object") {
+        this.closeConfig?.();
+        this.renderResult(last);
 
-          // abre a seção de revisão
-          setTimeout(() => {
-            const el = document.getElementById("sim-review");
-            if (el) el.classList.remove("hidden");
-          }, 50);
-        }
+        setTimeout(() => {
+          const el = document.getElementById("sim-review");
+          if (el) el.classList.remove("hidden");
+        }, 50);
       }
-
-      // ✅ REVIEW MODE (fila 1 por vez) vindo do dashboard
-      const start = localStorage.getItem("liora_review_start");
-      if (start === "1") {
-        localStorage.removeItem("liora_review_start");
-        this.startReviewQueue();
-        return;
-      }
-    } catch (e) {
-      console.warn("⚠️ showScreen falhou:", e);
     }
-  },
+
+    // (B) pedido do dashboard: iniciar revisão da fila (1 por vez)
+    const start = localStorage.getItem("liora_review_start");
+    if (start === "1") {
+      localStorage.removeItem("liora_review_start");
+      this.startReviewQueue();
+      return;
+    }
+  } catch (e) {
+    console.warn("⚠️ showScreen falhou:", e);
+  }
+
+  // (C) 🔥 sempre re-renderiza a UI correta ao entrar em Simulados
+  if (this.STATE.review?.active) {
+    this.renderReviewQueueOne();
+    return;
+  }
+
+  if (this.STATE.running) {
+    this.renderRunning();
+    this.renderQuestion();
+    this.renderButtonsState();
+    return;
+  }
+
+  // inclui caso _savedRun exista (renderIdle já mostra o card “Simulado em andamento”)
+  this.renderIdle();
+}
 
   // -----------------------------
   // MODAL CONFIG
@@ -1914,12 +1929,18 @@ export const simulados = {
     this.renderReviewQueueOne();
   },
 
-  reviewQueueExit() {
+    reviewQueueExit() {
     this.STATE.review.active = false;
     this.STATE.review.items = [];
     this.STATE.review.idx = 0;
     this.STATE.review.reveal = false;
-
+  
+    // ✅ importantíssimo: limpa a tela de revisão do DOM
+    // assim, quando você voltar em Simulados, aparece o “Simulado” normal
+    this.renderIdle();
+  
+    // volta para dashboard
     window.router?.go?.("dashboard");
   }
+
 };
