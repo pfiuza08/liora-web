@@ -1,6 +1,6 @@
 // =============================================================
 // 🔐 LIORA — Premium Modal (Upgrade)
-// Versão: v1.2 (user-changed + dashboard-refresh centralizados)
+// Versão: v1.3 (goPlans -> pricing + fallback robusto)
 // Abre com:
 // - liora:premium-bloqueado   (detail opcional)
 // - liora:login-required      (detail opcional)
@@ -13,8 +13,12 @@ export const premium = {
     this.ctx = ctx;
     this.ensureModal();
 
-    window.addEventListener("liora:premium-bloqueado", (ev) => this.open("premium", ev?.detail));
-    window.addEventListener("liora:login-required", (ev) => this.open("login", ev?.detail));
+    window.addEventListener("liora:premium-bloqueado", (ev) =>
+      this.open("premium", ev?.detail)
+    );
+    window.addEventListener("liora:login-required", (ev) =>
+      this.open("login", ev?.detail)
+    );
 
     document.addEventListener("click", (ev) => {
       const modal = document.getElementById("liora-premium");
@@ -33,9 +37,22 @@ export const premium = {
         return;
       }
 
+      // ✅ FIX: "Ver planos" agora navega para #pricing e força render
       if (act === "goPlans") {
         this.close();
-        window.dispatchEvent(new Event("liora:open-plans"));
+
+        // router padrão (v85)
+        try {
+          window.router?.go?.("pricing");
+        } catch {}
+
+        // fallback mínimo
+        if (!window.router?.go) {
+          location.hash = "#pricing";
+        }
+
+        // força o pricing a abrir/renderizar (caso seu módulo use o evento)
+        window.dispatchEvent(new Event("liora:open-pricing"));
         return;
       }
 
@@ -48,7 +65,7 @@ export const premium = {
       }
     });
 
-    console.log("🔐 premium.js iniciado");
+    console.log("🔐 premium.js iniciado (v1.3)");
   },
 
   isDevMode() {
@@ -139,7 +156,9 @@ export const premium = {
     if (kind === "login") {
       if (title) title.textContent = "Entrar para continuar";
       if (sub) sub.textContent = "Faça login para acessar este recurso.";
-      if (note) note.textContent = "Seu progresso fica salvo e sincronizado quando você estiver logada.";
+      if (note)
+        note.textContent =
+          "Seu progresso fica salvo e sincronizado quando você estiver logada.";
 
       if (loginBtn) loginBtn.classList.remove("hidden");
     } else {
