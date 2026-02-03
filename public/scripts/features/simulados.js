@@ -519,6 +519,14 @@ export const simulados = {
     return typeof r.escolha === "number";
   },
 
+    countAnswered() {
+    let n = 0;
+    for (let i = 0; i < (this.STATE.questoes?.length || 0); i++) {
+      if (this.isAnsweredIdx(i)) n++;
+    }
+    return n;
+  },
+  
   prev() {
     if (!this.STATE.running) return;
     if (this.STATE.atual > 0) {
@@ -940,28 +948,30 @@ restart() {
     this.renderFlagButton();
   },
 
-  renderButtonsState() {
-    const total = this.STATE.questoes.length;
-    const idx = this.STATE.atual;
+     renderButtonsState() {
+      const total = this.STATE.questoes.length;
+      const idx = this.STATE.atual;
+    
+      const answeredCurrent = this.isAnsweredIdx(idx);
+      const answeredAny = this.countAnswered();
+    
+      const btnPrev = document.getElementById("btn-prev");
+      const btnNext = document.getElementById("btn-next");
+      const btnFinish = document.getElementById("btn-finish");
+    
+      if (btnPrev) btnPrev.disabled = idx <= 0;
+      if (btnNext) btnNext.disabled = !answeredCurrent || idx >= total - 1;
+    
+      // finish: libera se respondeu pelo menos 1 de verdade (não só "flagged")
+      if (btnFinish) btnFinish.disabled = answeredAny === 0;
+    },
 
-    const answered = this.isAnsweredIdx(idx);
 
-    const btnPrev = document.getElementById("btn-prev");
-    const btnNext = document.getElementById("btn-next");
-    const btnFinish = document.getElementById("btn-finish");
-
-    if (btnPrev) btnPrev.disabled = idx <= 0;
-    if (btnNext) btnNext.disabled = !answered || idx >= total - 1;
-
-    // finish: libera se respondeu pelo menos 1
-    if (btnFinish) btnFinish.disabled = this.STATE.respostas.length === 0;
-  },
-
-  renderProgress() {
+   renderProgress() {
     const total = this.STATE.questoes.length || 1;
-    const answered = this.STATE.respostas.length;
+    const answered = this.countAnswered();
     const pct = Math.round((answered / total) * 100);
-
+  
     this.setText("sim-progress-text", `Respondidas: ${answered} / ${total}`);
     const fill = document.getElementById("sim-progress-bar");
     if (fill) fill.style.width = `${pct}%`;
