@@ -1,6 +1,6 @@
 // =============================================================
 // 📊 LIORA — DASHBOARD (MVP local, de verdade)
-// Versão: v1.3 (compatível com HTML estático do dashboard)
+// Versão: v1.4 (Resumo sempre aparece + botões inteligentes)
 //
 // HTML esperado em #screen-dashboard:
 // - #dash-kpis       (grid de KPIs)
@@ -36,7 +36,7 @@ export const dashboard = {
 
     this.ensureShell();
     this.bindOnce();
-    console.log("📊 dashboard.js iniciado (v1.3 compat HTML)");
+    console.log("📊 dashboard.js iniciado (v1.4)");
   },
 
   showScreen() {
@@ -201,7 +201,7 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Render (preenche placeholders do HTML)
+  // Render
   // -----------------------------
   render() {
     this.ensureShell();
@@ -224,18 +224,6 @@ export const dashboard = {
     const reviewCount = this.reviewGetQueue().length;
     const last = this.getLastResult();
 
-    // empty state
-    if (!k.totalAttempts) {
-      elEmpty.classList.remove("hidden");
-      elKpis.innerHTML = "";
-      elInsights.innerHTML = "";
-      elTables.innerHTML = "";
-      if (elTop) elTop.innerHTML = "";
-      return;
-    }
-
-    elEmpty.classList.add("hidden");
-
     // helpers
     const chipMode = (m) => (String(m) === "disc" ? "DISC" : "OBJ");
     const fmtTime = (sec) => {
@@ -245,7 +233,7 @@ export const dashboard = {
       return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
     };
 
-    // topo (Resumo + Revisões + Último resultado)
+    // topo (Resumo sempre aparece: com botões inteligentes)
     if (elTop) {
       const userLine = (() => {
         if (!u) return `<span class="pill pill-base">visitante</span>`;
@@ -253,16 +241,41 @@ export const dashboard = {
         return `<span class="pill pill-upload">free</span>`;
       })();
 
+      const hasData = k.totalAttempts > 0;
+
       const resumoHtml = `
         <div class="panel" style="margin-bottom:12px;">
           <div class="card-title">Resumo</div>
           <div class="muted">Dados locais · atualiza automaticamente</div>
           <div style="margin-top:10px;">${userLine}</div>
 
-          <div class="actions-row" style="margin-top:12px;">
-            <button class="btn-secondary" data-action="dashRefresh">Atualizar</button>
+          <div class="actions-row" style="margin-top:12px; flex-wrap:wrap;">
+            <button
+              class="btn-secondary"
+              data-action="dashRefresh"
+              ${hasData ? "" : "disabled"}
+              title="${hasData ? "Recalcular o painel com os dados locais." : "Sem dados ainda. Faça um simulado para começar."}"
+            >
+              Atualizar
+            </button>
+
             ${premium ? "" : `<button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>`}
-            <button class="btn-secondary" data-action="dashMock">Gerar exemplo</button>
+
+            <button
+              class="btn-secondary"
+              data-action="dashMock"
+              title="Cria dados de demonstração (útil para testar o dashboard)."
+            >
+              Gerar exemplo
+            </button>
+
+            <button
+              class="btn-primary"
+              data-action="dashGoSimulados"
+              title="Começar agora com seu primeiro simulado."
+            >
+              Fazer 1º simulado
+            </button>
           </div>
         </div>
       `;
@@ -330,7 +343,18 @@ export const dashboard = {
       elTop.innerHTML = `${resumoHtml}${reviewHtml}${lastHtml}`;
     }
 
-    // KPIs (preenche apenas o grid)
+    // empty state (sem dados)
+    if (!k.totalAttempts) {
+      elEmpty.classList.remove("hidden");
+      elKpis.innerHTML = "";
+      elInsights.innerHTML = "";
+      elTables.innerHTML = "";
+      return;
+    }
+
+    elEmpty.classList.add("hidden");
+
+    // KPIs
     elKpis.innerHTML = `
       <div class="dash-card good">
         <div class="dash-title">Acurácia geral</div>
@@ -370,7 +394,7 @@ export const dashboard = {
       }
     `;
 
-    // Insights (2 colunas dentro do container)
+    // Insights
     elInsights.innerHTML = premium
       ? `
         <div class="dash-card">
@@ -400,7 +424,7 @@ export const dashboard = {
         </div>
       `;
 
-    // Tabelas (2 colunas: bancaRank + last5)
+    // Tabelas
     elTables.innerHTML = premium
       ? `
         <div class="dash-card">
@@ -476,6 +500,10 @@ export const dashboard = {
       if (act === "dashRefresh") return this.render();
       if (act === "dashUpgrade") return window.dispatchEvent(new Event("liora:premium-bloqueado"));
 
+      if (act === "dashGoSimulados") {
+        return this.nav("simulados");
+      }
+
       if (act === "dashMock") {
         this.seedMock();
         window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "mock" } }));
@@ -501,7 +529,6 @@ export const dashboard = {
       // botão do seu empty state no HTML: data-action="startSimulado"
       if (act === "startSimulado") {
         this.nav("simulados");
-        // pede start direto (simulados já escuta)
         window.dispatchEvent(new Event("liora:start-simulado"));
         return;
       }
