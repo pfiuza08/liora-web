@@ -2321,4 +2321,27 @@ body.liora-modal-open{
   background: rgba(196,75,4,.14);
   color: rgba(196,75,4,.95);
 }
+/* ============================================
+   💳 PRICING — alinhamento dos botões (fix)
+   Evita o "Ver benefícios" escapar do card
+============================================ */
+#screen-pricing .actions-row{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+#screen-pricing .actions-row .btn-primary,
+#screen-pricing .actions-row .btn-secondary{
+  width: 100%;
+  min-width: 0;
+}
+
+/* Em telas menores, empilha */
+@media (max-width: 560px){
+  #screen-pricing .actions-row{
+    grid-template-columns: 1fr;
+  }
+}
 
