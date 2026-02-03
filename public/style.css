@@ -2344,4 +2344,92 @@ body.liora-modal-open{
     grid-template-columns: 1fr;
   }
 }
+/* ============================================
+   💳 PRICING — layout mais "produto" (sem emojis)
+============================================ */
+#screen-pricing .screen-head{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+#screen-pricing .screen-title{
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+#screen-pricing .screen-subtitle{
+  margin-top: 6px;
+  opacity: .86;
+}
+
+/* cards lado a lado com altura consistente */
+#screen-pricing .dash-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+@media (max-width: 720px){
+  #screen-pricing .dash-grid{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* card visual mais limpo */
+#screen-pricing .dash-card{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+/* destaca Premium com elegância */
+#screen-pricing .dash-card.good{
+  border-width: 2px !important;
+  box-shadow: 0 16px 50px rgba(0,0,0,.25);
+}
+
+/* lista com respiro melhor */
+#screen-pricing .dash-list .dash-row{
+  padding: 10px 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+#screen-pricing .dash-list .dash-row:first-child{
+  border-top: 0;
+}
+
+/* ✅ botões alinhados e sem "fuga" */
+#screen-pricing .actions-row{
+  margin-top: auto; /* empurra botões pro fim do card */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+#screen-pricing .actions-row .btn-primary,
+#screen-pricing .actions-row .btn-secondary{
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 560px){
+  #screen-pricing .actions-row{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* opcional: deixa o botão secundário mais "quieto" */
+#screen-pricing .actions-row .btn-secondary{
+  opacity: .92;
+}
+#screen-pricing .actions-row .btn-secondary:hover{
+  opacity: 1;
+}
 
