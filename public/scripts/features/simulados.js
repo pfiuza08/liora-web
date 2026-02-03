@@ -1,54 +1,57 @@
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.8-PRODUCT (OBJ + DISC + métricas locais + eventos canônicos)
+// Versão: v2.9-PRODUCT (OBJ + DISC + métricas + review queue + revisão 1x1)
 //
 // ✔ SCREEN como runtime
-// ✔ MODAL apenas para configuração (robusto por JS)
+// ✔ MODAL apenas para configuração
 // ✔ Idle mostra Continuar/Descartar quando existir run salvo
 // ✔ Próxima só habilita após responder (hint contextual)
 // ✔ Timer + progresso + resultado + revisão com explicação
 // ✔ Questões via API (/api/gerarSimulado) + fallback mock
-// ✔ Suporta:
-//    - OBJ: MCQ (4) + CE (2)
-//    - DISC: Discursivas (textarea) em modo separado
-// ✔ Salvamento em localStorage
-// ✔ ✅ MÉTRICAS: grava tentativas em liora_stats:v1 e dispara liora:stats-changed
+// ✔ OBJ: MCQ (4) + CE (2) | DISC: discursivas (textarea)
+// ✔ Salvamento (run/config) em localStorage
+// ✔ ✅ MÉTRICAS: grava tentativas em liora_stats:v1 + eventos canônicos
+// ✔ ✅ REVIEW QUEUE: erradas + marcadas (OBJ/CE) e marcadas (DISC)
+// ✔ ✅ REVIEW MODE: consome fila 1 por vez
 // =============================================================
 
 export const simulados = {
   ctx: null,
 
   STATE: {
-  running: false,
-  _savedRun: null,
-  _runConfig: null, // snapshot do config usado no run (blinda o mode)
-  config: {
-    banca: "FGV",
-    qtd: 5, // OBJ: total de questões | DISC: total de discursivas
-    dificuldade: "misturado",
-    tema: "",
-    tempo: 20, // minutos
-    mode: "obj" // "obj" | "disc"
-  },
-  questoes: [],
-  atual: 0,
-  respostas: [], // { idx, tipo, escolha?, texto?, correta?, ... }
-  timer: {
-    enabled: true,
-    totalSec: 0,
-    leftSec: 0,
-    tickId: null
-  },
+    running: false,
+    _savedRun: null,
+    _runConfig: null, // snapshot do config usado no run (blinda o mode)
+    _finishedOnce: false,
 
-  // ✅ revisão (fila 1 por vez)
-  review: {
-    active: false,
-    idx: 0,
-    reveal: false,
-    items: [] // snapshot da fila atual
-  }
-},
+    config: {
+      banca: "FGV",
+      qtd: 5, // OBJ: total de questões | DISC: total de discursivas
+      dificuldade: "misturado",
+      tema: "",
+      tempo: 20, // minutos
+      mode: "obj" // "obj" | "disc"
+    },
 
+    questoes: [],
+    atual: 0,
+    respostas: [], // { idx, tipo, escolha?, texto?, correta?, flagged?, ... }
+
+    timer: {
+      enabled: true,
+      totalSec: 0,
+      leftSec: 0,
+      tickId: null
+    },
+
+    // ✅ revisão (fila 1 por vez)
+    review: {
+      active: false,
+      idx: 0,
+      reveal: false,
+      items: [] // snapshot da fila atual
+    }
+  },
 
   // -----------------------------
   // INIT
@@ -62,7 +65,7 @@ export const simulados = {
     window.lioraSimDebug = () => {
       const s = this.STATE;
       console.log("🧪 LIORA Simulados Debug");
-      console.log("running:", s.running, "idx:", s.atual, "/", Math.max(0, s.questoes.length - 1));
+      console.log("running:", s.running, "idx:", s.atual, "/", Math.max(0, (s.questoes || []).length - 1));
       console.log("config:", s.config);
       console.log("runConfig:", s._runConfig);
       console.log("timer:", s.timer);
@@ -81,7 +84,7 @@ export const simulados = {
       return JSON.parse(JSON.stringify(s));
     };
 
-    console.log("📝 simulados.js v2.8 — iniciado");
+    console.log("📝 simulados.js v2.9 — iniciado");
   },
 
   // -----------------------------
@@ -127,14 +130,14 @@ export const simulados = {
         case "reviewToggle": return this.toggleReview();
         case "toggleFlag": return this.toggleFlag();
 
+        // ✅ review queue mode
         case "reviewQueueReveal": return this.reviewQueueReveal();
         case "reviewQueueRight": return this.reviewQueueRight();
         case "reviewQueueWrong": return this.reviewQueueWrong();
         case "reviewQueueRemove": return this.reviewQueueRemove();
         case "reviewQueueNext": return this.reviewQueueNext();
         case "reviewQueueExit": return this.reviewQueueExit();
-  
- 
+
         default:
           return;
       }
@@ -179,6 +182,7 @@ export const simulados = {
   showScreen() {
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-simulados")?.classList.add("active");
+
     // se o dashboard pediu para abrir revisão do último resultado
     try {
       const flag = localStorage.getItem("liora_sim_open_review");
@@ -187,9 +191,9 @@ export const simulados = {
 
         const last = JSON.parse(localStorage.getItem("liora_sim_last_result") || "null");
         if (last && typeof last === "object") {
-          // render direto o resultado + revisão
           this.closeConfig?.();
           this.renderResult(last);
+
           // abre a seção de revisão
           setTimeout(() => {
             const el = document.getElementById("sim-review");
@@ -197,15 +201,17 @@ export const simulados = {
           }, 50);
         }
       }
+
       // ✅ REVIEW MODE (fila 1 por vez) vindo do dashboard
-      try {
-        const start = localStorage.getItem("liora_review_start");
-        if (start === "1") {
-          localStorage.removeItem("liora_review_start");
-          this.startReviewQueue();
-          return;
-        }
-      } catch {}
+      const start = localStorage.getItem("liora_review_start");
+      if (start === "1") {
+        localStorage.removeItem("liora_review_start");
+        this.startReviewQueue();
+        return;
+      }
+    } catch (e) {
+      console.warn("⚠️ showScreen falhou:", e);
+    }
   },
 
   // -----------------------------
@@ -283,10 +289,9 @@ export const simulados = {
     const timerMode = this.getValue("sim-timer-mode") || "on";
     const mode = this.getModeFromUI();
 
-    const qtd =
-      mode === "disc"
-        ? this.clamp(qtdRaw, 1, 10)
-        : this.clamp(qtdRaw, 3, 30);
+    const qtd = mode === "disc"
+      ? this.clamp(qtdRaw, 1, 10)
+      : this.clamp(qtdRaw, 3, 30);
 
     this.STATE.config = {
       ...this.STATE.config,
@@ -314,6 +319,9 @@ export const simulados = {
 
     this.closeConfig();
 
+    // reset guard anti-duplo-finish
+    this.STATE._finishedOnce = false;
+
     // -----------------------------
     // 🔒 GATES: limite free / premium (sem import)
     // -----------------------------
@@ -338,7 +346,7 @@ export const simulados = {
     } catch (e) {
       console.warn("⚠️ Gates falhou (start simulado):", e);
     }
-    
+
     // snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
     runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
@@ -353,8 +361,6 @@ export const simulados = {
     this.STATE.atual = 0;
     this.STATE.respostas = [];
     this.STATE.questoes = [];
-    this.STATE._finishedOnce = false;
-
 
     // timer
     if (this.STATE.timer.enabled) {
@@ -390,6 +396,9 @@ export const simulados = {
   resumeSimulado() {
     this.closeConfig();
 
+    // reset guard anti-duplo-finish
+    this.STATE._finishedOnce = false;
+
     let run = this.STATE._savedRun;
     if (!run) {
       try {
@@ -408,7 +417,6 @@ export const simulados = {
     }
 
     this.STATE.running = true;
-    this.STATE._finishedOnce = false;
     this.STATE.config = run.config || this.STATE.config;
 
     // garante _runConfig pra não “mudar modo” no meio do run
@@ -433,28 +441,25 @@ export const simulados = {
     this.renderButtonsState();
   },
 
- discardRun() {
-  this.stopTimer();
-  this.clearRun();
-  this.STATE._savedRun = null;
+  discardRun() {
+    this.stopTimer();
+    this.clearRun();
+    this.STATE._savedRun = null;
 
-  this.STATE.running = false;
+    this.STATE.running = false;
+    this.STATE._finishedOnce = false;
 
-  // ✅ reset do guard anti-duplo-finish
-  this.STATE._finishedOnce = false;
+    this.STATE.questoes = [];
+    this.STATE.atual = 0;
+    this.STATE.respostas = [];
+    this.STATE.timer.totalSec = 0;
+    this.STATE.timer.leftSec = 0;
+    this.STATE._runConfig = null;
 
-  this.STATE.questoes = [];
-  this.STATE.atual = 0;
-  this.STATE.respostas = [];
-  this.STATE.timer.totalSec = 0;
-  this.STATE.timer.leftSec = 0;
-  this.STATE._runConfig = null;
-
-  this.closeConfig();
-  this.renderIdle();
-  this.toast("Simulado descartado.");
-},
-
+    this.closeConfig();
+    this.renderIdle();
+    this.toast("Simulado descartado.");
+  },
 
   // -----------------------------
   // ANSWERS
@@ -469,9 +474,9 @@ export const simulados = {
     if (tipo === "disc") return;
 
     const correta = index === q.corretaIndex;
-
     const existing = this.STATE.respostas.find((r) => r.idx === this.STATE.atual);
-        const payload = {
+
+    const payload = {
       idx: this.STATE.atual,
       tipo,
       escolha: index,
@@ -483,7 +488,6 @@ export const simulados = {
       explicacao: q.explicacao || ""
     };
 
-
     if (existing) Object.assign(existing, payload);
     else this.STATE.respostas.push(payload);
 
@@ -491,6 +495,7 @@ export const simulados = {
     this.renderProgress();
     this.renderButtonsState();
     this.updateHintForCurrent();
+    this.renderFlagButton();
   },
 
   saveDiscAnswer(texto) {
@@ -515,9 +520,6 @@ export const simulados = {
       criterios: Array.isArray(q.criterios) ? q.criterios : []
     };
 
-
-
-
     if (existing) Object.assign(existing, payload);
     else this.STATE.respostas.push(payload);
 
@@ -525,6 +527,7 @@ export const simulados = {
     this.renderProgress();
     this.renderButtonsState();
     this.updateHintForCurrent();
+    this.renderFlagButton();
   },
 
   isAnsweredIdx(idx) {
@@ -543,14 +546,14 @@ export const simulados = {
     return typeof r.escolha === "number";
   },
 
-    countAnswered() {
+  countAnswered() {
     let n = 0;
     for (let i = 0; i < (this.STATE.questoes?.length || 0); i++) {
       if (this.isAnsweredIdx(i)) n++;
     }
     return n;
   },
-  
+
   prev() {
     if (!this.STATE.running) return;
     if (this.STATE.atual > 0) {
@@ -583,22 +586,23 @@ export const simulados = {
   },
 
   finish() {
-  // ✅ evita gravar duas vezes (timer + clique, spam click etc.)
-  if (this.STATE._finishedOnce) return;
-  this.STATE._finishedOnce = true;
+    // ✅ evita gravar duas vezes (timer + clique, spam click etc.)
+    if (this.STATE._finishedOnce) return;
+    this.STATE._finishedOnce = true;
 
-  if (!this.STATE.running) return;
+    if (!this.STATE.running) return;
 
-  // UX: desabilita botão Finalizar imediatamente
-  const btnFinish = document.getElementById("btn-finish");
-  if (btnFinish) btnFinish.disabled = true;
+    // UX: desabilita botão Finalizar imediatamente
+    const btnFinish = document.getElementById("btn-finish");
+    if (btnFinish) btnFinish.disabled = true;
 
-  this.STATE.running = false;
-  this.stopTimer();
+    this.STATE.running = false;
+    this.stopTimer();
 
-  const res = this.computeResult();
-  this.persistResult(res);
-      // ✅ REVIEW QUEUE: empilha erradas + marcadas (OBJ/CE) e marcadas (DISC)
+    const res = this.computeResult();
+    this.persistResult(res);
+
+    // ✅ REVIEW QUEUE: empilha erradas + marcadas (OBJ/CE) e marcadas (DISC)
     try {
       const cfg = this.STATE._runConfig || this.STATE.config || {};
       const banca = String(cfg.banca || "—");
@@ -608,10 +612,14 @@ export const simulados = {
       for (const d of (res?.detalhes || [])) {
         const tipo = String(d.tipo || "mcq");
 
-        // decide se entra na fila
-        const flagged = !!this.STATE.respostas.find((x) => x.idx === d.idx)?.flagged;
-        const wrong = tipo !== "disc" ? !d.correta : false;
+        const resp = this.STATE.respostas.find((x) => x.idx === d.idx);
+        const flagged = !!resp?.flagged;
 
+        const wrong = (tipo !== "disc") ? !d.correta : false;
+
+        // regra:
+        // - OBJ/CE: entra se errada OU marcada
+        // - DISC: entra se marcada
         const shouldQueue =
           (tipo === "disc" && flagged) ||
           (tipo !== "disc" && (wrong || flagged));
@@ -632,7 +640,7 @@ export const simulados = {
           explicacao: String(d.explicacao || ""),
           respostaModelo: String(d.respostaModelo || ""),
           criterios: Array.isArray(d.criterios) ? d.criterios : [],
-          flagged: true, // entrou por wrong ou flagged
+          flagged: true,
           source: "simulado"
         });
       }
@@ -643,99 +651,94 @@ export const simulados = {
       console.warn("⚠️ Falha ao salvar review queue:", e);
     }
 
-  // ✅ MÉTRICAS (somente se houver questões pontuadas)
-  const cfg = this.STATE._runConfig || this.STATE.config;
+    // ✅ MÉTRICAS (somente se houver questões pontuadas)
+    const cfg = this.STATE._runConfig || this.STATE.config;
 
-  const timeSpentSec =
-    this.STATE.timer.enabled && this.STATE.timer.totalSec
-      ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
-      : 0;
+    const timeSpentSec =
+      this.STATE.timer.enabled && this.STATE.timer.totalSec
+        ? Math.max(0, (this.STATE.timer.totalSec || 0) - (this.STATE.timer.leftSec || 0))
+        : 0;
 
-  const todayISO = (d = new Date()) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
+    const todayISO = (d = new Date()) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
 
-  const attempt = {
-    ts: Date.now(),
-    date: todayISO(),
-    banca: cfg?.banca || "—",
-    tema: (cfg?.tema || "").trim() || "Geral",
-    dificuldade: cfg?.dificuldade || "misturado",
-    mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
-    total: Number(res?.totalScored || 0),
-    correct: Number(res?.acertos || 0),
-    timeSec: Number(timeSpentSec || 0)
-  };
+    const attempt = {
+      ts: Date.now(),
+      date: todayISO(),
+      banca: cfg?.banca || "—",
+      tema: (cfg?.tema || "").trim() || "Geral",
+      dificuldade: cfg?.dificuldade || "misturado",
+      mode: String(cfg?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj",
+      total: Number(res?.totalScored || 0),
+      correct: Number(res?.acertos || 0),
+      timeSec: Number(timeSpentSec || 0)
+    };
 
-  if (attempt.total > 0) {
-    this.statsRecordAttempt(attempt);
-    window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "attempt", attempt } }));
-    window.dispatchEvent(new Event("liora:dashboard-refresh"));
-  } else {
-    console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva pura). Não registra métricas.");
-  }
+    if (attempt.total > 0) {
+      this.statsRecordAttempt(attempt);
+      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "attempt", attempt } }));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    } else {
+      console.log("ℹ️ Tentativa sem questões pontuadas (provável discursiva pura). Não registra métricas.");
+    }
 
-  window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
+    window.dispatchEvent(new CustomEvent("liora:simulado-finish", { detail: res }));
 
-  this.closeConfig();
-  this.renderResult(res);
-},
+    this.closeConfig();
+    this.renderResult(res);
+  },
 
-cancel() {
-  this.closeConfig();
+  cancel() {
+    this.closeConfig();
 
-  if (!this.STATE.running) {
+    if (!this.STATE.running) {
+      this.renderIdle();
+      return;
+    }
+
+    this.STATE.running = false;
+    this.stopTimer();
+    this.clearRun();
+
+    this.STATE._finishedOnce = false;
+    this.STATE._runConfig = null;
+
+    // limpa runtime
+    this.STATE.questoes = [];
+    this.STATE.atual = 0;
+    this.STATE.respostas = [];
+    this.STATE.timer.totalSec = 0;
+    this.STATE.timer.leftSec = 0;
+
+    window.dispatchEvent(new Event("liora:simulado-cancel"));
+
     this.renderIdle();
-    return;
-  }
+    this.toast("Simulado cancelado.");
+  },
 
-  this.STATE.running = false;
-  this.stopTimer();
-  this.clearRun();
+  restart() {
+    this.closeConfig();
+    this.clearRun();
+    this.STATE.running = false;
+    this.stopTimer();
 
-  // ✅ reset do guard anti-duplo-finish
-  this.STATE._finishedOnce = false;
+    this.STATE._finishedOnce = false;
+    this.STATE._runConfig = null;
 
-  this.STATE._runConfig = null;
+    // limpa runtime
+    this.STATE.questoes = [];
+    this.STATE.atual = 0;
+    this.STATE.respostas = [];
+    this.STATE.timer.totalSec = 0;
+    this.STATE.timer.leftSec = 0;
 
-  // (opcional, mas bom) limpa runtime para não ficar lixo em memória
-  this.STATE.questoes = [];
-  this.STATE.atual = 0;
-  this.STATE.respostas = [];
-  this.STATE.timer.totalSec = 0;
-  this.STATE.timer.leftSec = 0;
-
-  window.dispatchEvent(new Event("liora:simulado-cancel"));
-
-  this.renderIdle();
-  this.toast("Simulado cancelado.");
-},
-
-restart() {
-  this.closeConfig();
-  this.clearRun();
-  this.STATE.running = false;
-  this.stopTimer();
-
-  // ✅ reset do guard anti-duplo-finish
-  this.STATE._finishedOnce = false;
-
-  this.STATE._runConfig = null;
-
-  // (opcional) limpa runtime
-  this.STATE.questoes = [];
-  this.STATE.atual = 0;
-  this.STATE.respostas = [];
-  this.STATE.timer.totalSec = 0;
-  this.STATE.timer.leftSec = 0;
-
-  window.dispatchEvent(new Event("liora:simulado-restart"));
-
-  this.renderIdle();
-},
+    window.dispatchEvent(new Event("liora:simulado-restart"));
+    this.renderIdle();
+  },
 
   // -----------------------------
   // TIMER
@@ -859,7 +862,7 @@ restart() {
         <div class="sim-card sim-question">
           <div class="sim-q-head">
             <div class="sim-q-label" id="sim-q-label"></div>
-          
+
             <div style="display:flex; gap:10px; align-items:center;">
               <button class="btn-link small" data-action="toggleFlag" id="btn-flag">Marcar</button>
               <button class="btn-link small" data-action="cancelSimulado">Cancelar</button>
@@ -972,30 +975,29 @@ restart() {
     this.renderFlagButton();
   },
 
-     renderButtonsState() {
-      const total = this.STATE.questoes.length;
-      const idx = this.STATE.atual;
-    
-      const answeredCurrent = this.isAnsweredIdx(idx);
-      const answeredAny = this.countAnswered();
-    
-      const btnPrev = document.getElementById("btn-prev");
-      const btnNext = document.getElementById("btn-next");
-      const btnFinish = document.getElementById("btn-finish");
-    
-      if (btnPrev) btnPrev.disabled = idx <= 0;
-      if (btnNext) btnNext.disabled = !answeredCurrent || idx >= total - 1;
-    
-      // finish: libera se respondeu pelo menos 1 de verdade (não só "flagged")
-      if (btnFinish) btnFinish.disabled = answeredAny === 0;
-    },
+  renderButtonsState() {
+    const total = this.STATE.questoes.length;
+    const idx = this.STATE.atual;
 
+    const answeredCurrent = this.isAnsweredIdx(idx);
+    const answeredAny = this.countAnswered();
 
-   renderProgress() {
+    const btnPrev = document.getElementById("btn-prev");
+    const btnNext = document.getElementById("btn-next");
+    const btnFinish = document.getElementById("btn-finish");
+
+    if (btnPrev) btnPrev.disabled = idx <= 0;
+    if (btnNext) btnNext.disabled = !answeredCurrent || idx >= total - 1;
+
+    // finish: libera se respondeu pelo menos 1 de verdade (não só "flagged")
+    if (btnFinish) btnFinish.disabled = answeredAny === 0;
+  },
+
+  renderProgress() {
     const total = this.STATE.questoes.length || 1;
     const answered = this.countAnswered();
     const pct = Math.round((answered / total) * 100);
-  
+
     this.setText("sim-progress-text", `Respondidas: ${answered} / ${total}`);
     const fill = document.getElementById("sim-progress-bar");
     if (fill) fill.style.width = `${pct}%`;
@@ -1055,7 +1057,7 @@ restart() {
     const list = document.getElementById("sim-review-list");
     if (!list) return;
 
-    const rows = result.detalhes.map((r, i) => {
+    const rows = (result.detalhes || []).map((r, i) => {
       const tipo = r.tipo || ((r.alternativas?.length || 0) === 2 ? "ce" : "mcq");
 
       // DISC
@@ -1145,9 +1147,8 @@ restart() {
     const idx = this.STATE.atual;
     const existing = this.STATE.respostas.find((r) => r.idx === idx);
 
-    // se ainda não respondeu, cria um placeholder flagged
+    // se ainda não respondeu, cria placeholder flagged
     const payload = existing || { idx, tipo: this.STATE.questoes[idx]?.tipo || "mcq" };
-
     payload.flagged = !payload.flagged;
 
     if (!existing) this.STATE.respostas.push(payload);
@@ -1169,7 +1170,6 @@ restart() {
     btn.style.opacity = flagged ? "1" : "0.75";
   },
 
-  
   renderHeaderState({ mode }) {
     const badge = document.getElementById("sim-mode");
     if (!badge) return;
@@ -1220,7 +1220,6 @@ restart() {
   // -----------------------------
   async fetchQuestoesAPI(config) {
     const mode = String(config?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
-
     console.log("🛰️ fetchQuestoesAPI mode =", mode);
 
     const payload =
@@ -1398,7 +1397,9 @@ restart() {
           enunciado: q.enunciado,
           texto: String(r?.texto || ""),
           respostaModelo: q.respostaModelo || r?.respostaModelo || "",
-          criterios: Array.isArray(q.criterios) ? q.criterios : (Array.isArray(r?.criterios) ? r.criterios : [])
+          criterios: Array.isArray(q.criterios)
+            ? q.criterios
+            : (Array.isArray(r?.criterios) ? r.criterios : [])
         });
         continue;
       }
@@ -1525,6 +1526,17 @@ restart() {
       console.warn("⚠️ Falha ao salvar stats:", e);
     }
   },
+
+  statsRecordAttempt(attempt) {
+    const data = this.statsGet();
+    data.attempts.push(attempt);
+
+    // guarda só as últimas 800
+    if (data.attempts.length > 800) data.attempts = data.attempts.slice(-800);
+
+    this.statsSet(data);
+  },
+
   // -----------------------------
   // ✅ REVIEW QUEUE (erradas + marcadas)
   // localStorage: liora_review_queue:v1
@@ -1540,7 +1552,7 @@ restart() {
       return { items: [] };
     }
   },
-  
+
   reviewSetQueue(next) {
     const key = "liora_review_queue:v1";
     try {
@@ -1549,7 +1561,7 @@ restart() {
       console.warn("⚠️ Falha ao salvar review queue:", e);
     }
   },
-  
+
   reviewHash(str) {
     // hash simples (estável) só para dedup
     const s = String(str || "");
@@ -1560,53 +1572,53 @@ restart() {
     }
     return String(h);
   },
-  
+
   reviewUpsertItem(item) {
     const q = this.reviewGetQueue();
     const items = q.items || [];
-  
+
     const id = String(item.id || "");
     if (!id) return;
-  
+
     const idx = items.findIndex((x) => String(x.id) === id);
-  
+
     if (idx >= 0) {
       items[idx] = { ...items[idx], ...item, ts: Date.now() };
     } else {
       items.push({ ...item, ts: Date.now() });
     }
-  
+
     // limita para não crescer infinito
     const MAX = 200;
     const sorted = items
       .sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))
       .slice(0, MAX);
-  
+
     this.reviewSetQueue({ items: sorted });
   },
-  
+
   reviewRemoveItem(id) {
     const q = this.reviewGetQueue();
     const items = (q.items || []).filter((x) => String(x.id) !== String(id));
     this.reviewSetQueue({ items });
   },
-  
+
   reviewBumpItem(id, patch = {}) {
     const q = this.reviewGetQueue();
     const items = q.items || [];
     const idx = items.findIndex((x) => String(x.id) === String(id));
     if (idx < 0) return;
-  
+
     items[idx] = { ...items[idx], ...patch, ts: Date.now() };
-  
+
     const MAX = 200;
     const sorted = items
       .sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))
       .slice(0, MAX);
-  
+
     this.reviewSetQueue({ items: sorted });
   },
-  
+
   // -----------------------------
   // HELPERS
   // -----------------------------
@@ -1664,6 +1676,7 @@ restart() {
     } catch {}
     console.log("🔔", msg);
   },
+
   // -----------------------------
   // GATES (global)
   // -----------------------------
@@ -1674,244 +1687,239 @@ restart() {
       return null;
     }
   },
-// -----------------------------
-// ✅ REVIEW MODE (1 item por vez)
-// -----------------------------
-startReviewQueue() {
-  this.stopTimer();
-  this.closeConfig?.();
 
-  const q = this.reviewGetQueue();
-  const items = (q.items || []).slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+  // -----------------------------
+  // ✅ REVIEW MODE (1 item por vez)
+  // -----------------------------
+  startReviewQueue() {
+    this.stopTimer();
+    this.closeConfig?.();
 
-  this.STATE.review.active = true;
-  this.STATE.review.idx = 0;
-  this.STATE.review.reveal = false;
-  this.STATE.review.items = items;
+    const q = this.reviewGetQueue();
+    const items = (q.items || []).slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
 
-  this.renderReviewQueueOne();
-},
+    this.STATE.review.active = true;
+    this.STATE.review.idx = 0;
+    this.STATE.review.reveal = false;
+    this.STATE.review.items = items;
 
-getCurrentReviewItem() {
-  if (!this.STATE.review.active) return null;
-  const items = this.STATE.review.items || [];
-  const idx = this.STATE.review.idx || 0;
-  return items[idx] || null;
-},
+    this.renderReviewQueueOne();
+  },
 
-renderReviewQueueOne() {
-  const el = document.getElementById("sim-body");
-  if (!el) return;
+  getCurrentReviewItem() {
+    if (!this.STATE.review.active) return null;
+    const items = this.STATE.review.items || [];
+    const idx = this.STATE.review.idx || 0;
+    return items[idx] || null;
+  },
 
-  const items = this.STATE.review.items || [];
-  const idx = this.STATE.review.idx || 0;
+  renderReviewQueueOne() {
+    const el = document.getElementById("sim-body");
+    if (!el) return;
 
-  if (!items.length) {
-    el.innerHTML = `
-      <div class="card">
-        <div class="card-title">Revisão</div>
-        <div class="muted">Fila vazia ✅</div>
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-secondary" data-action="reviewQueueExit">Voltar</button>
-          <button class="btn-primary" data-action="startSimulado">Fazer simulado</button>
-        </div>
-      </div>
-    `;
-    this.renderHeaderState({ mode: "idle" });
-    return;
-  }
+    const items = this.STATE.review.items || [];
+    const idx = this.STATE.review.idx || 0;
 
-  const it = items[idx];
-  const tipo = String(it.tipo || "mcq");
-  const reveal = !!this.STATE.review.reveal;
-
-  const head = `
-    <div class="sim-topbar">
-      <div class="sim-progress">
-        <div class="muted" id="sim-progress-text">Revisão: ${idx + 1} de ${items.length}</div>
-        <div class="sim-bar">
-          <div class="sim-bar-fill" style="width:${Math.round(((idx + 1) / items.length) * 100)}%"></div>
-        </div>
-      </div>
-      <div class="sim-timer-pill"><span>REVISÃO</span></div>
-    </div>
-  `;
-
-  const enun = `<div class="sim-enunciado" style="margin-top:10px;">${this.escape(it.enunciado)}</div>`;
-
-  const body = (() => {
-    if (tipo === "disc") {
-      const modelo = String(it.respostaModelo || "").trim();
-      const criterios = Array.isArray(it.criterios) ? it.criterios : [];
-      return `
-        <div class="card" style="padding:12px; margin-top:10px;">
-          <div class="muted small">Discursiva (autoavaliação)</div>
-
-          <div class="${reveal ? "" : "hidden"}" id="rev-answer" style="margin-top:10px;">
-            ${modelo ? `
-              <div class="muted small"><b>Resposta modelo</b></div>
-              <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
-            ` : `<div class="muted">Sem modelo salvo.</div>`}
-
-            ${criterios.length ? `
-              <div style="margin-top:10px;" class="muted small"><b>Critérios</b></div>
-              <ul style="margin:6px 0 0 18px;">
-                ${criterios.slice(0, 12).map((c) => `<li>${this.escape(c)}</li>`).join("")}
-              </ul>
-            ` : ""}
+    if (!items.length) {
+      el.innerHTML = `
+        <div class="card">
+          <div class="card-title">Revisão</div>
+          <div class="muted">Fila vazia ✅</div>
+          <div class="actions-row" style="margin-top:12px;">
+            <button class="btn-secondary" data-action="reviewQueueExit">Voltar</button>
+            <button class="btn-primary" data-action="startSimulado">Fazer simulado</button>
           </div>
         </div>
       `;
+      this.renderHeaderState({ mode: "idle" });
+      return;
     }
 
-    const alts = Array.isArray(it.alternativas) ? it.alternativas : [];
-    const isCE = tipo === "ce" || alts.length === 2;
-    const letter = (n) => (isCE ? (n === 0 ? "C" : "E") : String.fromCharCode(65 + n));
-    const textChoice = (n) => {
-      if (n == null) return "—";
-      if (isCE) return n === 0 ? "Certo" : "Errado";
-      return this.escape(alts[n] ?? "");
-    };
+    const it = items[idx];
+    const tipo = String(it.tipo || "mcq");
+    const reveal = !!this.STATE.review.reveal;
 
-    const gabarito = reveal
-      ? `
-        <div class="card" style="padding:12px; margin-top:10px;" id="rev-answer">
-          <div class="muted small"><b>Gabarito</b></div>
-          <div style="margin-top:6px;">
-            Correta: <b>${letter(it.corretaIndex)}.</b> ${textChoice(it.corretaIndex)}
+    const head = `
+      <div class="sim-topbar">
+        <div class="sim-progress">
+          <div class="muted" id="sim-progress-text">Revisão: ${idx + 1} de ${items.length}</div>
+          <div class="sim-bar">
+            <div class="sim-bar-fill" style="width:${Math.round(((idx + 1) / items.length) * 100)}%"></div>
           </div>
-          ${it.explicacao ? `<div class="muted" style="margin-top:8px;"><b>Explicação:</b> ${this.escape(it.explicacao)}</div>` : ""}
         </div>
-      `
-      : "";
-
-    return `
-      <div class="card" style="padding:12px; margin-top:10px;">
-        <div class="muted small">Objetiva</div>
-        ${alts.length ? `
-          <div style="margin-top:8px;">
-            ${alts.map((a, i) => `<div class="muted small" style="margin-top:6px;"><b>${letter(i)}.</b> ${this.escape(a)}</div>`).join("")}
-          </div>
-        ` : ""}
+        <div class="sim-timer-pill"><span>REVISÃO</span></div>
       </div>
-      ${gabarito}
     `;
-  })();
 
-  const actions = `
-    <div class="sim-actions" style="margin-top:12px;">
-      <button class="btn-secondary" data-action="reviewQueueExit">Sair</button>
+    const enun = `<div class="sim-enunciado" style="margin-top:10px;">${this.escape(it.enunciado)}</div>`;
 
-      <div class="spacer"></div>
+    const body = (() => {
+      if (tipo === "disc") {
+        const modelo = String(it.respostaModelo || "").trim();
+        const criterios = Array.isArray(it.criterios) ? it.criterios : [];
+        return `
+          <div class="card" style="padding:12px; margin-top:10px;">
+            <div class="muted small">Discursiva (autoavaliação)</div>
 
-      <button class="btn-secondary" data-action="reviewQueueReveal">${reveal ? "Ocultar gabarito" : "Mostrar gabarito"}</button>
-      <button class="btn-secondary" data-action="reviewQueueRemove">Remover</button>
-      <button class="btn-primary" data-action="reviewQueueRight">Acertei</button>
-      <button class="btn-primary" data-action="reviewQueueWrong">Errei</button>
-      <button class="btn-secondary" data-action="reviewQueueNext">Próximo</button>
-    </div>
-  `;
+            <div class="${reveal ? "" : "hidden"}" id="rev-answer" style="margin-top:10px;">
+              ${modelo ? `
+                <div class="muted small"><b>Resposta modelo</b></div>
+                <div class="muted" style="white-space:pre-wrap; margin-top:4px;">${this.escape(modelo)}</div>
+              ` : `<div class="muted">Sem modelo salvo.</div>`}
 
-  el.innerHTML = `
-    ${head}
-    <div class="sim-card sim-question">
-      ${enun}
-      ${body}
-      ${actions}
-      <div class="muted small" style="margin-top:10px;">Dica: “Errei” mantém na fila (bump). “Acertei” remove.</div>
-    </div>
-  `;
+              ${criterios.length ? `
+                <div style="margin-top:10px;" class="muted small"><b>Critérios</b></div>
+                <ul style="margin:6px 0 0 18px;">
+                  ${criterios.slice(0, 12).map((c) => `<li>${this.escape(c)}</li>`).join("")}
+                </ul>
+              ` : ""}
+            </div>
+          </div>
+        `;
+      }
 
-  this.renderHeaderState({ mode: "running" });
-},
+      const alts = Array.isArray(it.alternativas) ? it.alternativas : [];
+      const isCE = tipo === "ce" || alts.length === 2;
+      const letter = (n) => (isCE ? (n === 0 ? "C" : "E") : String.fromCharCode(65 + n));
+      const textChoice = (n) => {
+        if (n == null) return "—";
+        if (isCE) return n === 0 ? "Certo" : "Errado";
+        return this.escape(alts[n] ?? "");
+      };
 
-reviewQueueReveal() {
-  if (!this.STATE.review.active) return;
-  this.STATE.review.reveal = !this.STATE.review.reveal;
-  this.renderReviewQueueOne();
-},
+      const gabarito = reveal
+        ? `
+          <div class="card" style="padding:12px; margin-top:10px;" id="rev-answer">
+            <div class="muted small"><b>Gabarito</b></div>
+            <div style="margin-top:6px;">
+              Correta: <b>${letter(it.corretaIndex)}.</b> ${textChoice(it.corretaIndex)}
+            </div>
+            ${it.explicacao ? `<div class="muted" style="margin-top:8px;"><b>Explicação:</b> ${this.escape(it.explicacao)}</div>` : ""}
+          </div>
+        `
+        : "";
 
-reviewQueueRemove() {
-  const it = this.getCurrentReviewItem();
-  if (!it) return;
+      return `
+        <div class="card" style="padding:12px; margin-top:10px;">
+          <div class="muted small">Objetiva</div>
+          ${alts.length ? `
+            <div style="margin-top:8px;">
+              ${alts.map((a, i) => `<div class="muted small" style="margin-top:6px;"><b>${letter(i)}.</b> ${this.escape(a)}</div>`).join("")}
+            </div>
+          ` : ""}
+        </div>
+        ${gabarito}
+      `;
+    })();
 
-  this.reviewRemoveItem(it.id);
-  this.toast("Removido da fila.");
+    const actions = `
+      <div class="sim-actions" style="margin-top:12px;">
+        <button class="btn-secondary" data-action="reviewQueueExit">Sair</button>
 
-  // re-sync snapshot e mantém idx válido
-  const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
-  this.STATE.review.items = items;
+        <div class="spacer"></div>
 
-  if (this.STATE.review.idx >= items.length) this.STATE.review.idx = Math.max(0, items.length - 1);
-  this.STATE.review.reveal = false;
+        <button class="btn-secondary" data-action="reviewQueueReveal">${reveal ? "Ocultar gabarito" : "Mostrar gabarito"}</button>
+        <button class="btn-secondary" data-action="reviewQueueRemove">Remover</button>
+        <button class="btn-primary" data-action="reviewQueueRight">Acertei</button>
+        <button class="btn-primary" data-action="reviewQueueWrong">Errei</button>
+        <button class="btn-secondary" data-action="reviewQueueNext">Próximo</button>
+      </div>
+    `;
 
-  window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
-  window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    el.innerHTML = `
+      ${head}
+      <div class="sim-card sim-question">
+        ${enun}
+        ${body}
+        ${actions}
+        <div class="muted small" style="margin-top:10px;">Dica: “Errei” mantém na fila (bump). “Acertei” remove.</div>
+      </div>
+    `;
 
-  this.renderReviewQueueOne();
-},
+    this.renderHeaderState({ mode: "running" });
+  },
 
-reviewQueueRight() {
-  const it = this.getCurrentReviewItem();
-  if (!it) return;
+  reviewQueueReveal() {
+    if (!this.STATE.review.active) return;
+    this.STATE.review.reveal = !this.STATE.review.reveal;
+    this.renderReviewQueueOne();
+  },
 
-  // acertou => remove
-  this.reviewRemoveItem(it.id);
-  this.toast("✅ Boa. Removido da fila.");
+  reviewQueueRemove() {
+    const it = this.getCurrentReviewItem();
+    if (!it) return;
 
-  const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
-  this.STATE.review.items = items;
-  if (this.STATE.review.idx >= items.length) this.STATE.review.idx = Math.max(0, items.length - 1);
-  this.STATE.review.reveal = false;
+    this.reviewRemoveItem(it.id);
+    this.toast("Removido da fila.");
 
-  window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
-  window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+    this.STATE.review.items = items;
 
-  this.renderReviewQueueOne();
-},
+    if (this.STATE.review.idx >= items.length) this.STATE.review.idx = Math.max(0, items.length - 1);
+    this.STATE.review.reveal = false;
 
-reviewQueueWrong() {
-  const it = this.getCurrentReviewItem();
-  if (!it) return;
+    window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
-  // errou => bump (fica na fila, sobe ts)
-  const seen = Number(it.seenCount || 0) + 1;
-  this.reviewBumpItem(it.id, { lastOutcome: "wrong", seenCount: seen });
+    this.renderReviewQueueOne();
+  },
 
-  this.toast("↩️ Mantido na fila (vamos ver de novo).");
+  reviewQueueRight() {
+    const it = this.getCurrentReviewItem();
+    if (!it) return;
 
-  const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
-  this.STATE.review.items = items;
-  this.STATE.review.reveal = false;
+    this.reviewRemoveItem(it.id);
+    this.toast("✅ Boa. Removido da fila.");
 
-  window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
-  window.dispatchEvent(new Event("liora:dashboard-refresh"));
+    const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+    this.STATE.review.items = items;
+    if (this.STATE.review.idx >= items.length) this.STATE.review.idx = Math.max(0, items.length - 1);
+    this.STATE.review.reveal = false;
 
-  // após bump, vai para o próximo (não fica preso no mesmo)
-  this.reviewQueueNext();
-},
+    window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
-reviewQueueNext() {
-  if (!this.STATE.review.active) return;
+    this.renderReviewQueueOne();
+  },
 
-  const items = this.STATE.review.items || [];
-  if (!items.length) return this.renderReviewQueueOne();
+  reviewQueueWrong() {
+    const it = this.getCurrentReviewItem();
+    if (!it) return;
 
-  if (this.STATE.review.idx < items.length - 1) this.STATE.review.idx += 1;
-  else this.STATE.review.idx = 0; // volta ao início
+    const seen = Number(it.seenCount || 0) + 1;
+    this.reviewBumpItem(it.id, { lastOutcome: "wrong", seenCount: seen });
 
-  this.STATE.review.reveal = false;
-  this.renderReviewQueueOne();
-},
+    this.toast("↩️ Mantido na fila (vamos ver de novo).");
 
-reviewQueueExit() {
-  this.STATE.review.active = false;
-  this.STATE.review.items = [];
-  this.STATE.review.idx = 0;
-  this.STATE.review.reveal = false;
+    const items = this.reviewGetQueue().items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+    this.STATE.review.items = items;
+    this.STATE.review.reveal = false;
 
-  // volta para dashboard (mais útil)
-  window.router?.go?.("dashboard");
-},
+    window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
+    this.reviewQueueNext();
+  },
+
+  reviewQueueNext() {
+    if (!this.STATE.review.active) return;
+
+    const items = this.STATE.review.items || [];
+    if (!items.length) return this.renderReviewQueueOne();
+
+    if (this.STATE.review.idx < items.length - 1) this.STATE.review.idx += 1;
+    else this.STATE.review.idx = 0;
+
+    this.STATE.review.reveal = false;
+    this.renderReviewQueueOne();
+  },
+
+  reviewQueueExit() {
+    this.STATE.review.active = false;
+    this.STATE.review.items = [];
+    this.STATE.review.idx = 0;
+    this.STATE.review.reveal = false;
+
+    window.router?.go?.("dashboard");
+  }
 };
