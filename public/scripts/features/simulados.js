@@ -164,16 +164,16 @@ export const simulados = {
       this.saveDiscAnswer(ta.value);
     });
 
-    // Eventos canônicos
     window.addEventListener("liora:open-simulados", () => {
-      this.;
+      this.showScreen();
       // não inicia automaticamente
     });
-
+    
     window.addEventListener("liora:start-simulado", () => {
-      this.;
+      this.showScreen();
       this.start();
     });
+
   },
 
   // -----------------------------
@@ -227,7 +227,7 @@ export const simulados = {
 
   // inclui caso _savedRun exista (renderIdle já mostra o card “Simulado em andamento”)
   this.renderIdle();
-}
+},
 
   // -----------------------------
   // MODAL CONFIG
