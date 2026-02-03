@@ -41,37 +41,37 @@
     <main class="main">
 
       <!-- HOME -->
-     <section id="screen-home" class="screen active">
-      <div class="hero">
-        <h2>Como deseja estudar hoje?</h2>
-    
-        <div class="grid-2">
-          <button class="card-btn" data-nav="tema">
-            <div class="card-title">Tema</div>
-            <div class="card-desc">Gere plano e sessões por assunto</div>
-            <span class="pill pill-base">Base</span>
-          </button>
-    
-          <button class="card-btn" data-nav="pdf">
-            <div class="card-title">PDF</div>
-            <div class="card-desc">Gere plano com base no conteúdo do PDF</div>
-            <span class="pill pill-upload">Upload</span>
-          </button>
-    
-          <button class="card-btn" data-nav="simulados">
-            <div class="card-title">Simulados</div>
-            <div class="card-desc">Questões por banca e dificuldade</div>
-            <span class="pill pill-ia">IA</span>
-          </button>
-    
-          <button class="card-btn" data-nav="dashboard">
-            <div class="card-title">Meu desempenho</div>
-            <div class="card-desc">Acompanhe sua evolução</div>
-            <span class="pill pill-mvp">MVP</span>
-          </button>
+      <section id="screen-home" class="screen active">
+        <div class="hero">
+          <h2>Como deseja estudar hoje?</h2>
+
+          <div class="grid-2">
+            <button class="card-btn" data-nav="tema">
+              <div class="card-title">Tema</div>
+              <div class="card-desc">Gere plano e sessões por assunto</div>
+              <span class="pill pill-base">Base</span>
+            </button>
+
+            <button class="card-btn" data-nav="pdf">
+              <div class="card-title">PDF</div>
+              <div class="card-desc">Gere plano com base no conteúdo do PDF</div>
+              <span class="pill pill-upload">Upload</span>
+            </button>
+
+            <button class="card-btn" data-nav="simulados">
+              <div class="card-title">Simulados</div>
+              <div class="card-desc">Questões por banca e dificuldade</div>
+              <span class="pill pill-ia">IA</span>
+            </button>
+
+            <button class="card-btn" data-nav="dashboard">
+              <div class="card-title">Meu desempenho</div>
+              <div class="card-desc">Acompanhe sua evolução</div>
+              <span class="pill pill-mvp">MVP</span>
+            </button>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
       <!-- TEMA -->
       <section id="screen-tema" class="screen">
@@ -83,22 +83,21 @@
         <div class="panel">
           <label class="label">Tema</label>
           <input id="inp-tema" class="input" placeholder="Ex.: IA Generativa, Direito Constitucional..." />
-        
+
           <label class="label">Nível</label>
           <select id="sel-nivel" class="input">
             <option value="iniciante">Iniciante</option>
             <option value="intermediario">Intermediário</option>
             <option value="avancado">Avançado</option>
           </select>
-        
-          <!-- ✅ Botões padronizados -->
+
           <div class="btn-row">
             <button id="btn-gerar-tema" class="btn-primary">Gerar plano</button>
             <button id="btn-limpar-plano" class="btn-secondary">Limpar plano</button>
           </div>
-        
+
           <div id="tema-status" class="muted small"></div>
-        
+
           <div id="tema-progress" class="progress-wrap hidden">
             <div class="progress-top">
               <span class="muted small">Progresso</span>
@@ -122,18 +121,17 @@
         </div>
       </section>
 
-     
       <!-- PDF -->
       <section id="screen-pdf" class="screen">
         <div class="screen-head">
           <button class="btn-link" data-nav="home">← Voltar</button>
           <h3>Plano por PDF</h3>
         </div>
-      
+
         <div class="panel">
           <label class="label">Arquivo PDF</label>
           <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
-      
+
           <div class="grid-2">
             <div>
               <label class="label">Nível</label>
@@ -143,7 +141,7 @@
                 <option value="avancado">Avançado</option>
               </select>
             </div>
-      
+
             <div>
               <label class="label">Finalidade</label>
               <select id="sel-finalidade-pdf" class="input">
@@ -156,27 +154,14 @@
               </select>
             </div>
           </div>
-      
-          <!-- ✅ Botões padronizados (PDF) -->
+
           <div class="btn-row">
             <button id="btn-gerar-pdf" class="btn-primary">Gerar plano</button>
             <button id="btn-limpar-pdf" class="btn-secondary">Limpar plano</button>
           </div>
-          
-          <div id="pdf-status" class="muted small"></div>
-          
-          <div id="pdf-progress" class="progress-wrap hidden">
-            <div class="progress-top">
-              <span class="muted small">Progresso</span>
-              <span id="pdf-progress-pct" class="muted small">0%</span>
-            </div>
-            <div class="progress-bar">
-              <div id="pdf-progress-fill" class="progress-fill" style="width:0%"></div>
-            </div>
-          </div>
- 
-     
+
           <div id="pdf-status" class="muted small" style="margin-top:10px;"></div>
+
           <div id="pdf-progress" class="progress-wrap hidden">
             <div class="progress-top">
               <span class="muted small">Progresso</span>
@@ -186,18 +171,15 @@
               <div id="pdf-progress-fill" class="progress-fill" style="width:0%"></div>
             </div>
           </div>
-          
         </div>
-      
+
         <div id="pdf-result" class="two-cols hidden">
           <aside class="aside">
             <div class="aside-title">Sessões</div>
             <div id="pdf-lista-sessoes" class="list"></div>
           </aside>
-      
+
           <section class="content">
-      
-            <!-- ✅ Viewer embutido: abre quando clicar nas fontes -->
             <div id="pdf-viewer-wrap" class="pdf-viewer-wrap hidden">
               <div class="pdf-viewer-head">
                 <div class="pdf-viewer-title">📄 PDF</div>
@@ -205,40 +187,37 @@
                   <button id="btn-pdf-close" class="btn-secondary">Fechar PDF</button>
                 </div>
               </div>
-      
+
               <iframe id="pdf-iframe" class="pdf-iframe" src="" loading="lazy"></iframe>
             </div>
-      
-            <!-- Sessão renderizada -->
+
             <div id="pdf-sessao-view" class="sessao"></div>
-      
           </section>
         </div>
       </section>
 
-     <!-- SIMULADOS -->
+      <!-- SIMULADOS -->
       <section id="screen-simulados" class="screen">
         <div class="screen-head">
           <button class="btn-link" data-nav="home">← Voltar</button>
           <h3>Simulados</h3>
           <span class="badge" id="sim-mode">Pronto</span>
         </div>
-      
+
         <div class="panel">
-          <!-- ✅ O simulados.js renderiza tudo aqui -->
           <div id="sim-body"></div>
         </div>
-      
+
         <!-- MODAL CONFIG -->
         <div class="modal" id="sim-config" aria-hidden="true">
           <div class="modal-backdrop" data-action="closeConfig"></div>
-      
+
           <div class="modal-card">
             <div class="modal-head">
-             <div class="modal-title">Configurar simulado</div>
+              <div class="modal-title">Configurar simulado</div>
               <button class="btn-secondary" data-action="closeConfig" aria-label="Fechar">Fechar</button>
             </div>
-      
+
             <div class="modal-body">
               <div class="grid-2">
                 <label class="field">
@@ -252,12 +231,12 @@
                     <option value="AOCP">AOCP</option>
                   </select>
                 </label>
-      
+
                 <label class="field">
                   <span class="label">Quantidade</span>
                   <input id="sim-qtd" class="input" type="number" min="3" max="30" value="5" />
                 </label>
-      
+
                 <label class="field">
                   <span class="label">Dificuldade</span>
                   <select id="sim-dificuldade" class="input">
@@ -267,27 +246,27 @@
                     <option value="dificil">Difícil</option>
                   </select>
                 </label>
-      
+
                 <label class="field">
                   <span class="label">Tempo (min)</span>
                   <input id="sim-tempo" class="input" type="number" min="5" max="180" value="20" />
                 </label>
               </div>
 
-               <label class="field">
+              <label class="field">
                 <span class="label">Tipo de simulado</span>
                 <select id="sim-kind" class="input">
                   <option value="obj">Objetivas (MCQ + C/E)</option>
                   <option value="disc">Discursivas</option>
                 </select>
               </label>
-            
+
               <label class="field">
                 <span class="label">Tema (opcional)</span>
                 <input id="sim-tema" class="input" type="text" placeholder="Ex.: LGPD, SQL, Redes..." />
               </label>
-      
-               <label class="field">
+
+              <label class="field">
                 <span class="label">Timer</span>
                 <select id="sim-timer-mode" class="input">
                   <option value="on">Ligado</option>
@@ -295,7 +274,7 @@
                 </select>
               </label>
             </div>
-      
+
             <div class="modal-foot">
               <button class="btn-secondary" data-action="closeConfig">Cancelar</button>
               <button class="btn-primary" data-action="saveConfig">Salvar</button>
@@ -304,171 +283,159 @@
         </div>
       </section>
 
-
       <!-- DASHBOARD -->
       <section id="screen-dashboard" class="screen">
-      <div class="screen-head">
-        <button class="btn-link" data-nav="home">← Voltar</button>
-        <h3>Meu desempenho</h3>
-      </div>
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Meu desempenho</h3>
+        </div>
 
-        <!-- =========================================================
-     💳 LIORA — PRICING (tela de planos)
-     Requer: router.js com "pricing" nas screens
-     Requer: features/pricing.js para bindar ações
-========================================================= -->
-<section id="screen-pricing" class="screen">
-  <div class="screen-head">
-    <div>
-      <h2 class="screen-title">Planos</h2>
-      <p class="screen-subtitle">Escolha o nível de poder da sua Liora ⚡</p>
-    </div>
+        <!-- RESUMO (FREE) -->
+        <div class="panel">
+          <div class="dash-grid" id="dash-kpis"></div>
+        </div>
 
-    <div class="screen-head-actions">
-      <button class="btn-secondary" data-nav="home">Voltar</button>
-    </div>
-  </div>
-
-  <div class="panel">
-    <div class="card-title">Comparação rápida</div>
-    <div class="muted">Você pode usar como visitante. Premium libera insights e detalhes do dashboard.</div>
-
-    <div class="dash-grid" style="margin-top:12px;">
-      <!-- FREE -->
-      <div class="dash-card">
-        <div class="dash-title">Free</div>
-        <div class="dash-value">R$ 0</div>
-        <div class="dash-sub">para testar e estudar no básico</div>
-
-        <div class="dash-list" style="margin-top:10px;">
-          <div class="dash-row">
-            <div>
-              <div class="dash-row-title">Dashboard básico</div>
-              <div class="dash-row-sub">acurácia geral e total de simulados</div>
-            </div>
-            <div class="dash-row-metric">✅</div>
+        <!-- INSIGHTS -->
+        <div class="panel">
+          <div class="panel-head">
+            <h4>Insights</h4>
+            <div class="muted">Análises e recomendações</div>
           </div>
 
-          <div class="dash-row">
-            <div>
-              <div class="dash-row-title">Insights avançados</div>
-              <div class="dash-row-sub">melhor banca, recomendações</div>
-            </div>
-            <div class="dash-row-metric">🔒</div>
+          <div class="dash-grid dash-grid-2" id="dash-insights"></div>
+        </div>
+
+        <!-- DETALHES -->
+        <div class="panel">
+          <div class="panel-head">
+            <h4>Detalhes</h4>
+            <div class="muted">Onde você mais ganha pontos</div>
           </div>
 
-          <div class="dash-row">
-            <div>
-              <div class="dash-row-title">Detalhes por banca + histórico</div>
-              <div class="dash-row-sub">rank e últimos simulados</div>
-            </div>
-            <div class="dash-row-metric">🔒</div>
+          <div class="dash-grid dash-grid-2" id="dash-tables"></div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div class="panel hidden" id="dash-empty">
+          <div class="muted">
+            Ainda não há dados suficientes.<br />
+            Faça seu primeiro simulado para começar a medir seu progresso ✅
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn-primary" data-action="startSimulado">Fazer simulado agora</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PRICING (Planos) ✅ AGORA NO NÍVEL CERTO -->
+      <section id="screen-pricing" class="screen">
+        <div class="screen-head">
+          <div>
+            <h2 class="screen-title">Planos</h2>
+            <p class="screen-subtitle">Escolha o nível de poder da sua Liora ⚡</p>
+          </div>
+
+          <div class="screen-head-actions">
+            <button class="btn-secondary" data-nav="home">Voltar</button>
           </div>
         </div>
 
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-secondary" data-action="pricingChoose" data-plan="free">
-            Continuar no Free
-          </button>
-        </div>
-      </div>
+        <div class="panel">
+          <div class="card-title">Comparação rápida</div>
+          <div class="muted">Você pode usar como visitante. Premium libera insights e detalhes do dashboard.</div>
 
-      <!-- PREMIUM -->
-      <div class="dash-card good" style="border-width:2px;">
-        <div class="dash-title">Premium</div>
-        <div class="dash-value">R$ 19,90</div>
-        <div class="dash-sub">mês · desbloqueia o “modo turbo” 🚀</div>
+          <div class="dash-grid" style="margin-top:12px;">
+            <!-- FREE -->
+            <div class="dash-card">
+              <div class="dash-title">Free</div>
+              <div class="dash-value">R$ 0</div>
+              <div class="dash-sub">para testar e estudar no básico</div>
 
-        <div class="dash-list" style="margin-top:10px;">
-          <div class="dash-row">
-            <div>
-              <div class="dash-row-title">Insights avançados</div>
-              <div class="dash-row-sub">melhor banca + próximo passo sugerido</div>
+              <div class="dash-list" style="margin-top:10px;">
+                <div class="dash-row">
+                  <div>
+                    <div class="dash-row-title">Dashboard básico</div>
+                    <div class="dash-row-sub">acurácia geral e total de simulados</div>
+                  </div>
+                  <div class="dash-row-metric">✅</div>
+                </div>
+
+                <div class="dash-row">
+                  <div>
+                    <div class="dash-row-title">Insights avançados</div>
+                    <div class="dash-row-sub">melhor banca, recomendações</div>
+                  </div>
+                  <div class="dash-row-metric">🔒</div>
+                </div>
+
+                <div class="dash-row">
+                  <div>
+                    <div class="dash-row-title">Detalhes por banca + histórico</div>
+                    <div class="dash-row-sub">rank e últimos simulados</div>
+                  </div>
+                  <div class="dash-row-metric">🔒</div>
+                </div>
+              </div>
+
+              <div class="actions-row" style="margin-top:12px;">
+                <button class="btn-secondary" data-action="pricingChoose" data-plan="free">
+                  Continuar no Free
+                </button>
+              </div>
             </div>
-            <div class="dash-row-metric">✅</div>
-          </div>
 
-          <div class="dash-row">
-            <div>
-              <div class="dash-row-title">Detalhes por banca</div>
-              <div class="dash-row-sub">rank por acurácia e volume</div>
+            <!-- PREMIUM -->
+            <div class="dash-card good" style="border-width:2px;">
+              <div class="dash-title">Premium</div>
+              <div class="dash-value">R$ 19,90</div>
+              <div class="dash-sub">mês · desbloqueia o “modo turbo” 🚀</div>
+
+              <div class="dash-list" style="margin-top:10px;">
+                <div class="dash-row">
+                  <div>
+                    <div class="dash-row-title">Insights avançados</div>
+                    <div class="dash-row-sub">melhor banca + próximo passo sugerido</div>
+                  </div>
+                  <div class="dash-row-metric">✅</div>
+                </div>
+
+                <div class="dash-row">
+                  <div>
+                    <div class="dash-row-title">Detalhes por banca</div>
+                    <div class="dash-row-sub">rank por acurácia e volume</div>
+                  </div>
+                  <div class="dash-row-metric">✅</div>
+                </div>
+
+                <div class="dash-row">
+                  <div>
+                    <div class="dash-row-title">Histórico recente</div>
+                    <div class="dash-row-sub">últimos simulados com tempo</div>
+                  </div>
+                  <div class="dash-row-metric">✅</div>
+                </div>
+              </div>
+
+              <div class="actions-row" style="margin-top:12px;">
+                <button class="btn-primary" data-action="pricingChoose" data-plan="premium">
+                  Ativar Premium
+                </button>
+                <button class="btn-secondary" data-action="pricingLearnMore">
+                  Ver benefícios
+                </button>
+              </div>
             </div>
-            <div class="dash-row-metric">✅</div>
-          </div>
-
-          <div class="dash-row">
-            <div>
-              <div class="dash-row-title">Histórico recente</div>
-              <div class="dash-row-sub">últimos simulados com tempo</div>
-            </div>
-            <div class="dash-row-metric">✅</div>
           </div>
         </div>
 
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-primary" data-action="pricingChoose" data-plan="premium">
-            Ativar Premium
-          </button>
-          <button class="btn-secondary" data-action="pricingLearnMore">
-            Ver benefícios
-          </button>
+        <div class="panel" style="margin-top:12px;">
+          <div class="card-title">Nota</div>
+          <div class="muted">
+            Nesta fase, “ativar premium” pode ser um toggle/localStorage para simular o produto.
+            Depois você pluga Hotmart/Stripe/Pagar.me sem reescrever a UI.
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel" style="margin-top:12px;">
-    <div class="card-title">Nota</div>
-    <div class="muted">
-      Nesta fase, “ativar premium” pode ser um toggle/localStorage para simular o produto.
-      Depois você pluga Hotmart/Stripe/Pagar.me sem reescrever a UI.
-    </div>
-  </div>
-</section>
-       
-      <!-- RESUMO (FREE) -->
-      <div class="panel">
-        <div class="dash-grid" id="dash-kpis">
-          <!-- preenchido via JS -->
-        </div>
-      </div>
-    
-      <!-- INSIGHTS (parte PREMIUM com bloqueio no MVP) -->
-      <div class="panel">
-        <div class="panel-head">
-          <h4>Insights</h4>
-          <div class="muted">Análises e recomendações</div>
-        </div>
-    
-        <div class="dash-grid dash-grid-2" id="dash-insights">
-          <!-- preenchido via JS -->
-        </div>
-      </div>
-    
-      <!-- DETALHES (tabelas) -->
-      <div class="panel">
-        <div class="panel-head">
-          <h4>Detalhes</h4>
-          <div class="muted">Onde você mais ganha pontos</div>
-        </div>
-    
-        <div class="dash-grid dash-grid-2" id="dash-tables">
-          <!-- preenchido via JS -->
-        </div>
-      </div>
-    
-      <!-- EMPTY STATE -->
-      <div class="panel hidden" id="dash-empty">
-        <div class="muted">
-          Ainda não há dados suficientes.<br />
-          Faça seu primeiro simulado para começar a medir seu progresso ✅
-        </div>
-        <div style="margin-top:12px">
-          <button class="btn-primary" data-action="startSimulado">Fazer simulado agora</button>
-        </div>
-      </div>
-    </section>
-
+      </section>
 
     </main>
 
