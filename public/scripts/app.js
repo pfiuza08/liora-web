@@ -1,6 +1,6 @@
 // =============================================================
 // 🧠 LIORA — APP (Boot + Theme + Gates + Features)
-// Versão: v85-FREEMIUM-MVP (router.js único + pricing)
+// Versão: v85.1-FREEMIUM-MVP (router.js único + pricing + eventos por rota)
 // -------------------------------------------------------------
 // ✔ Router por hash via ./router.js (telas: home, tema, pdf, simulados, dashboard, pricing)
 // ✔ Nav por [data-nav] e marca ativo (is-active) via router.js
@@ -10,6 +10,7 @@
 // ✔ Boot com imports dinâmicos (não quebra se faltar módulo)
 // ✔ Integra Premium Modal (premium.js)
 // ✔ Carrega pricing (pricing.js)
+// ✔ Dispara eventos liora:open-* ao trocar rota (inclui pricing)
 // =============================================================
 
 /* -----------------------------
@@ -184,6 +185,50 @@ async function loadFeature(path, exportName) {
 }
 
 /* -----------------------------
+   ROUTE -> EVENTOS CANÔNICOS
+----------------------------- */
+function wireRouteEvents(router) {
+  const emitFor = (routeRaw) => {
+    const route = String(routeRaw || "").trim().toLowerCase();
+
+    if (route === "simulados") return window.dispatchEvent(new Event("liora:open-simulados"));
+
+    if (route === "dashboard") {
+      window.dispatchEvent(new Event("liora:open-dashboard"));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+      return;
+    }
+
+    if (route === "pricing") return window.dispatchEvent(new Event("liora:open-pricing"));
+    if (route === "tema") return window.dispatchEvent(new Event("liora:open-tema"));
+    if (route === "pdf") return window.dispatchEvent(new Event("liora:open-pdf"));
+    if (route === "home") return window.dispatchEvent(new Event("liora:open-home"));
+
+    // (se você tiver login como rota no futuro)
+    if (route === "login") return window.dispatchEvent(new Event("liora:open-login"));
+  };
+
+  // evento do router.js (v3) ou equivalente
+  window.addEventListener("liora:route-changed", (ev) => {
+    emitFor(ev?.detail?.route);
+  });
+
+  // também cobre casos onde alguém muda o hash direto
+  window.addEventListener("hashchange", () => {
+    try {
+      const r = router?.getInitialRoute?.() || (location.hash || "#home").replace("#", "");
+      emitFor(r);
+    } catch {}
+  });
+
+  // primeira emissão (rota atual)
+  try {
+    const r0 = router?.getInitialRoute?.() || (location.hash || "#home").replace("#", "");
+    emitFor(r0);
+  } catch {}
+}
+
+/* -----------------------------
    BOOT
 ----------------------------- */
 (async function boot() {
@@ -214,15 +259,23 @@ async function loadFeature(path, exportName) {
     routerMod.init();
     window.router = routerMod; // para features chamarem window.router.go(...)
     ctx.router = routerMod;
+
+    // liga eventos por rota (inclui pricing)
+    wireRouteEvents(routerMod);
   } else {
     console.warn("⚠️ router.js não carregou. Verifique o caminho ./router.js");
     // fallback mínimo: não quebra tudo
     window.router = {
       go(r) {
         location.hash = `#${String(r || "home")}`;
+        window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route: r } }));
+      },
+      getInitialRoute() {
+        return (location.hash || "#home").replace("#", "");
       }
     };
     ctx.router = window.router;
+    wireRouteEvents(window.router);
   }
 
   // -----------------------------
