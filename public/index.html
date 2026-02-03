@@ -182,7 +182,7 @@
           <section class="content">
             <div id="pdf-viewer-wrap" class="pdf-viewer-wrap hidden">
               <div class="pdf-viewer-head">
-                <div class="pdf-viewer-title">📄 PDF</div>
+                <div class="pdf-viewer-title">PDF</div>
                 <div class="pdf-viewer-actions">
                   <button id="btn-pdf-close" class="btn-secondary">Fechar PDF</button>
                 </div>
@@ -319,7 +319,7 @@
         <div class="panel hidden" id="dash-empty">
           <div class="muted">
             Ainda não há dados suficientes.<br />
-            Faça seu primeiro simulado para começar a medir seu progresso ✅
+            Faça seu primeiro simulado para começar a medir seu progresso.
           </div>
           <div style="margin-top:12px">
             <button class="btn-primary" data-action="startSimulado">Fazer simulado agora</button>
@@ -327,7 +327,7 @@
         </div>
       </section>
 
-      <!-- PRICING (Planos) ✅ AGORA NO NÍVEL CERTO -->
+      <!-- PRICING (Planos) -->
       <section id="screen-pricing" class="screen">
         <div class="screen-head">
           <div>
@@ -341,97 +341,82 @@
         </div>
 
         <div class="panel">
-          <div class="card-title">Comparação rápida</div>
-          <div class="muted">Você pode usar como visitante. Premium libera insights e detalhes do dashboard.</div>
+          <div class="card-title">Planos Premium</div>
+          <div class="muted">O plano gratuito continua disponível. Premium libera insights e detalhes avançados.</div>
 
-          <div class="dash-grid" style="margin-top:12px;">
-            <!-- FREE -->
-            <div class="dash-card">
-              <div class="dash-title">Free</div>
-              <div class="dash-value">R$ 0</div>
-              <div class="dash-sub">para testar e estudar no básico</div>
-
-              <div class="dash-list" style="margin-top:10px;">
-                <div class="dash-row">
-                  <div>
-                    <div class="dash-row-title">Dashboard básico</div>
-                    <div class="dash-row-sub">acurácia geral e total de simulados</div>
-                  </div>
-                  <div class="dash-row-metric">✅</div>
-                </div>
-
-                <div class="dash-row">
-                  <div>
-                    <div class="dash-row-title">Insights avançados</div>
-                    <div class="dash-row-sub">melhor banca, recomendações</div>
-                  </div>
-                  <div class="dash-row-metric">🔒</div>
-                </div>
-
-                <div class="dash-row">
-                  <div>
-                    <div class="dash-row-title">Detalhes por banca + histórico</div>
-                    <div class="dash-row-sub">rank e últimos simulados</div>
-                  </div>
-                  <div class="dash-row-metric">🔒</div>
-                </div>
+          <div class="pricing-grid" style="margin-top:12px;">
+            <!-- Mensal -->
+            <div class="pricing-card">
+              <div class="pricing-top">
+                <div class="pricing-title">Mensal</div>
+                <div class="pricing-price">R$ 19,90</div>
+                <div class="pricing-sub">por mês</div>
               </div>
 
-              <div class="actions-row" style="margin-top:12px;">
-                <button class="btn-secondary" data-action="pricingChoose" data-plan="free">
-                  Continuar no Free
-                </button>
+              <div class="pricing-list">
+                <div class="pricing-item">Insights avançados no dashboard</div>
+                <div class="pricing-item">Detalhes por banca (rank e métricas)</div>
+                <div class="pricing-item">Histórico recente com tempo</div>
+              </div>
+
+              <div class="pricing-actions">
+                <button class="btn-primary" data-action="pricingChoose" data-plan="monthly">Assinar mensal</button>
+                <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
               </div>
             </div>
 
-            <!-- PREMIUM -->
-            <div class="dash-card good" style="border-width:2px;">
-              <div class="dash-title">Premium</div>
-              <div class="dash-value">R$ 19,90</div>
-              <div class="dash-sub">mensal</div>
-              
-              <div class="dash-list" style="margin-top:10px;">
-                <div class="dash-row">
-                  <div>
-                    <div class="dash-row-title">Insights avançados</div>
-                    <div class="dash-row-sub">melhor banca + próximo passo sugerido</div>
-                  </div>
-                  <div class="dash-row-metric">✅</div>
-                </div>
+            <!-- Trimestral -->
+            <div class="pricing-card pricing-featured">
+              <div class="pricing-badge">Recomendado</div>
 
-                <div class="dash-row">
-                  <div>
-                    <div class="dash-row-title">Detalhes por banca</div>
-                    <div class="dash-row-sub">rank por acurácia e volume</div>
-                  </div>
-                  <div class="dash-row-metric">✅</div>
-                </div>
-
-                <div class="dash-row">
-                  <div>
-                    <div class="dash-row-title">Histórico recente</div>
-                    <div class="dash-row-sub">últimos simulados com tempo</div>
-                  </div>
-                  <div class="dash-row-metric">✅</div>
-                </div>
+              <div class="pricing-top">
+                <div class="pricing-title">Trimestral</div>
+                <div class="pricing-price">R$ 49,90</div>
+                <div class="pricing-sub">a cada 3 meses</div>
               </div>
 
-              <div class="actions-row" style="margin-top:12px;">
-                <button class="btn-primary" data-action="pricingChoose" data-plan="premium">
-                  Ativar Premium
-                </button>
-                <button class="btn-secondary" data-action="pricingLearnMore">
-                  Ver benefícios
-                </button>
+              <div class="pricing-list">
+                <div class="pricing-item">Melhor custo-benefício</div>
+                <div class="pricing-item">Acesso Premium completo</div>
+                <div class="pricing-item">Prioridade nas novidades</div>
+              </div>
+
+              <div class="pricing-actions">
+                <button class="btn-primary" data-action="pricingChoose" data-plan="quarterly">Assinar trimestral</button>
+                <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
               </div>
             </div>
+
+            <!-- Vitalício -->
+            <div class="pricing-card">
+              <div class="pricing-top">
+                <div class="pricing-title">Vitalício</div>
+                <div class="pricing-price">R$ 149,00</div>
+                <div class="pricing-sub">pagamento único</div>
+              </div>
+
+              <div class="pricing-list">
+                <div class="pricing-item">Premium para sempre</div>
+                <div class="pricing-item">Sem renovação</div>
+                <div class="pricing-item">Ideal para maratonas de estudo</div>
+              </div>
+
+              <div class="pricing-actions">
+                <button class="btn-primary" data-action="pricingChoose" data-plan="lifetime">Quero vitalício</button>
+                <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions-row" style="margin-top:12px;">
+            <button class="btn-secondary" data-action="pricingChoose" data-plan="free">Continuar no Free</button>
           </div>
         </div>
 
         <div class="panel" style="margin-top:12px;">
           <div class="card-title">Nota</div>
           <div class="muted">
-            Nesta fase, “ativar premium” pode ser um toggle/localStorage para simular o produto.
+            Nesta fase, “assinar” pode ser um toggle/localStorage para simular o produto.
             Depois você pluga Hotmart/Stripe/Pagar.me sem reescrever a UI.
           </div>
         </div>
@@ -450,7 +435,7 @@
     <!-- ERROR -->
     <div id="ui-error" class="overlay hidden" aria-hidden="true">
       <div class="overlay-card">
-        <div class="overlay-title">Algo deu ruim 😅</div>
+        <div class="overlay-title">Algo deu ruim</div>
         <div id="ui-error-text" class="overlay-text">Erro</div>
         <div class="overlay-actions">
           <button id="ui-error-close" class="btn-primary">Fechar</button>
