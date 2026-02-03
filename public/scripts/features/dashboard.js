@@ -126,6 +126,30 @@ export const dashboard = {
   },
 
   // -----------------------------
+  // CTA Premium (visitante vs free)
+  // -----------------------------
+  premiumCTA() {
+    const u = this.getUser();
+    const isVisitor = !u;
+
+    if (isVisitor) {
+      return `
+        <div class="actions-row" style="margin-top:10px;">
+          <button class="btn-primary" data-action="dashLogin">Entrar para desbloquear</button>
+        </div>
+      `;
+    }
+
+    // usuário existe e não é premium
+    return `
+      <div class="actions-row" style="margin-top:10px;">
+        <button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>
+      </div>
+    `;
+  },
+
+  
+  // -----------------------------
   // Compute KPIs
   // -----------------------------
   compute() {
@@ -380,9 +404,10 @@ export const dashboard = {
           : `
             <div class="dash-card dash-locked">
               <div class="dash-lock">Premium</div>
-              <div class="dash-title">Tipos</div>
-              <div class="dash-value">Premium</div>
-              <div class="dash-sub">OBJ/DISC mais usado</div>
+              <div class="dash-title">Insights</div>
+              <div class="dash-value">Bloqueado</div>
+              <div class="dash-sub">Desbloqueie para recomendações automáticas.</div>
+              ${this.premiumCTA()}
             </div>
           `
       }
@@ -409,6 +434,7 @@ export const dashboard = {
           <div class="dash-title">Insights</div>
           <div class="dash-value">Bloqueado</div>
           <div class="dash-sub">Desbloqueie para recomendações automáticas.</div>
+          ${this.premiumCTA()}
         </div>
 
         <div class="dash-card">
@@ -459,6 +485,7 @@ export const dashboard = {
           <div class="dash-title">Detalhes</div>
           <div class="dash-value">Bloqueado</div>
           <div class="dash-sub">Breakdown por banca e histórico detalhado.</div>
+          ${this.premiumCTA()}
         </div>
 
         <div class="dash-card">
@@ -496,6 +523,11 @@ export const dashboard = {
         return;
       }
 
+           if (act === "dashLogin") {
+        return window.dispatchEvent(new Event("liora:login-required"));
+      }
+
+      
       // Opção A: demo só no estado inicial
       if (act === "dashDemo") {
         this.seedMock();
