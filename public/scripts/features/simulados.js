@@ -19,32 +19,36 @@ export const simulados = {
   ctx: null,
 
   STATE: {
-    running: false,
-    _savedRun: null,
-    _runConfig: null, // snapshot do config usado no run (blinda o mode)
-    config: {
-      banca: "FGV",
-      qtd: 5, // OBJ: total de questões | DISC: total de discursivas
-      dificuldade: "misturado",
-      tema: "",
-      tempo: 20, // minutos
-      mode: "obj" // "obj" | "disc"
-    },
-    questoes: [],
-    atual: 0,
-    respostas: [], // { idx, tipo, escolha?, texto?, correta?, enunciado, alternativas?, corretaIndex?, explicacao?, respostaModelo?, criterios? }
-    timer: {
-      enabled: true,
-      totalSec: 0,
-      leftSec: 0,
-      tickId: null
-    }
-     review: {
-      active: false,
-      idx: 0,
-      reveal: false,
-      items: [] // snapshot da fila atual
-    },
+  running: false,
+  _savedRun: null,
+  _runConfig: null, // snapshot do config usado no run (blinda o mode)
+  config: {
+    banca: "FGV",
+    qtd: 5, // OBJ: total de questões | DISC: total de discursivas
+    dificuldade: "misturado",
+    tema: "",
+    tempo: 20, // minutos
+    mode: "obj" // "obj" | "disc"
+  },
+  questoes: [],
+  atual: 0,
+  respostas: [], // { idx, tipo, escolha?, texto?, correta?, ... }
+  timer: {
+    enabled: true,
+    totalSec: 0,
+    leftSec: 0,
+    tickId: null
+  },
+
+  // ✅ revisão (fila 1 por vez)
+  review: {
+    active: false,
+    idx: 0,
+    reveal: false,
+    items: [] // snapshot da fila atual
+  }
+},
+
 
   // -----------------------------
   // INIT
