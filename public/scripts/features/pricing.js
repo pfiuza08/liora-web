@@ -1,12 +1,14 @@
 // =============================================================
 // 💳 LIORA — PRICING (Tela de Planos)
-// Versão: v1.2 (compatível com HTML estático do screen-pricing)
+// Versão: v1.3 (3 planos + compat modal premium)
 // -------------------------------------------------------------
 // ✔ Usa HTML existente (não sobrescreve)
-// ✔ Botões: data-action="pricingChoose" (free/premium)
+// ✔ Botões: data-action="pricingChoose" (free/monthly/quarterly/lifetime)
+// ✔ Compat: data-plan="premium" (trata como mensal)
 // ✔ Botão: data-action="pricingLearnMore"
-// ✔ Se premium já ativo: desabilita CTA e mostra toast
-// ✔ Evento canônico: liora:open-pricing
+// ✔ Eventos canônicos:
+//    - liora:open-pricing
+//    - liora:open-plans   (compat com premium.js antigo)
 // =============================================================
 
 export const pricing = {
@@ -16,13 +18,15 @@ export const pricing = {
   init(ctx) {
     this.ctx = ctx;
 
+    // eventos canônicos
     window.addEventListener("liora:open-pricing", () => this.render());
+    window.addEventListener("liora:open-plans", () => this.render()); // compat: premium.js antigo
     window.addEventListener("liora:user-changed", () => this.render());
 
     this.bindOnce();
     this.render();
 
-    console.log("💳 pricing.js iniciado (v1.2 compat HTML estático)");
+    console.log("💳 pricing.js iniciado (v1.3 3 planos)");
   },
 
   // -----------------------------
@@ -63,18 +67,27 @@ export const pricing = {
 
     const premium = this.isPremium();
 
-    // se já é premium: desabilita botões de ativação
-    screen.querySelectorAll('[data-action="pricingChoose"][data-plan="premium"]').forEach((btn) => {
-      btn.disabled = premium;
-      btn.classList.toggle("is-disabled", premium);
-      btn.textContent = premium ? "Premium ativo ✅" : "Ativar Premium";
-    });
+    // todos os CTAs premium (mensal/trimestral/vitalício/premium)
+    screen
+      .querySelectorAll('[data-action="pricingChoose"]')
+      .forEach((btn) => {
+        const plan = (btn.getAttribute("data-plan") || "").trim().toLowerCase();
+        const isFree = plan === "free";
 
-    // botão "continuar free" continua habilitado, mas se premium, vira um "voltar"
-    screen.querySelectorAll('[data-action="pricingChoose"][data-plan="free"]').forEach((btn) => {
-      btn.disabled = false;
-      btn.textContent = premium ? "Continuar (já Premium)" : "Continuar no Free";
-    });
+        // se for premium ativo, desabilita os botões de compra
+        if (!isFree && premium) {
+          btn.disabled = true;
+          btn.classList.add("is-disabled");
+        } else {
+          btn.disabled = false;
+          btn.classList.remove("is-disabled");
+        }
+
+        // rótulo do botão free fica informativo
+        if (isFree) {
+          btn.textContent = premium ? "Continuar (Premium ativo)" : "Continuar no Free";
+        }
+      });
   },
 
   // -----------------------------
@@ -95,37 +108,47 @@ export const pricing = {
       if (!act) return;
 
       if (act === "pricingLearnMore") {
-        // abre seu modal premium (ou só mostra toast)
+        // abre modal premium (se existir) e mostra uma dica curta
         window.dispatchEvent(new Event("liora:premium-bloqueado"));
-        this.toast("✨ Premium libera insights e detalhes do dashboard.");
+        this.toast("Premium libera insights e detalhes do dashboard.");
         return;
       }
 
       if (act === "pricingChoose") {
-        const plan = (btn.getAttribute("data-plan") || "free").trim().toLowerCase();
+        const raw = (btn.getAttribute("data-plan") || "free").trim().toLowerCase();
 
-        if (plan === "premium") {
-          // se você quiser exigir login antes:
-          if (this.ctx?.gates?.requireLogin) {
-            const ok = this.ctx.gates.requireLogin();
-            if (!ok) return;
-          }
+        // compat com telas antigas
+        const plan =
+          raw === "premium" ? "monthly" : raw;
 
-          if (this.isPremium()) {
-            this.toast("Você já está Premium ✅");
-            this.nav("dashboard");
-            return;
-          }
+        if (plan === "free") {
+          this.toast(this.isPremium() ? "Premium já está ativo." : "Ok. Você está no Free.");
+          this.nav("home");
+          return;
+        }
 
-          this.setPremiumLocal(true);
-          this.toast("✅ Premium ativado (modo MVP).");
+        // se quiser exigir login antes de assinar
+        if (this.ctx?.gates?.requireLogin) {
+          const ok = this.ctx.gates.requireLogin();
+          if (!ok) return;
+        }
+
+        if (this.isPremium()) {
+          this.toast("Premium já está ativo.");
           this.nav("dashboard");
           return;
         }
 
-        // plan free
-        this.toast(this.isPremium() ? "Você já é Premium ✅" : "Ok! Vamos de Free 🙂");
-        this.nav("home");
+        // MVP: ativa premium local
+        this.setPremiumLocal(true);
+
+        const label =
+          plan === "quarterly" ? "trimestral" :
+          plan === "lifetime" ? "vitalício" :
+          "mensal";
+
+        this.toast(`Premium ativado (${label}).`);
+        this.nav("dashboard");
         return;
       }
     });
@@ -143,5 +166,6 @@ export const pricing = {
     try {
       this.ctx?.ui?.toast?.(msg);
     } catch {}
+    console.log("🔔", msg);
   }
 };
