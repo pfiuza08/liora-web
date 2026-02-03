@@ -2533,4 +2533,37 @@ body.liora-modal-open{
 #screen-pricing .panel{
   overflow: visible;
 }
+/* =========================================================
+   PRICING — evita "Vitalício órfão"
+   Cole no FINAL do style.css
+========================================================= */
+
+/* dá mais largura útil ao conteúdo do pricing */
+#screen-pricing .panel{
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* grid: 3 colunas quando couber, senão quebra de forma previsível */
+#screen-pricing .pricing-grid{
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+/* em larguras médias, 2 colunas (fica bonito e sem órfão) */
+@media (max-width: 1080px){
+  #screen-pricing .pricing-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* mobile: 1 coluna */
+@media (max-width: 740px){
+  #screen-pricing .pricing-grid{
+    grid-template-columns: 1fr;
+  }
+}
 
