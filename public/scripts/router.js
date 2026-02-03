@@ -1,37 +1,17 @@
-// router.js — v3 (hash + nav ativo + evento canônico + telas)
-// Inclui: home, tema, pdf, simulados, dashboard, pricing
-
+// router.js — v3 (hash + nav ativo + eventos canônicos por tela)
 export const router = {
   screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing"],
 
   init() {
-    // aplica rota inicial
-    const r0 = this.getInitialRoute();
-    this.go(r0, { pushHash: false });
-
     // reage a mudanças de hash (ex: /#dashboard)
     window.addEventListener("hashchange", () => {
       const r = this.getInitialRoute();
       this.go(r, { pushHash: false });
     });
 
-    // suporte a botões [data-nav]
-    document.addEventListener("click", (ev) => {
-      const el = ev.target.closest("[data-nav]");
-      if (!el) return;
-
-      const to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
-      if (!to) return;
-
-      this.go(to);
-    });
-
-    // suporte a navegação por evento (para módulos)
-    window.addEventListener("liora:nav", (ev) => {
-      const to = (ev?.detail?.to || "").trim().toLowerCase();
-      if (!to) return;
-      this.go(to);
-    });
+    // aplica rota inicial ao carregar
+    const r0 = this.getInitialRoute();
+    this.go(r0, { pushHash: false });
   },
 
   normalize(route) {
@@ -53,7 +33,6 @@ export const router = {
   },
 
   setActiveNav(route) {
-    // marca qualquer elemento com data-nav
     document.querySelectorAll("[data-nav]").forEach((el) => {
       const to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
       const active = to === route;
@@ -64,41 +43,23 @@ export const router = {
     });
   },
 
-  dispatchRouteEvents(route) {
-    // ✅ evento canônico geral
+  // ✅ dispara eventos canônicos que cada feature já escuta
+  emitOpenEvent(route) {
+    // evento genérico (útil p/ debug)
     window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route } }));
 
-    // ✅ eventos por tela (para manter compat com seu app atual)
-    if (route === "simulados") {
-      window.dispatchEvent(new Event("liora:open-simulados"));
-      return;
-    }
-
+    // eventos por tela (o que suas features esperam)
+    if (route === "simulados") window.dispatchEvent(new Event("liora:open-simulados"));
     if (route === "dashboard") {
       window.dispatchEvent(new Event("liora:open-dashboard"));
       window.dispatchEvent(new Event("liora:dashboard-refresh"));
-      return;
     }
+    if (route === "tema") window.dispatchEvent(new Event("liora:open-tema"));
+    if (route === "pdf") window.dispatchEvent(new Event("liora:open-pdf"));
+    if (route === "home") window.dispatchEvent(new Event("liora:open-home"));
 
-    if (route === "pricing") {
-      window.dispatchEvent(new Event("liora:open-pricing"));
-      return;
-    }
-
-    if (route === "tema") {
-      window.dispatchEvent(new Event("liora:open-tema"));
-      return;
-    }
-
-    if (route === "pdf") {
-      window.dispatchEvent(new Event("liora:open-pdf"));
-      return;
-    }
-
-    if (route === "home") {
-      window.dispatchEvent(new Event("liora:open-home"));
-      return;
-    }
+    // ⭐ o que estava faltando:
+    if (route === "pricing") window.dispatchEvent(new Event("liora:open-pricing"));
   },
 
   go(route, opts = {}) {
@@ -114,16 +75,11 @@ export const router = {
     // atualiza URL (sem recarregar)
     if (pushHash) {
       const next = `#${r}`;
-      if (location.hash !== next) {
-        history.pushState(null, "", next);
-        // como pushState não dispara hashchange em todo browser, garantimos a execução:
-        this.dispatchRouteEvents(r);
-      } else {
-        this.dispatchRouteEvents(r);
-      }
-    } else {
-      this.dispatchRouteEvents(r);
+      if (location.hash !== next) history.pushState(null, "", next);
     }
+
+    // ✅ eventos canônicos
+    this.emitOpenEvent(r);
 
     console.log("🧭 Router →", r);
   }
