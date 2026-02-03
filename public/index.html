@@ -311,7 +311,121 @@
         <button class="btn-link" data-nav="home">← Voltar</button>
         <h3>Meu desempenho</h3>
       </div>
-    
+
+        <!-- =========================================================
+     💳 LIORA — PRICING (tela de planos)
+     Requer: router.js com "pricing" nas screens
+     Requer: features/pricing.js para bindar ações
+========================================================= -->
+<section id="screen-pricing" class="screen">
+  <div class="screen-head">
+    <div>
+      <h2 class="screen-title">Planos</h2>
+      <p class="screen-subtitle">Escolha o nível de poder da sua Liora ⚡</p>
+    </div>
+
+    <div class="screen-head-actions">
+      <button class="btn-secondary" data-nav="home">Voltar</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="card-title">Comparação rápida</div>
+    <div class="muted">Você pode usar como visitante. Premium libera insights e detalhes do dashboard.</div>
+
+    <div class="dash-grid" style="margin-top:12px;">
+      <!-- FREE -->
+      <div class="dash-card">
+        <div class="dash-title">Free</div>
+        <div class="dash-value">R$ 0</div>
+        <div class="dash-sub">para testar e estudar no básico</div>
+
+        <div class="dash-list" style="margin-top:10px;">
+          <div class="dash-row">
+            <div>
+              <div class="dash-row-title">Dashboard básico</div>
+              <div class="dash-row-sub">acurácia geral e total de simulados</div>
+            </div>
+            <div class="dash-row-metric">✅</div>
+          </div>
+
+          <div class="dash-row">
+            <div>
+              <div class="dash-row-title">Insights avançados</div>
+              <div class="dash-row-sub">melhor banca, recomendações</div>
+            </div>
+            <div class="dash-row-metric">🔒</div>
+          </div>
+
+          <div class="dash-row">
+            <div>
+              <div class="dash-row-title">Detalhes por banca + histórico</div>
+              <div class="dash-row-sub">rank e últimos simulados</div>
+            </div>
+            <div class="dash-row-metric">🔒</div>
+          </div>
+        </div>
+
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-secondary" data-action="pricingChoose" data-plan="free">
+            Continuar no Free
+          </button>
+        </div>
+      </div>
+
+      <!-- PREMIUM -->
+      <div class="dash-card good" style="border-width:2px;">
+        <div class="dash-title">Premium</div>
+        <div class="dash-value">R$ 19,90</div>
+        <div class="dash-sub">mês · desbloqueia o “modo turbo” 🚀</div>
+
+        <div class="dash-list" style="margin-top:10px;">
+          <div class="dash-row">
+            <div>
+              <div class="dash-row-title">Insights avançados</div>
+              <div class="dash-row-sub">melhor banca + próximo passo sugerido</div>
+            </div>
+            <div class="dash-row-metric">✅</div>
+          </div>
+
+          <div class="dash-row">
+            <div>
+              <div class="dash-row-title">Detalhes por banca</div>
+              <div class="dash-row-sub">rank por acurácia e volume</div>
+            </div>
+            <div class="dash-row-metric">✅</div>
+          </div>
+
+          <div class="dash-row">
+            <div>
+              <div class="dash-row-title">Histórico recente</div>
+              <div class="dash-row-sub">últimos simulados com tempo</div>
+            </div>
+            <div class="dash-row-metric">✅</div>
+          </div>
+        </div>
+
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-primary" data-action="pricingChoose" data-plan="premium">
+            Ativar Premium
+          </button>
+          <button class="btn-secondary" data-action="pricingLearnMore">
+            Ver benefícios
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:12px;">
+    <div class="card-title">Nota</div>
+    <div class="muted">
+      Nesta fase, “ativar premium” pode ser um toggle/localStorage para simular o produto.
+      Depois você pluga Hotmart/Stripe/Pagar.me sem reescrever a UI.
+    </div>
+  </div>
+</section>
+       
       <!-- RESUMO (FREE) -->
       <div class="panel">
         <div class="dash-grid" id="dash-kpis">
