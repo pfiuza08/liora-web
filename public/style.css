@@ -2432,4 +2432,105 @@ body.liora-modal-open{
 #screen-pricing .actions-row .btn-secondary:hover{
   opacity: 1;
 }
+/* =========================================================
+   PRICING — Cards lado a lado (3 colunas)
+   Cole no FINAL do style.css
+========================================================= */
+
+#screen-pricing .pricing-grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+/* Se a largura apertar, cai para 1 coluna */
+@media (max-width: 920px){
+  #screen-pricing .pricing-grid{
+    grid-template-columns: 1fr;
+  }
+}
+
+#screen-pricing .pricing-card{
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.03);
+  box-shadow: 0 18px 60px rgba(0,0,0,.20);
+}
+
+#screen-pricing .pricing-top{
+  display: grid;
+  gap: 6px;
+}
+
+#screen-pricing .pricing-title{
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+#screen-pricing .pricing-price{
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+#screen-pricing .pricing-sub{
+  font-size: 13px;
+  opacity: .82;
+}
+
+#screen-pricing .pricing-list{
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+#screen-pricing .pricing-item{
+  font-size: 13px;
+  opacity: .92;
+}
+
+#screen-pricing .pricing-actions{
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+#screen-pricing .pricing-actions .btn-primary,
+#screen-pricing .pricing-actions .btn-secondary{
+  width: 100%;
+}
+
+/* Card recomendado */
+#screen-pricing .pricing-featured{
+  border-width: 2px;
+  background: rgba(255,255,255,.045);
+  box-shadow: 0 24px 80px rgba(0,0,0,.28);
+}
+
+#screen-pricing .pricing-badge{
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.25);
+}
+
+/* Opcional: dá um “respiro” no painel do pricing */
+#screen-pricing .panel{
+  overflow: visible;
+}
 
