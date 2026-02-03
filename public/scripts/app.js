@@ -1,14 +1,15 @@
 // =============================================================
-// 🧠 LIORA — APP (Router + Boot + Nav + Theme + Gates)
-// Versão: v84-FREEMIUM-MVP (robusto)
+// 🧠 LIORA — APP (Boot + Theme + Gates + Features)
+// Versão: v85-FREEMIUM-MVP (router.js único + pricing)
 // -------------------------------------------------------------
-// ✔ Router por hash (#home, #tema, #pdf, #simulados, #dashboard)
-// ✔ Nav por [data-nav] e marca ativo (is-active)
+// ✔ Router por hash via ./router.js (telas: home, tema, pdf, simulados, dashboard, pricing)
+// ✔ Nav por [data-nav] e marca ativo (is-active) via router.js
 // ✔ Theme toggle (html.light / html.dark)
 // ✔ Store (localStorage) + UI helpers (toast/error simples)
 // ✔ Gates (login/premium) via eventos canônicos
 // ✔ Boot com imports dinâmicos (não quebra se faltar módulo)
 // ✔ Integra Premium Modal (premium.js)
+// ✔ Carrega pricing (pricing.js)
 // =============================================================
 
 /* -----------------------------
@@ -110,6 +111,7 @@ function createTheme(store) {
     const m = mode === "light" ? "light" : "dark";
     root.classList.remove("light", "dark");
     root.classList.add(m);
+
     // mantém compat com CSS que usa :root.light e html.light
     if (m === "light") root.classList.add("light");
     store.set("theme", m);
@@ -127,43 +129,6 @@ function createTheme(store) {
   }
 
   return { init, toggle, apply };
-}
-
-/* -----------------------------
-   ROUTER (hash)
------------------------------ */
-function createRouter() {
-  const routes = new Set(["home", "tema", "pdf", "simulados", "dashboard"]);
-
-  function getRouteFromHash() {
-    const h = String(location.hash || "#home").replace("#", "").trim();
-    return routes.has(h) ? h : "home";
-  }
-
-  function go(route) {
-    const r = routes.has(route) ? route : "home";
-    if (location.hash !== `#${r}`) location.hash = `#${r}`;
-    else window.dispatchEvent(new Event("hashchange"));
-  }
-
-  return { getRouteFromHash, go };
-}
-
-/* -----------------------------
-   NAV helpers
------------------------------ */
-function setActiveNav(route) {
-  document.querySelectorAll("[data-nav]").forEach((el) => {
-    const to = el.getAttribute("data-nav");
-    if (!to) return;
-    el.classList.toggle("is-active", to === route);
-  });
-}
-
-function showScreen(route) {
-  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  const screen = document.getElementById(`screen-${route}`);
-  if (screen) screen.classList.add("active");
 }
 
 /* -----------------------------
@@ -224,77 +189,45 @@ async function loadFeature(path, exportName) {
 (async function boot() {
   const store = createStore("liora:");
   const ui = createUI();
-  const router = createRouter();
   const gates = createGates(store);
   const theme = createTheme(store);
 
-  // expõe para debug e para módulos que chamam window.router/store
-  window.router = router;
+  // expõe para debug
   window.lioraStore = store;
 
   theme.init();
 
   // botão de tema (se existir)
-  const btnTheme = document.getElementById("btn-theme") || document.querySelector("[data-action='toggleTheme']");
+  const btnTheme =
+    document.getElementById("btn-theme") ||
+    document.querySelector("[data-action='toggleTheme']");
   btnTheme?.addEventListener("click", () => theme.toggle());
 
-  // NAV: clique em qualquer [data-nav]
-  document.addEventListener("click", (ev) => {
-    const el = ev.target.closest("[data-nav]");
-    if (!el) return;
+  // Contexto padrão para features
+  const ctx = { store, gates, ui, theme };
 
-    const to = el.getAttribute("data-nav");
-    if (!to) return;
-
-    // rota canônica
-    router.go(to);
-  });
-
-  // NAV via evento (fallback para módulos)
-  window.addEventListener("liora:nav", (ev) => {
-    const to = ev?.detail?.to;
-    if (!to) return;
-    router.go(to);
-  });
-
-  // Router apply
-  function applyRoute() {
-    const route = router.getRouteFromHash();
-
-    setActiveNav(route);
-    showScreen(route);
-
-    // eventos canônicos por tela
-    if (route === "simulados") {
-      window.dispatchEvent(new Event("liora:open-simulados"));
-      return;
-    }
-
-    if (route === "dashboard") {
-      window.dispatchEvent(new Event("liora:open-dashboard"));
-      window.dispatchEvent(new Event("liora:dashboard-refresh"));
-      return;
-    }
-
-    if (route === "tema") {
-      window.dispatchEvent(new Event("liora:open-tema"));
-      return;
-    }
-
-    if (route === "pdf") {
-      window.dispatchEvent(new Event("liora:open-pdf"));
-      return;
-    }
-
-    if (route === "home") {
-      window.dispatchEvent(new Event("liora:open-home"));
-      return;
-    }
+  // -----------------------------
+  // ✅ Router (único) via módulo
+  // -----------------------------
+  const routerMod = await loadFeature("./router.js", "router");
+  if (routerMod?.init) {
+    routerMod.init();
+    window.router = routerMod; // para features chamarem window.router.go(...)
+    ctx.router = routerMod;
+  } else {
+    console.warn("⚠️ router.js não carregou. Verifique o caminho ./router.js");
+    // fallback mínimo: não quebra tudo
+    window.router = {
+      go(r) {
+        location.hash = `#${String(r || "home")}`;
+      }
+    };
+    ctx.router = window.router;
   }
 
-  window.addEventListener("hashchange", applyRoute);
-
-  // Fallback: se sua UI usar botões com data-action de abrir telas
+  // -----------------------------
+  // NAV fallback por data-action (se sua UI tiver)
+  // -----------------------------
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest("[data-action]");
     if (!a) return;
@@ -302,17 +235,17 @@ async function loadFeature(path, exportName) {
     const act = a.getAttribute("data-action");
     if (!act) return;
 
-    if (act === "openDashboard") return router.go("dashboard");
-    if (act === "openSimulados") return router.go("simulados");
-    if (act === "openTema") return router.go("tema");
-    if (act === "openPdf") return router.go("pdf");
-    if (act === "goHome") return router.go("home");
+    if (act === "openDashboard") return ctx.router.go("dashboard");
+    if (act === "openSimulados") return ctx.router.go("simulados");
+    if (act === "openTema") return ctx.router.go("tema");
+    if (act === "openPdf") return ctx.router.go("pdf");
+    if (act === "openPricing") return ctx.router.go("pricing");
+    if (act === "goHome") return ctx.router.go("home");
   });
 
-  // Contexto padrão para features
-  const ctx = { router, store, gates, ui, theme };
-
-  // --- Carrega features (não quebra se faltar alguma) ---
+  // -----------------------------
+  // Features (não quebra se faltar)
+  // -----------------------------
   const premium = await loadFeature("./premium.js", "premium");
   premium?.init?.(ctx);
 
@@ -321,6 +254,9 @@ async function loadFeature(path, exportName) {
 
   const dashboard = await loadFeature("./features/dashboard.js", "dashboard");
   dashboard?.init?.(ctx);
+
+  const pricing = await loadFeature("./features/pricing.js", "pricing");
+  pricing?.init?.(ctx);
 
   // opcionais (se existirem no seu repo)
   const planos = await loadFeature("./features/planos.js", "planos");
@@ -332,23 +268,21 @@ async function loadFeature(path, exportName) {
   //const estudos = await loadFeature("./features/estudos.js", "estudos");
   //estudos?.init?.(ctx);
 
-  // handlers canônicos para login/premium (caso sua tela de login seja separada)
+  // -----------------------------
+  // Gates canônicos: login required
+  // -----------------------------
   window.addEventListener("liora:login-required", () => {
-    // se existir screen-login, navega; senão abre modal premium (que mostra texto de login)
+    // se existir screen-login, navega; senão premium.js abre modal (texto de login)
     if (document.getElementById("screen-login")) {
-      showScreen("login");
+      ctx.router.go("login");
       return;
     }
-    // premium.js já escuta esse evento e abre modal.
   });
 
-  // pequena conveniência: quando user muda, re-render do dashboard
+  // conveniência: quando user muda, re-render do dashboard
   window.addEventListener("liora:user-changed", () => {
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   });
-
-  // aplica rota inicial
-  applyRoute();
 
   // -------------------------------------------------
   // ✅ STUDY SESSIONS -> STATS (sessions)
@@ -380,26 +314,20 @@ async function loadFeature(path, exportName) {
       localStorage.setItem(key, JSON.stringify(data));
 
       // eventos que o dashboard já escuta
-      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "session" } }));
+      window.dispatchEvent(
+        new CustomEvent("liora:stats-changed", { detail: { type: "session" } })
+      );
       window.dispatchEvent(new Event("liora:dashboard-refresh"));
     } catch (e) {
       console.warn("⚠️ Falha ao salvar session:", e);
     }
   });
 
-    // ✅ stats (dashboard real)
-   try {
-     const statsMod = window.lioraStats || window.stats || null;
-     statsMod?.init?.(ctx);
-   
-     // render inicial do dashboard (mesmo sem dados, ele monta o shell)
-     window.dispatchEvent(new Event("liora:dashboard-refresh"));
-   } catch (e) {
-     console.warn("⚠️ stats init falhou", e);
-   }
+  // ✅ render inicial do dashboard (mesmo sem dados, ele monta o shell)
+  window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
   console.log("✅ LIORA boot ok", {
-    route: router.getRouteFromHash(),
+    route: ctx.router?.getInitialRoute?.() || (location.hash || "#home"),
     premium: gates.isPremium(),
     logged: gates.isLogged()
   });
