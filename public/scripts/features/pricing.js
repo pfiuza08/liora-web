@@ -1,16 +1,12 @@
 // =============================================================
-// 💳 LIORA — PRICING / PAYWALL (Planos de assinatura)
-// Arquivo: pricing.js
-// Versão: v1.0
-//
-// ✔ Screen própria (#screen-pricing)
-// ✔ Cards Free / Premium
-// ✔ CTA inteligente (visitante / free / premium)
-// ✔ Eventos canônicos:
-//   - liora:open-pricing
-//   - liora:premium-bloqueado
-//   - liora:login-required
-// ✔ Modo DEMO opcional: ativar premium local (para testar fluxo)
+// 💳 LIORA — PRICING (Tela de Planos)
+// Versão: v1.0 (MVP produto, sem gateway real)
+// -------------------------------------------------------------
+// ✔ Mostra planos e CTAs
+// ✔ Se usuário já é premium: mostra estado Premium ativo
+// ✔ CTA "Assinar" simula upgrade local (marca user.premium=true)
+// ✔ CTA "Tenho dúvidas" dispara modal premium (se existir)
+// ✔ Reage ao evento canônico: liora:open-pricing
 // =============================================================
 
 export const pricing = {
@@ -25,66 +21,30 @@ export const pricing = {
       this.render();
     });
 
+    // se user mudar (login/premium), re-render
     window.addEventListener("liora:user-changed", () => this.render());
-    window.addEventListener("liora:auth-changed", () => this.render());
 
-    this.ensureShell();
     this.bindOnce();
-
-    console.log("💳 pricing.js iniciado (v1.0)");
+    this.render(); // monta caso já esteja na tela
+    console.log("💳 pricing.js iniciado");
   },
 
-  // -----------------------------
-  // Screen
-  // -----------------------------
   showScreen() {
+    // caso você use router.js para alternar telas, isso é redundante, mas é seguro.
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     document.getElementById("screen-pricing")?.classList.add("active");
   },
 
-  ensureShell() {
-    if (document.getElementById("screen-pricing")) return;
-
-    const app = document.querySelector("main") || document.body;
-
-    const sec = document.createElement("section");
-    sec.className = "screen";
-    sec.id = "screen-pricing";
-
-    sec.innerHTML = `
-      <div class="screen-head">
-        <a class="back-link" data-nav="dashboard">← Voltar</a>
-        <h2>Planos</h2>
-        <div class="muted">Escolha o nível de poder do seu estudo 🧠⚡</div>
-      </div>
-
-      <div id="pricing-body"></div>
-    `;
-
-    app.appendChild(sec);
-  },
-
-  qs(id) {
-    return document.getElementById(id);
-  },
-
   // -----------------------------
-  // User state
+  // State helpers
   // -----------------------------
   getUser() {
     try {
-      return (
+      const u =
         this.ctx?.store?.get?.("user") ||
         this.ctx?.store?.get?.("liora_user") ||
-        (() => {
-          try {
-            const raw = localStorage.getItem("liora_user");
-            return raw ? JSON.parse(raw) : null;
-          } catch {
-            return null;
-          }
-        })()
-      );
+        null;
+      return u && typeof u === "object" ? u : null;
     } catch {
       return null;
     }
@@ -92,7 +52,7 @@ export const pricing = {
 
   isLogged() {
     const u = this.getUser();
-    return !!u?.email || !!u?.uid || !!u?.name;
+    return !!u?.uid || !!u?.email || !!u?.name;
   },
 
   isPremium() {
@@ -100,124 +60,145 @@ export const pricing = {
     return !!u?.premium;
   },
 
+  setPremiumLocal(on = true) {
+    // MVP: marca premium local no store
+    const u = this.getUser() || {};
+    const next = { ...u, premium: !!on };
+
+    try {
+      this.ctx?.store?.set?.("user", next);
+    } catch {}
+
+    window.dispatchEvent(new Event("liora:user-changed"));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  },
+
   // -----------------------------
   // Render
   // -----------------------------
+  ensureRoot() {
+    const screen = document.getElementById("screen-pricing");
+    if (!screen) return null;
+
+    // cria container interno, se não existir
+    let root = screen.querySelector("#pricing-root");
+    if (!root) {
+      root = document.createElement("div");
+      root.id = "pricing-root";
+      screen.appendChild(root);
+    }
+    return root;
+  },
+
   render() {
-    this.ensureShell();
+    const root = this.ensureRoot();
+    if (!root) {
+      console.warn("⚠️ screen-pricing não encontrado no DOM.");
+      return;
+    }
 
-    const el = this.qs("pricing-body");
-    if (!el) return;
-
-    const logged = this.isLogged();
     const premium = this.isPremium();
+    const logged = this.isLogged();
 
-    const badge = premium
-      ? `<span class="pill pill-mvp">premium</span>`
-      : logged
-        ? `<span class="pill pill-upload">free</span>`
-        : `<span class="pill pill-base">visitante</span>`;
+    const statusPill = (() => {
+      if (!logged) return `<span class="pill pill-base">visitante</span>`;
+      if (premium) return `<span class="pill pill-mvp">premium</span>`;
+      return `<span class="pill pill-upload">free</span>`;
+    })();
 
-    // CTA rules
-    const ctaLabel = premium
-      ? "Você já é Premium ✅"
-      : logged
-        ? "Assinar Premium"
-        : "Entrar para assinar";
+    const premiumPanel = premium
+      ? `
+        <div class="panel" style="margin-bottom:12px;">
+          <div class="card-title">Você já é Premium ✅</div>
+          <div class="muted">Aproveite os recursos completos da Liora.</div>
+          <div class="actions-row" style="margin-top:12px;">
+            <button class="btn-secondary" data-nav="dashboard">Ir para dashboard</button>
+            <button class="btn-secondary" data-nav="simulados">Ir para simulados</button>
+            <button class="btn-secondary" data-action="pricingDisable">Desativar Premium (teste)</button>
+          </div>
+        </div>
+      `
+      : `
+        <div class="panel" style="margin-bottom:12px;">
+          <div class="card-title">Desbloquear Premium</div>
+          <div class="muted">Mais insights, mais controle, mais evolução.</div>
+          <div style="margin-top:10px;">Status: ${statusPill}</div>
+        </div>
+      `;
 
-    const ctaAction = premium
-      ? "noop"
-      : logged
-        ? "buyPremium"
-        : "loginToBuy";
+    const plans = [
+      {
+        id: "monthly",
+        title: "Mensal",
+        price: "R$ 19,90",
+        sub: "por mês",
+        bullets: ["Acesso Premium completo", "Insights no dashboard", "Revisões e métricas avançadas"],
+        cta: "Assinar mensal",
+        highlight: false
+      },
+      {
+        id: "quarterly",
+        title: "Trimestral",
+        price: "R$ 49,90",
+        sub: "a cada 3 meses",
+        bullets: ["Melhor custo-benefício", "Acesso Premium completo", "Prioridade em novidades"],
+        cta: "Assinar trimestral",
+        highlight: true
+      },
+      {
+        id: "lifetime",
+        title: "Vitalício",
+        price: "R$ 149,00",
+        sub: "pagamento único",
+        bullets: ["Premium para sempre", "Sem renovação", "Ideal para maratonas de estudo"],
+        cta: "Quero vitalício",
+        highlight: false
+      }
+    ];
 
-    el.innerHTML = `
-      <div class="panel" style="margin-bottom:12px;">
-        <div class="card-title">Seu status</div>
-        <div style="margin-top:10px;">${badge}</div>
-      </div>
-
+    const plansHtml = `
       <div class="dash-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); gap:12px;">
-        ${this.cardFree({ premium })}
-        ${this.cardPremiumMensal({ premium, ctaLabel, ctaAction })}
-        ${this.cardPremiumLife({ premium, ctaLabel, ctaAction })}
-      </div>
+        ${plans
+          .map((p) => {
+            const cls = p.highlight ? "dash-card good" : "dash-card";
+            const disabled = premium ? "disabled" : "";
+            return `
+              <div class="${cls}">
+                <div class="dash-title">${this.escape(p.title)}</div>
+                <div class="dash-value">${this.escape(p.price)}</div>
+                <div class="dash-sub">${this.escape(p.sub)}</div>
 
+                <div class="dash-list" style="margin-top:10px;">
+                  ${p.bullets.map((b) => `<div class="dash-row-sub">• ${this.escape(b)}</div>`).join("")}
+                </div>
+
+                <div class="actions-row" style="margin-top:12px;">
+                  <button class="btn-primary" data-action="pricingBuy" data-plan="${this.escape(
+                    p.id
+                  )}" ${disabled}>${this.escape(p.cta)}</button>
+                </div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+
+    const foot = `
       <div class="panel" style="margin-top:12px;">
-        <div class="muted small">
-          * MVP: checkout real (Hotmart/Stripe/Mercado Pago) entra depois.  
-          Por enquanto, “Assinar Premium” dispara o fluxo de upgrade que você já usa.
-        </div>
-
-        <div class="actions-row" style="margin-top:10px;">
-          <button class="btn-secondary" data-action="demoOn">Ativar Premium (DEMO)</button>
-          <button class="btn-secondary" data-action="demoOff">Voltar para Free</button>
+        <div class="card-title">Dúvidas?</div>
+        <div class="muted">No MVP, o botão “Assinar” simula premium local. Depois plugamos Hotmart/Stripe.</div>
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-secondary" data-nav="home">Voltar</button>
+          <button class="btn-secondary" data-action="pricingHelp">Falar sobre Premium</button>
         </div>
       </div>
     `;
-  },
 
-  cardFree({ premium }) {
-    return `
-      <div class="dash-card ${premium ? "" : "good"}">
-        <div class="dash-title">Free</div>
-        <div class="dash-value">R$ 0</div>
-        <div class="dash-sub">Para começar agora</div>
-
-        <div class="dash-list" style="margin-top:10px;">
-          <div class="dash-row"><div>Simulados OBJ</div><div class="dash-row-metric">✓</div></div>
-          <div class="dash-row"><div>Revisão básica</div><div class="dash-row-metric">✓</div></div>
-          <div class="dash-row"><div>Insights avançados</div><div class="dash-row-metric">—</div></div>
-        </div>
-
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-secondary" data-action="goSimulados">Fazer simulado</button>
-        </div>
-      </div>
-    `;
-  },
-
-  cardPremiumMensal({ premium, ctaLabel, ctaAction }) {
-    return `
-      <div class="dash-card ${premium ? "good" : ""}">
-        <div class="dash-title">Premium Mensal</div>
-        <div class="dash-value">R$ 19,90</div>
-        <div class="dash-sub">Velocidade de cruzeiro</div>
-
-        <div class="dash-list" style="margin-top:10px;">
-          <div class="dash-row"><div>OBJ + DISC</div><div class="dash-row-metric">✓</div></div>
-          <div class="dash-row"><div>Insights</div><div class="dash-row-metric">✓</div></div>
-          <div class="dash-row"><div>Detalhes por banca</div><div class="dash-row-metric">✓</div></div>
-        </div>
-
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-primary" data-action="${ctaAction}" ${premium ? "disabled" : ""}>
-            ${ctaLabel}
-          </button>
-        </div>
-      </div>
-    `;
-  },
-
-  cardPremiumLife({ premium, ctaLabel, ctaAction }) {
-    return `
-      <div class="dash-card ${premium ? "" : "ok"}">
-        <div class="dash-title">Premium Vitalício</div>
-        <div class="dash-value">R$ 149</div>
-        <div class="dash-sub">Modo turbina</div>
-
-        <div class="dash-list" style="margin-top:10px;">
-          <div class="dash-row"><div>Tudo do Premium</div><div class="dash-row-metric">✓</div></div>
-          <div class="dash-row"><div>Recursos futuros</div><div class="dash-row-metric">✓</div></div>
-          <div class="dash-row"><div>Prioridade</div><div class="dash-row-metric">✓</div></div>
-        </div>
-
-        <div class="actions-row" style="margin-top:12px;">
-          <button class="btn-secondary" data-action="${ctaAction}" ${premium ? "disabled" : ""}>
-            ${premium ? "Ativo ✅" : "Assinar (quando lançar)"}
-          </button>
-        </div>
-      </div>
+    root.innerHTML = `
+      ${premiumPanel}
+      ${premium ? "" : plansHtml}
+      ${foot}
     `;
   },
 
@@ -228,62 +209,84 @@ export const pricing = {
     if (this._bound) return;
     this._bound = true;
 
-    const screen = document.getElementById("screen-pricing");
-    if (!screen) return;
+    document.addEventListener("click", (ev) => {
+      const screen = ev.target.closest("#screen-pricing");
+      if (!screen) return;
 
-    screen.addEventListener("click", (ev) => {
       const nav = ev.target.closest("[data-nav]");
       if (nav) {
-        const to = nav.getAttribute("data-nav");
-        if (to) return this.nav(to);
+        const to = (nav.getAttribute("data-nav") || "").trim().toLowerCase();
+        if (to) this.nav(to);
+        return;
       }
 
       const btn = ev.target.closest("[data-action]");
       if (!btn) return;
 
       const act = btn.getAttribute("data-action");
+      if (!act) return;
 
-      if (act === "goSimulados") {
-        this.nav("simulados");
-        return;
-      }
-
-      if (act === "loginToBuy") {
-        window.dispatchEvent(new Event("liora:login-required"));
-        return;
-      }
-
-      if (act === "buyPremium") {
+      if (act === "pricingHelp") {
+        // abre modal premium, se existir
         window.dispatchEvent(new Event("liora:premium-bloqueado"));
         return;
       }
 
-      if (act === "demoOn") return this.demoSetPremium(true);
-      if (act === "demoOff") return this.demoSetPremium(false);
+      if (act === "pricingDisable") {
+        this.setPremiumLocal(false);
+        this.toast("Premium desativado (teste).");
+        this.render();
+        return;
+      }
+
+      if (act === "pricingBuy") {
+        const plan = (btn.getAttribute("data-plan") || "monthly").trim();
+        this.handleBuy(plan);
+        return;
+      }
     });
   },
 
+  handleBuy(plan) {
+    // Se quiser forçar login antes de assinar:
+    if (this.ctx?.gates?.requireLogin) {
+      const ok = this.ctx.gates.requireLogin();
+      if (!ok) return;
+    }
+
+    // MVP: simula a compra
+    this.setPremiumLocal(true);
+
+    const label =
+      plan === "quarterly" ? "trimestral" : plan === "lifetime" ? "vitalício" : "mensal";
+
+    this.toast(`✅ Premium ativado (${label}).`);
+    this.nav("dashboard");
+  },
+
   nav(to) {
-    try { window.router?.go?.(to); } catch {}
+    try {
+      // se você estiver usando router.js global
+      window.router?.go?.(to);
+      return;
+    } catch {}
+
+    // fallback canônico
     window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to } }));
   },
 
-  // -----------------------------
-  // DEMO (opcional)
-  // -----------------------------
-  demoSetPremium(on) {
+  toast(msg) {
     try {
-      const u = this.getUser() || {};
-      const next = { ...u, premium: !!on };
+      this.ctx?.ui?.toast?.(msg);
+    } catch {}
+    console.log("🔔", msg);
+  },
 
-      this.ctx?.store?.set?.("user", next);
-
-      try { localStorage.setItem("liora_user", JSON.stringify(next)); } catch {}
-
-      window.dispatchEvent(new Event("liora:user-changed"));
-      this.render();
-    } catch (e) {
-      console.warn("⚠️ demoSetPremium falhou:", e);
-    }
+  escape(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
   }
 };
