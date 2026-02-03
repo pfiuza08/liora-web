@@ -1,17 +1,27 @@
-// router.js — v3 (hash + nav ativo + eventos canônicos por tela)
+// router.js — v4 (hash + nav ativo + clique [data-nav] + eventos canônicos)
 export const router = {
   screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing"],
 
   init() {
-    // reage a mudanças de hash (ex: /#dashboard)
+    // ✅ clique em qualquer [data-nav] em qualquer lugar da UI
+    document.addEventListener("click", (ev) => {
+      const el = ev.target.closest("[data-nav]");
+      if (!el) return;
+
+      const to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
+      if (!to) return;
+
+      this.go(to);
+    });
+
+    // reage ao hash
     window.addEventListener("hashchange", () => {
       const r = this.getInitialRoute();
       this.go(r, { pushHash: false });
     });
 
-    // aplica rota inicial ao carregar
-    const r0 = this.getInitialRoute();
-    this.go(r0, { pushHash: false });
+    // aplica rota inicial
+    this.go(this.getInitialRoute(), { pushHash: false });
   },
 
   normalize(route) {
@@ -43,12 +53,9 @@ export const router = {
     });
   },
 
-  // ✅ dispara eventos canônicos que cada feature já escuta
   emitOpenEvent(route) {
-    // evento genérico (útil p/ debug)
     window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route } }));
 
-    // eventos por tela (o que suas features esperam)
     if (route === "simulados") window.dispatchEvent(new Event("liora:open-simulados"));
     if (route === "dashboard") {
       window.dispatchEvent(new Event("liora:open-dashboard"));
@@ -57,8 +64,6 @@ export const router = {
     if (route === "tema") window.dispatchEvent(new Event("liora:open-tema"));
     if (route === "pdf") window.dispatchEvent(new Event("liora:open-pdf"));
     if (route === "home") window.dispatchEvent(new Event("liora:open-home"));
-
-    // ⭐ o que estava faltando:
     if (route === "pricing") window.dispatchEvent(new Event("liora:open-pricing"));
   },
 
@@ -66,21 +71,15 @@ export const router = {
     const { pushHash = true } = opts;
     const r = this.normalize(route);
 
-    // troca tela
     this.setActiveScreen(r);
-
-    // marca nav ativo
     this.setActiveNav(r);
 
-    // atualiza URL (sem recarregar)
     if (pushHash) {
       const next = `#${r}`;
       if (location.hash !== next) history.pushState(null, "", next);
     }
 
-    // ✅ eventos canônicos
     this.emitOpenEvent(r);
-
     console.log("🧭 Router →", r);
   }
 };
