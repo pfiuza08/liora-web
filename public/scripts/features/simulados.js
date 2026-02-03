@@ -1941,6 +1941,6 @@ export const simulados = {
   
     // volta para dashboard
     window.router?.go?.("dashboard");
-  }
+  },
 
 };
