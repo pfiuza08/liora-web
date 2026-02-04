@@ -256,10 +256,11 @@ export const dashboard = {
     };
 
     const userLine = (() => {
-      if (!u) return `<span class="pill pill-base">visitante</span>`;
-      if (u.premium) return `<span class="pill pill-mvp">premium</span>`;
-      return `<span class="pill pill-upload">free</span>`;
+      if (!u) return `<div class="muted small">Status: visitante</div>`;
+      if (u.premium) return `<div class="muted small">Status: Premium</div>`;
+      return `<div class="muted small">Status: Free</div>`;
     })();
+
 
     // -----------------------------
     // EMPTY (Opção A): mostra CTA + demo, sem parecer "botão perdido"
