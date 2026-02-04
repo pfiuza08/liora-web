@@ -2566,4 +2566,26 @@ body.liora-modal-open{
     grid-template-columns: 1fr;
   }
 }
+/* =========================================
+   FIX: Pill "Premium" não pode ser absoluto
+   ========================================= */
+
+#liora-auth-pill{
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+
+/* garante alinhamento bonitinho no header */
+.header-actions{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
