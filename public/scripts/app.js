@@ -1,6 +1,6 @@
 // =============================================================
 // 🧠 LIORA — APP (Boot + Theme + Gates + Features)
-// Versão: v85.1-FREEMIUM-MVP (router.js único + pricing + eventos por rota)
+// Versão: v85.1-FREEMIUM-MVP (router.js único + pricing + eventos por rota + login mock)
 // -------------------------------------------------------------
 // ✔ Router por hash via ./router.js (telas: home, tema, pdf, simulados, dashboard, pricing)
 // ✔ Nav por [data-nav] e marca ativo (is-active) via router.js
@@ -11,6 +11,7 @@
 // ✔ Integra Premium Modal (premium.js)
 // ✔ Carrega pricing (pricing.js)
 // ✔ Dispara eventos liora:open-* ao trocar rota (inclui pricing)
+// ✔ Login MOCK (modal simples) + header state (Visitante/Free/Premium)
 // =============================================================
 
 /* -----------------------------
@@ -203,17 +204,13 @@ function wireRouteEvents(router) {
     if (route === "tema") return window.dispatchEvent(new Event("liora:open-tema"));
     if (route === "pdf") return window.dispatchEvent(new Event("liora:open-pdf"));
     if (route === "home") return window.dispatchEvent(new Event("liora:open-home"));
-
-    // (se você tiver login como rota no futuro)
     if (route === "login") return window.dispatchEvent(new Event("liora:open-login"));
   };
 
-  // evento do router.js (v3) ou equivalente
   window.addEventListener("liora:route-changed", (ev) => {
     emitFor(ev?.detail?.route);
   });
 
-  // também cobre casos onde alguém muda o hash direto
   window.addEventListener("hashchange", () => {
     try {
       const r = router?.getInitialRoute?.() || (location.hash || "#home").replace("#", "");
@@ -221,11 +218,175 @@ function wireRouteEvents(router) {
     } catch {}
   });
 
-  // primeira emissão (rota atual)
   try {
     const r0 = router?.getInitialRoute?.() || (location.hash || "#home").replace("#", "");
     emitFor(r0);
   } catch {}
+}
+
+/* -----------------------------
+   LOGIN MOCK (modal simples + header state)
+----------------------------- */
+function wireLoginMock(ctx) {
+  function ensureLoginModal() {
+    if (document.getElementById("liora-login")) return;
+
+    const el = document.createElement("div");
+    el.id = "liora-login";
+    el.className = "liora-modal hidden";
+    el.innerHTML = `
+      <div class="liora-modal-backdrop" data-login-action="close"></div>
+
+      <div class="liora-modal-card" style="max-width:520px;">
+        <div class="liora-modal-head">
+          <div>
+            <div class="liora-modal-title">Entrar</div>
+            <div class="liora-modal-sub muted">Salva seu progresso neste dispositivo.</div>
+          </div>
+          <button class="btn-secondary" data-login-action="close">Fechar</button>
+        </div>
+
+        <div class="liora-modal-body">
+          <label class="label">Nome</label>
+          <input id="liora-login-name" class="input" placeholder="Seu nome" />
+
+          <label class="label" style="margin-top:10px;">Email (opcional)</label>
+          <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
+
+          <div class="muted small" style="margin-top:10px;">
+            No MVP, o login é local. Depois conectamos autenticação real.
+          </div>
+        </div>
+
+        <div class="liora-modal-actions">
+          <button class="btn-secondary" data-login-action="close">Cancelar</button>
+          <button class="btn-primary" data-login-action="submit">Entrar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+
+  function openLogin() {
+    ensureLoginModal();
+    const modal = document.getElementById("liora-login");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    document.body.classList.add("liora-modal-open");
+    setTimeout(() => document.getElementById("liora-login-name")?.focus(), 50);
+  }
+
+  function closeLogin() {
+    const modal = document.getElementById("liora-login");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    document.body.classList.remove("liora-modal-open");
+  }
+
+  function getUserSafe() {
+    const u = ctx?.store?.get?.("user");
+    return u && typeof u === "object" ? u : null;
+  }
+
+  function setUserSafe(u) {
+    ctx?.store?.set?.("user", u);
+    window.dispatchEvent(new Event("liora:user-changed"));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  }
+
+  function clearUserSafe() {
+    ctx?.store?.remove?.("user");
+    window.dispatchEvent(new Event("liora:user-changed"));
+    window.dispatchEvent(new Event("liora:dashboard-refresh"));
+  }
+
+  function updateHeaderAuthUI() {
+    const btnLogin = document.getElementById("btn-login");
+    const btnLogout = document.getElementById("btn-logout");
+
+    let pill = document.getElementById("liora-auth-pill");
+    if (!pill) {
+      pill = document.createElement("span");
+      pill.id = "liora-auth-pill";
+      pill.className = "pill pill-base";
+      pill.style.marginRight = "8px";
+      const host = document.querySelector(".header-actions");
+      host?.insertBefore(pill, btnLogin || host.firstChild);
+    }
+
+    const u = getUserSafe();
+    const logged = !!u?.name || !!u?.email || !!u?.uid;
+    const premium = !!u?.premium;
+
+    if (!logged) {
+      pill.textContent = "Visitante";
+      pill.className = "pill pill-base";
+      btnLogin?.classList.remove("hidden");
+      btnLogout?.classList.add("hidden");
+      return;
+    }
+
+    if (premium) {
+      pill.textContent = "Premium";
+      pill.className = "pill pill-mvp";
+    } else {
+      pill.textContent = "Free";
+      pill.className = "pill pill-upload";
+    }
+
+    btnLogin?.classList.add("hidden");
+    btnLogout?.classList.remove("hidden");
+  }
+
+  // header buttons
+  document.getElementById("btn-login")?.addEventListener("click", () => openLogin());
+  document.getElementById("btn-logout")?.addEventListener("click", () => {
+    clearUserSafe();
+    ctx?.ui?.toast?.("Sessão encerrada.");
+    ctx?.router?.go?.("home");
+  });
+
+  // eventos canônicos
+  window.addEventListener("liora:open-login", () => openLogin());
+  window.addEventListener("liora:login-required", () => openLogin());
+  window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
+
+  // modal actions
+  document.addEventListener("click", (ev) => {
+    const modal = document.getElementById("liora-login");
+    if (!modal || modal.classList.contains("hidden")) return;
+
+    const a = ev.target.closest("[data-login-action]");
+    if (!a) return;
+
+    const act = a.getAttribute("data-login-action");
+    if (act === "close") return closeLogin();
+
+    if (act === "submit") {
+      const name = (document.getElementById("liora-login-name")?.value || "").trim();
+      const email = (document.getElementById("liora-login-email")?.value || "").trim();
+
+      if (!name) {
+        ctx?.ui?.toast?.("Informe seu nome para continuar.");
+        return;
+      }
+
+      const prev = getUserSafe() || {};
+      setUserSafe({
+        ...prev,
+        name,
+        email,
+        premium: !!prev.premium
+      });
+
+      closeLogin();
+      ctx?.ui?.toast?.("Você entrou.");
+    }
+  });
+
+  // init
+  ensureLoginModal();
+  updateHeaderAuthUI();
 }
 
 /* -----------------------------
@@ -267,8 +428,9 @@ function wireRouteEvents(router) {
     // fallback mínimo: não quebra tudo
     window.router = {
       go(r) {
-        location.hash = `#${String(r || "home")}`;
-        window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route: r } }));
+        const rr = String(r || "home");
+        location.hash = `#${rr}`;
+        window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route: rr } }));
       },
       getInitialRoute() {
         return (location.hash || "#home").replace("#", "");
@@ -297,6 +459,11 @@ function wireRouteEvents(router) {
   });
 
   // -----------------------------
+  // ✅ Login Mock (MVP)
+  // -----------------------------
+  wireLoginMock(ctx);
+
+  // -----------------------------
   // Features (não quebra se faltar)
   // -----------------------------
   const premium = await loadFeature("./premium.js", "premium");
@@ -322,17 +489,8 @@ function wireRouteEvents(router) {
   //estudos?.init?.(ctx);
 
   // -----------------------------
-  // Gates canônicos: login required
-  // -----------------------------
-  window.addEventListener("liora:login-required", () => {
-    // se existir screen-login, navega; senão premium.js abre modal (texto de login)
-    if (document.getElementById("screen-login")) {
-      ctx.router.go("login");
-      return;
-    }
-  });
-
   // conveniência: quando user muda, re-render do dashboard
+  // -----------------------------
   window.addEventListener("liora:user-changed", () => {
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   });
@@ -376,7 +534,7 @@ function wireRouteEvents(router) {
     }
   });
 
-  // ✅ render inicial do dashboard (mesmo sem dados, ele monta o shell)
+  // ✅ render inicial do dashboard
   window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
   console.log("✅ LIORA boot ok", {
