@@ -2227,44 +2227,48 @@ body.liora-modal-open{
   border-radius: 12px;
 }
 /* ---------------------------------------------
-   PILL (badge) — padrão único + variações
+   PILL (badge) — base neutra (não flutua sozinha)
 --------------------------------------------- */
 .pill{
-  position:absolute;
-  top:12px;
-  right:12px;
+  position: static;
+  display: inline-flex;
+  align-items: center;
 
-  font-size:12px;
-  font-weight:600;
-  letter-spacing:.2px;
-  padding:6px 10px;
-  border-radius:999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  padding: 6px 10px;
+  border-radius: 999px;
 
-  border:1px solid rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.16);
   background: rgba(255,255,255,.08);
   color: rgba(255,255,255,.88);
 
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 
-  pointer-events:none; /* não “vira botão” acidentalmente */
+  pointer-events: none;
 }
 
 /* tema claro */
 .light .pill{
-  border:1px solid rgba(0,0,0,.12);
+  border: 1px solid rgba(0,0,0,.12);
   background: rgba(0,0,0,.04);
   color: rgba(0,0,0,.72);
 }
 
-/* variações sem cor “gritante” (só nuance) */
-.pill-base   { }
-.pill-upload { opacity:.92; }
-.pill-ia     { opacity:1; }
-.pill-mvp    { opacity:.9; }
-.card-btn{
-  position: relative;
+/* ---------------------------------------------
+   PILL ABSOLUTA: somente em card da HOME
+   (onde existe position:relative)
+--------------------------------------------- */
+.card-btn{ position: relative; }
+
+.card-btn > .pill{
+  position: absolute;
+  top: 12px;
+  right: 12px;
 }
+
 /* =========================================================
    HOME CARDS — DE LUXE (override mínimo)
    Cole no FINAL do CSS
@@ -2569,16 +2573,6 @@ body.liora-modal-open{
 /* =========================================
    FIX: Pill "Premium" não pode ser absoluto
    ========================================= */
-
-#liora-auth-pill{
-  position: static !important;
-  top: auto !important;
-  right: auto !important;
-  left: auto !important;
-  bottom: auto !important;
-  transform: none !important;
-  margin: 0 !important;
-}
 
 /* garante alinhamento bonitinho no header */
 .header-actions{
