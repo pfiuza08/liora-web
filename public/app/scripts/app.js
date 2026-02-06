@@ -101,7 +101,21 @@ function createUI() {
   }
 
   // Loading overlay (compat com features antigas)
-  function loading(show = true, text = "Processando…") {
+    function loading(a = true, b = "Processando…") {
+    // aceita: loading(true, "texto"), loading(false), loading("texto")
+    let show = true;
+    let text = "Processando…";
+
+    if (typeof a === "boolean") {
+      show = a;
+      text = typeof b === "string" ? b : text;
+    } else if (typeof a === "string") {
+      show = true;
+      text = a;
+    } else {
+      show = !!a;
+    }
+
     try {
       const box = document.getElementById("ui-loading");
       const txt = document.getElementById("ui-loading-text");
@@ -114,6 +128,7 @@ function createUI() {
       console.warn("⚠️ ui.loading falhou:", e);
     }
   }
+
 
   function hideLoading() {
     loading(false);
