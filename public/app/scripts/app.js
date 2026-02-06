@@ -577,4 +577,73 @@ function wireLoginMock(ctx) {
     premium: gates.isPremium(),
     logged: gates.isLogged()
   });
+// =============================================================
+// 🧼 Reset Demo (aparece só com ?demo=1)
+// - Limpa apenas: liora:* e liora_stats:v1
+// - Volta para #home e recarrega
+// =============================================================
+(function demoReset() {
+  function isDemo() {
+    try {
+      const p = new URLSearchParams(location.search);
+      return p.get("demo") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function showDemoTools() {
+    const box = document.getElementById("demo-tools");
+    if (!box) return;
+    if (isDemo()) box.classList.remove("hidden");
+    else box.classList.add("hidden");
+  }
+
+  function resetLioraStorage() {
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith("liora:")) keysToRemove.push(k);
+        if (k === "liora_stats:v1") keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn("⚠️ reset demo falhou:", e);
+    }
+  }
+
+  function wire() {
+    showDemoTools();
+
+    const btn = document.getElementById("btn-reset-demo");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      if (!isDemo()) return; // segurança extra
+      const ok = window.confirm("Resetar a demo? Isso apaga os dados locais da Liora neste navegador.");
+      if (!ok) return;
+
+      resetLioraStorage();
+
+      try { location.hash = "#home"; } catch (e) {}
+      try {
+        // mantém o modo demo na URL
+        const url = new URL(location.href);
+        url.searchParams.set("demo", "1");
+        location.replace(url.toString());
+      } catch (e) {
+        location.reload();
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wire);
+  } else {
+    wire();
+  }
+})();
+   
 })();
