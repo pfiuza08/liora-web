@@ -448,6 +448,17 @@ function wireLoginMock(ctx) {
   const ctx = { store, gates, ui, theme };
 
   // -----------------------------
+  // 🔐 Supabase Auth (Magic Link)
+  // -----------------------------
+  const authMod = await loadFeature("./auth.js", "auth");
+  if (authMod?.init) {
+    ctx.auth = authMod;
+    authMod.init(ctx);
+  } else {
+    console.warn("⚠️ auth.js não carregou (verifique ./auth.js em /app/scripts)");
+  }
+ 
+  // -----------------------------
   // ✅ Router (único) via módulo
   // -----------------------------
   const routerMod = await loadFeature("./router.js", "router");
