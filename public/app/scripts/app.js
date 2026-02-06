@@ -100,7 +100,27 @@ function createUI() {
     console.error("❌", msg);
   }
 
-  return { toast, error };
+  // Loading overlay (compat com features antigas)
+  function loading(show = true, text = "Processando…") {
+    try {
+      const box = document.getElementById("ui-loading");
+      const txt = document.getElementById("ui-loading-text");
+      if (!box) return;
+
+      if (txt) txt.textContent = text || "Processando…";
+      box.classList.toggle("hidden", !show);
+      box.setAttribute("aria-hidden", show ? "false" : "true");
+    } catch (e) {
+      console.warn("⚠️ ui.loading falhou:", e);
+    }
+  }
+
+  function hideLoading() {
+    loading(false);
+  }
+
+  return { toast, error, loading, hideLoading };
+
 }
 
 /* -----------------------------
