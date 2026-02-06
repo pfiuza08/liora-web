@@ -645,5 +645,43 @@ function wireLoginMock(ctx) {
     wire();
   }
 })();
+// =============================================================
+// 🏷️ Selo DEMO no header (só com ?demo=1)
+// =============================================================
+(function demoBadge() {
+  function isDemo() {
+    try {
+      return new URLSearchParams(location.search).get("demo") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function ensureBadge() {
+    const host = document.querySelector(".header-actions");
+    if (!host) return;
+
+    let badge = document.getElementById("liora-demo-badge");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.id = "liora-demo-badge";
+      badge.className = "pill pill-base";
+      badge.style.marginRight = "8px";
+      badge.style.opacity = "0.9";
+      badge.style.borderStyle = "dashed";
+      badge.textContent = "DEMO";
+      host.insertBefore(badge, host.firstChild);
+    }
+    badge.classList.toggle("hidden", !isDemo());
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ensureBadge);
+  } else {
+    ensureBadge();
+  }
+
+  window.addEventListener("hashchange", ensureBadge);
+})();
    
 })();
