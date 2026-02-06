@@ -264,43 +264,44 @@ function wireRouteEvents(router) {
 ----------------------------- */
 function wireLoginMock(ctx) {
   function ensureLoginModal() {
-    if (document.getElementById("liora-login")) return;
+  if (document.getElementById("liora-login")) return;
 
-    const el = document.createElement("div");
-    el.id = "liora-login";
-    el.className = "liora-modal hidden";
-    el.innerHTML = `
-      <div class="liora-modal-backdrop" data-login-action="close"></div>
+  const el = document.createElement("div");
+  el.id = "liora-login";
+  el.className = "liora-modal hidden";
+  el.innerHTML = `
+    <div class="liora-modal-backdrop" data-login-action="close"></div>
 
-      <div class="liora-modal-card" style="max-width:520px;">
-        <div class="liora-modal-head">
-          <div>
-            <div class="liora-modal-title">Entrar</div>
-            <div class="liora-modal-sub muted">Salva seu progresso neste dispositivo.</div>
-          </div>
-          <button class="btn-secondary" data-login-action="close">Fechar</button>
+    <div class="liora-modal-card" style="max-width:520px;">
+      <div class="liora-modal-head">
+        <div>
+          <div class="liora-modal-title">Entrar</div>
+          <div class="liora-modal-sub muted">Receba um link por e-mail para acessar.</div>
         </div>
+        <button class="btn-secondary" data-login-action="close">Fechar</button>
+      </div>
 
-        <div class="liora-modal-body">
-          <label class="label">Nome</label>
-          <input id="liora-login-name" class="input" placeholder="Seu nome" />
+      <div class="liora-modal-body">
+        <label class="label">E-mail</label>
+        <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
 
-          <label class="label" style="margin-top:10px;">Email (opcional)</label>
-          <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
+        <button class="btn-primary" style="width:100%; margin-top:10px;" data-login-action="magic">
+          Enviar link de acesso
+        </button>
 
-          <div class="muted small" style="margin-top:10px;">
-            No MVP, o login é local. Depois conectamos autenticação real.
-          </div>
-        </div>
-
-        <div class="liora-modal-actions">
-          <button class="btn-secondary" data-login-action="close">Cancelar</button>
-          <button class="btn-primary" data-login-action="submit">Entrar</button>
+        <div class="muted small" style="margin-top:10px;">
+          Dica: verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
         </div>
       </div>
-    `;
-    document.body.appendChild(el);
-  }
+
+      <div class="liora-modal-actions">
+        <button class="btn-secondary" data-login-action="close">Fechar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
 
   function openLogin() {
     ensureLoginModal();
@@ -375,49 +376,64 @@ function wireLoginMock(ctx) {
 
   // header buttons
   document.getElementById("btn-login")?.addEventListener("click", () => openLogin());
-  document.getElementById("btn-logout")?.addEventListener("click", () => {
+  document.getElementById("btn-logout")?.addEventListener("click", async () => {
+    try {
+      if (ctx?.auth?.signOut) await ctx.auth.signOut();
+    } catch (e) {}
+
     clearUserSafe();
     ctx?.ui?.toast?.("Sessão encerrada.");
     ctx?.router?.go?.("home");
   });
+
 
   // eventos canônicos
   window.addEventListener("liora:open-login", () => openLogin());
   window.addEventListener("liora:login-required", () => openLogin());
   window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
 
-  // modal actions
+ // modal actions
   document.addEventListener("click", (ev) => {
-    const modal = document.getElementById("liora-login");
-    if (!modal || modal.classList.contains("hidden")) return;
+  const modal = document.getElementById("liora-login");
+  if (!modal || modal.classList.contains("hidden")) return;
 
-    const a = ev.target.closest("[data-login-action]");
-    if (!a) return;
+  const a = ev.target.closest("[data-login-action]");
+  if (!a) return;
 
-    const act = a.getAttribute("data-login-action");
-    if (act === "close") return closeLogin();
+  const act = a.getAttribute("data-login-action");
+  if (act === "close") return closeLogin();
 
-    if (act === "submit") {
-      const name = (document.getElementById("liora-login-name")?.value || "").trim();
-      const email = (document.getElementById("liora-login-email")?.value || "").trim();
+  if (act === "magic") {
+    const email = (document.getElementById("liora-login-email")?.value || "").trim();
 
-      if (!name) {
-        ctx?.ui?.toast?.("Informe seu nome para continuar.");
+    if (!email) {
+      ctx?.ui?.toast?.("Digite seu e-mail.");
+      return;
+    }
+
+    if (!ctx?.auth?.sendMagicLink) {
+      ctx?.ui?.toast?.("Auth ainda não carregou.");
+      return;
+    }
+
+    ctx?.ui?.loading?.("Enviando link…");
+    ctx.auth.sendMagicLink(email).then(({ error }) => {
+      ctx?.ui?.loading?.(false);
+
+      if (error) {
+        console.warn("⚠️ magic link error:", error);
+        ctx?.ui?.toast?.("Falha ao enviar link. Tente novamente.");
         return;
       }
 
-      const prev = getUserSafe() || {};
-      setUserSafe({
-        ...prev,
-        name,
-        email,
-        premium: !!prev.premium
-      });
+      ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail.");
+      // opcional: manter modal aberto para o usuário ler a dica
+      // closeLogin();
+    });
 
-      closeLogin();
-      ctx?.ui?.toast?.("Você entrou.");
-    }
-  });
+    return;
+  }
+});
 
   // init
   ensureLoginModal();
