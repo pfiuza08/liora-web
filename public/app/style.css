@@ -2582,4 +2582,52 @@ body.liora-modal-open{
   gap: 10px;
   flex-wrap: wrap;
 }
+/* =========================================================
+   ✅ FIX MODAL (SIMULADOS) NO MOBILE
+   - Mantém header e footer visíveis
+   - Corpo rola com scroll
+   ========================================================= */
+
+@media (max-width: 520px) {
+  /* garante que o modal ocupa a tela e centraliza */
+  .modal {
+    padding: 14px;
+  }
+
+  /* limita a altura do card */
+  .modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 88vh;      /* <<< chave do fix */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;       /* evita "vazar" */
+  }
+
+  /* header e footer fixos dentro do card */
+  .modal-head,
+  .modal-foot {
+    flex: 0 0 auto;
+    position: sticky;
+    z-index: 2;
+    background: inherit;
+  }
+  .modal-head { top: 0; }
+  .modal-foot { bottom: 0; }
+
+  /* corpo vira área rolável */
+  .modal-body {
+    flex: 1 1 auto;
+    overflow: auto;         /* <<< scroll aqui */
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 14px;   /* respiro antes do footer */
+  }
+
+  /* campos um pouco mais compactos no mobile */
+  .modal-body .input,
+  .modal-body select,
+  .modal-body input {
+    font-size: 16px;        /* evita zoom do iOS */
+  }
+}
 
