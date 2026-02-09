@@ -1,5 +1,5 @@
 // =============================================================
-// 🔐 LIORA — AUTH (Supabase Magic Link) v1
+// 🔐 LIORA — AUTH (Supabase Magic Link) v1.1 (profiles + premium)
 // Exporta: auth
 // =============================================================
 export const auth = {
@@ -39,22 +39,47 @@ export const auth = {
       // desloga no store local (para não ficar "Free/Premium" falso)
       ctx?.store?.remove?.("user");
       window.dispatchEvent(new Event("liora:user-changed"));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
       return;
     }
 
-    const name =
+    const fallbackName =
       this.user?.user_metadata?.full_name ||
       this.user?.user_metadata?.name ||
       "";
 
-    const email = this.user?.email || "";
+    const fallbackEmail = this.user?.email || "";
 
-    // espelha no store do MVP (gates atuais continuam funcionando)
+    // ---------------------------------------------------------
+    // ✅ Busca profile (premium) e espelha no store do MVP
+    // ---------------------------------------------------------
+    let premium = false;
+    let name = fallbackName;
+    let email = fallbackEmail;
+
+    try {
+      const { data, error } = await this.sb
+        .from("profiles")
+        .select("premium, name, email")
+        .eq("id", this.user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        premium = !!data.premium;
+        const pName = String(data.name || "").trim();
+        const pEmail = String(data.email || "").trim();
+        if (pName) name = pName;
+        if (pEmail) email = pEmail;
+      }
+    } catch (e) {
+      // fallback mantém premium=false
+    }
+
     ctx?.store?.set?.("user", {
       uid: this.user.id,
       name,
       email,
-      premium: false // premium vamos ligar depois via Hotmart/webhook
+      premium
     });
 
     window.dispatchEvent(new Event("liora:user-changed"));
