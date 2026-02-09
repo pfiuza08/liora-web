@@ -2630,4 +2630,72 @@ body.liora-modal-open{
     font-size: 16px;        /* evita zoom do iOS */
   }
 }
+/* =========================================================
+   ✅ FIX DEFINITIVO: Modal SIM Config (mobile)
+   - Garante scroll no body (min-height:0 + overflow)
+   - Usa 100dvh (corrige teclado/mobile)
+   - Footer sempre visível
+   ========================================================= */
+
+#sim-config {
+  position: fixed;
+  inset: 0;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 520px) {
+  /* usa viewport dinâmica (teclado no mobile) */
+  #sim-config {
+    height: 100dvh;
+    padding: 12px;
+  }
+
+  /* card vira coluna com área rolável */
+  #sim-config .modal-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden; /* importante: scroll fica no body */
+    min-height: 0;    /* <<< chave para scroll funcionar em flex */
+  }
+
+  /* header e footer não encolhem */
+  #sim-config .modal-head,
+  #sim-config .modal-foot {
+    flex: 0 0 auto;
+  }
+
+  /* corpo rola */
+  #sim-config .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;                 /* <<< chave para scroll funcionar */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
+  /* fixa o footer no fim (dentro do card) */
+  #sim-config .modal-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: inherit;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* evita zoom do iOS ao focar em inputs */
+  #sim-config .modal-body .input,
+  #sim-config .modal-body input,
+  #sim-config .modal-body select,
+  #sim-config .modal-body textarea {
+    font-size: 16px;
+  }
+}
 
