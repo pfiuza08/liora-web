@@ -415,52 +415,83 @@ function wireLoginMock(ctx) {
   const act = a.getAttribute("data-login-action");
   if (act === "close") return closeLogin();
 
-  if (act === "magic") {
+ if (act === "magic") {
   const email = (document.getElementById("liora-login-email")?.value || "").trim();
   if (!email) {
     ctx?.ui?.toast?.("Digite seu e-mail.");
     return;
   }
 
-  if (!ctx?.auth?.sendMagicLink) {
-    ctx?.ui?.toast?.("Auth ainda não carregou.");
+  // ✅ trava global (mesmo se existirem listeners duplicados)
+  window.__lioraMagic = window.__lioraMagic || { busy: false, lastAt: 0, cooldownMs: 60000, tries: 0 };
+
+  const now = Date.now();
+  const left = window.__lioraMagic.lastAt
+    ? window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)
+    : 0;
+
+  // se ainda está no cooldown, nem tenta enviar
+  if (left > 0) {
+    const s = Math.ceil(left / 1000);
+    ctx?.ui?.toast?.(`Aguarde ${s}s para reenviar o link.`);
     return;
   }
 
-  const btn = a;            // botão clicado
-  const cooldownMs = 45000; // 45s (pode ser 60000)
+  if (window.__lioraMagic.busy) {
+    ctx?.ui?.toast?.("Enviando link…");
+    return;
+  }
 
-  // trava clique repetido
-  if (btn.dataset.busy === "1") return;
-  btn.dataset.busy = "1";
+  window.__lioraMagic.busy = true;
+  window.__lioraMagic.lastAt = now;
+  window.__lioraMagic.tries++;
+
+  const btn = a;
   btn.disabled = true;
 
   const unlock = () => {
+    window.__lioraMagic.busy = false;
     window.setTimeout(() => {
       btn.disabled = false;
-      btn.dataset.busy = "0";
-    }, cooldownMs);
+    }, 800); // libera o botão, mas mantém cooldown pelo lastAt
   };
 
   ctx?.ui?.loading?.("Enviando link…");
+
+  // ✅ log de diagnóstico (mostra duplicação fácil)
+  console.log("🔐 magic link attempt", {
+    email,
+    tries: window.__lioraMagic.tries,
+    at: new Date().toISOString()
+  });
+
   ctx.auth.sendMagicLink(email).then(({ error }) => {
     ctx?.ui?.loading?.(false);
 
     if (error) {
       console.warn("⚠️ magic link error:", error);
 
-      const msg =
+      // Se rate-limit, aumenta cooldown para reduzir sofrimento
+      const isRate =
         String(error?.message || "").toLowerCase().includes("rate limit") ||
-        String(error?.status || "").includes("429")
-          ? "Muitos pedidos em pouco tempo. Aguarde 1 minuto e tente novamente."
-          : "Falha ao enviar link. Tente novamente.";
+        String(error?.status || "").includes("429");
 
-      ctx?.ui?.toast?.(msg);
-      return unlock();
+      if (isRate) {
+        window.__lioraMagic.cooldownMs = 120000; // 2 min após rate-limit
+        ctx?.ui?.toast?.("Muitos pedidos em pouco tempo. Aguarde 2 minutos e tente novamente.");
+      } else {
+        window.__lioraMagic.cooldownMs = 60000;
+        ctx?.ui?.toast?.("Falha ao enviar link. Tente novamente.");
+      }
+
+      unlock();
+      return;
     }
 
+    // sucesso
+    window.__lioraMagic.cooldownMs = 60000;
     ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
-    return unlock();
+    unlock();
   });
 
   return;
