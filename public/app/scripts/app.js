@@ -404,35 +404,55 @@ function wireLoginMock(ctx) {
   if (act === "close") return closeLogin();
 
   if (act === "magic") {
-    const email = (document.getElementById("liora-login-email")?.value || "").trim();
-
-    if (!email) {
-      ctx?.ui?.toast?.("Digite seu e-mail.");
-      return;
-    }
-
-    if (!ctx?.auth?.sendMagicLink) {
-      ctx?.ui?.toast?.("Auth ainda não carregou.");
-      return;
-    }
-
-    ctx?.ui?.loading?.("Enviando link…");
-    ctx.auth.sendMagicLink(email).then(({ error }) => {
-      ctx?.ui?.loading?.(false);
-
-      if (error) {
-        console.warn("⚠️ magic link error:", error);
-        ctx?.ui?.toast?.("Falha ao enviar link. Tente novamente.");
-        return;
-      }
-
-      ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail.");
-      // opcional: manter modal aberto para o usuário ler a dica
-      // closeLogin();
-    });
-
+  const email = (document.getElementById("liora-login-email")?.value || "").trim();
+  if (!email) {
+    ctx?.ui?.toast?.("Digite seu e-mail.");
     return;
   }
+
+  if (!ctx?.auth?.sendMagicLink) {
+    ctx?.ui?.toast?.("Auth ainda não carregou.");
+    return;
+  }
+
+  const btn = a;            // botão clicado
+  const cooldownMs = 45000; // 45s (pode ser 60000)
+
+  // trava clique repetido
+  if (btn.dataset.busy === "1") return;
+  btn.dataset.busy = "1";
+  btn.disabled = true;
+
+  const unlock = () => {
+    window.setTimeout(() => {
+      btn.disabled = false;
+      btn.dataset.busy = "0";
+    }, cooldownMs);
+  };
+
+  ctx?.ui?.loading?.("Enviando link…");
+  ctx.auth.sendMagicLink(email).then(({ error }) => {
+    ctx?.ui?.loading?.(false);
+
+    if (error) {
+      console.warn("⚠️ magic link error:", error);
+
+      const msg =
+        String(error?.message || "").toLowerCase().includes("rate limit") ||
+        String(error?.status || "").includes("429")
+          ? "Muitos pedidos em pouco tempo. Aguarde 1 minuto e tente novamente."
+          : "Falha ao enviar link. Tente novamente.";
+
+      ctx?.ui?.toast?.(msg);
+      return unlock();
+    }
+
+    ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
+    return unlock();
+  });
+
+  return;
+}
 });
 
   // init
