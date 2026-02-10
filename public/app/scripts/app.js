@@ -264,6 +264,15 @@ function wireRouteEvents(router) {
 ----------------------------- */
 function wireLoginMock(ctx) {
   function ensureLoginModal() {
+  // ✅ garante que não existe “modal duplicado” no DOM
+  const all = document.querySelectorAll("#liora-login");
+  if (all.length > 1) {
+    all.forEach((n, idx) => {
+      if (idx > 0) n.remove();
+    });
+  }
+
+  // se já existe 1, não recria
   if (document.getElementById("liora-login")) return;
 
   const el = document.createElement("div");
@@ -296,7 +305,14 @@ function wireLoginMock(ctx) {
     </div>
   `;
   document.body.appendChild(el);
+
+  // ✅ se alguma versão antiga injetar botões "close" extras no card, remove
+  const closes = el.querySelectorAll(".liora-modal-card [data-login-action='close']");
+  closes.forEach((c, i) => {
+    if (i > 0) c.remove();
+  });
 }
+
 
 
   function openLogin() {
