@@ -285,17 +285,13 @@ function wireLoginMock(ctx) {
         <label class="label">E-mail</label>
         <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
 
-        <button class="btn-primary" style="width:100%; margin-top:10px;" data-login-action="magic">
-          Enviar link de acesso
-        </button>
-
         <div class="muted small" style="margin-top:10px;">
           Dica: verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
         </div>
       </div>
 
       <div class="liora-modal-actions">
-        <button class="btn-secondary" data-login-action="close">Fechar</button>
+        <button class="btn-primary" data-login-action="magic">Enviar link de acesso</button>
       </div>
     </div>
   `;
