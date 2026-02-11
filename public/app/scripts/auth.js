@@ -1,5 +1,5 @@
 // =============================================================
-// 🔐 LIORA — AUTH (Supabase Magic Link) v1.1 (profiles + premium)
+// 🔐 LIORA — AUTH (Supabase Magic Link) v1.2 (profiles + premium + pending)
 // Exporta: auth
 // =============================================================
 export const auth = {
@@ -31,6 +31,68 @@ export const auth = {
     });
   },
 
+  // ---------------------------------------------------------
+  // ✅ Consome premium pendente (compra antes do login)
+  // - procura em premium_pending por email
+  // - se premium=true, aplica em profiles (id = auth user id)
+  // - remove o pending
+  // ---------------------------------------------------------
+  async _consumePendingPremium(email) {
+    try {
+      const sb = this.sb;
+      const u = this.user;
+
+      const e = String(email || "").trim().toLowerCase();
+      if (!sb || !u?.id || !e) return { consumed: false };
+
+      // 1) busca pendência
+      const { data: pending, error: e1 } = await sb
+        .from("premium_pending")
+        .select("email, premium, plan, last_event, payload_id, updated_at")
+        .eq("email", e)
+        .maybeSingle();
+
+      if (e1) {
+        console.warn("⚠️ pending select error:", e1);
+        return { consumed: false, error: e1.message };
+      }
+
+      if (!pending || pending.premium !== true) {
+        return { consumed: false };
+      }
+
+      // 2) aplica em profiles (respeita FK: profiles.id = auth.users.id)
+      const { error: e2 } = await sb
+        .from("profiles")
+        .upsert(
+          {
+            id: u.id,
+            email: e,
+            premium: true,
+            premium_source: "hotmart",
+            premium_updated_at: new Date().toISOString(),
+            hotmart_event: pending.last_event || "pending",
+            hotmart_payload_id: pending.payload_id || null
+          },
+          { onConflict: "id" }
+        );
+
+      if (e2) {
+        console.warn("⚠️ profiles upsert error:", e2);
+        return { consumed: false, error: e2.message };
+      }
+
+      // 3) remove pendência
+      const { error: e3 } = await sb.from("premium_pending").delete().eq("email", e);
+      if (e3) console.warn("⚠️ pending delete error:", e3);
+
+      return { consumed: true };
+    } catch (err) {
+      console.warn("⚠️ consume pending exception:", err);
+      return { consumed: false, error: String(err?.message || err) };
+    }
+  },
+
   async _handleSession(ctx, session) {
     this.session = session;
     this.user = session?.user || null;
@@ -51,6 +113,16 @@ export const auth = {
     const fallbackEmail = this.user?.email || "";
 
     // ---------------------------------------------------------
+    // ✅ Se houver compra antes do login, promove pending -> profiles
+    // ---------------------------------------------------------
+    if (fallbackEmail) {
+      const pend = await this._consumePendingPremium(fallbackEmail);
+      if (pend?.consumed) {
+        console.log("✅ Premium pendente aplicado (Hotmart → profiles).");
+      }
+    }
+
+    // ---------------------------------------------------------
     // ✅ Busca profile (premium) e espelha no store do MVP
     // ---------------------------------------------------------
     let premium = false;
@@ -67,9 +139,11 @@ export const auth = {
       if (!error && data) {
         premium = !!data.premium;
         const pName = String(data.name || "").trim();
-        const pEmail = String(data.email || "").trim();
+        const pEmail = String(data.email || "").trim().toLowerCase();
         if (pName) name = pName;
         if (pEmail) email = pEmail;
+      } else {
+        // se não existir profile ainda, mantém fallback
       }
     } catch (e) {
       // fallback mantém premium=false
@@ -87,8 +161,9 @@ export const auth = {
   },
 
   async sendMagicLink(email) {
+    const e = String(email || "").trim().toLowerCase();
     return this.sb.auth.signInWithOtp({
-      email,
+      email: e,
       options: {
         // precisa estar permitido em Auth → URL Configuration → Redirect URLs
         emailRedirectTo: location.origin + "/app/"
