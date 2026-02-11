@@ -85,7 +85,7 @@ function premiumActionFromEvent(eventNameRaw) {
 
 // chama Supabase REST (sem SDK)
 async function supabaseUpsertProfile({ supabaseUrl, serviceKey, email, premium, meta }) {
-  const url = `${supabaseUrl}/rest/v1/profiles`;
+  const url = `${supabaseUrl}/rest/v1/profiles?on_conflict=email`;
   const body = {
     email,
     premium: !!premium,
