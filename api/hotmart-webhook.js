@@ -1,8 +1,9 @@
 // /api/hotmart-webhook.js
 // ==========================================================
-// LIORA — Hotmart Webhook -> Supabase
-// - Se usuário existe no Auth: grava premium em public.profiles (id = auth.users.id)
-// - Se não existe: grava em public.premium_pending por email
+// LIORA — Hotmart Webhook -> Supabase (CORRIGIDO)
+// - Usa RPC get_uid_by_email para achar uid com precisão
+// - Se uid existe: upsert em profiles (id = uid)
+// - Se uid não existe: upsert em premium_pending
 // ==========================================================
 
 function json(res, status, data) {
@@ -70,32 +71,33 @@ function premiumActionFromEvent(eventNameRaw) {
   return { premium: null, reason: "ignored" };
 }
 
-async function authFindUserByEmail({ supabaseUrl, serviceKey, email }) {
-  // Admin API
-  const url = `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`;
+async function rpcGetUidByEmail({ supabaseUrl, serviceKey, email }) {
+  const url = `${supabaseUrl}/rest/v1/rpc/get_uid_by_email`;
   const resp = await fetch(url, {
-    method: "GET",
+    method: "POST",
     headers: {
       apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`
-    }
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ p_email: email })
   });
 
   const text = await resp.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { data = text; }
+
   if (!resp.ok) {
-    throw new Error(`Auth admin lookup failed ${resp.status}: ${text.slice(0, 250)}`);
+    throw new Error(
+      `RPC get_uid_by_email failed ${resp.status}: ${
+        typeof data === "string" ? data.slice(0, 300) : JSON.stringify(data).slice(0, 300)
+      }`
+    );
   }
 
-  let data = null;
-  try { data = JSON.parse(text); } catch {}
-
-  const user =
-    (Array.isArray(data?.users) && data.users[0]) ||
-    (Array.isArray(data) && data[0]) ||
-    data?.user ||
-    null;
-
-  return user?.id ? user : null;
+  // A função retorna uuid (string) ou null
+  const uid = typeof data === "string" ? data : null;
+  return uid && uid.length >= 10 ? uid : null;
 }
 
 async function upsertProfilesById({ supabaseUrl, serviceKey, uid, email, premium, meta }) {
@@ -194,24 +196,21 @@ export default async function handler(req, res) {
     if (act.premium === null) return json(res, 200, { ok: true, ignored: true, event: eventName, email });
 
     const meta = {
-      last_event: eventName,
-      payload_id: payload?.id || payload?.data?.id || null
+      hotmart_event: eventName,
+      hotmart_payload_id: payload?.id || payload?.data?.id || null
     };
 
-    // 1) tenta achar user no Auth
-    const user = await authFindUserByEmail({ supabaseUrl, serviceKey, email });
+    // ✅ Lookup correto
+    const uid = await rpcGetUidByEmail({ supabaseUrl, serviceKey, email });
 
-    if (user?.id) {
+    if (uid) {
       const updated = await upsertProfilesById({
         supabaseUrl,
         serviceKey,
-        uid: user.id,
+        uid,
         email,
         premium: act.premium,
-        meta: {
-          hotmart_event: meta.last_event,
-          hotmart_payload_id: meta.payload_id
-        }
+        meta
       });
 
       return json(res, 200, {
@@ -220,22 +219,21 @@ export default async function handler(req, res) {
         email,
         premium: act.premium,
         applied_to: "profiles",
-        uid: user.id,
+        uid,
         updated
       });
     }
 
-    // 2) se não existe ainda, guarda pendente por email
+    // Se não existe no Auth, vai para pending
     const pending = await upsertPendingByEmail({
       supabaseUrl,
       serviceKey,
       email,
       premium: act.premium,
       meta: {
-        source: "hotmart",
         plan: payload?.data?.purchase?.plan?.name || payload?.plan || null,
-        last_event: meta.last_event,
-        payload_id: meta.payload_id
+        last_event: eventName,
+        payload_id: meta.hotmart_payload_id
       }
     });
 
