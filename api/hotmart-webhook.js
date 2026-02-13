@@ -1,21 +1,64 @@
 // /api/hotmart-webhook.js
 // ==========================================================
-// LIORA — Hotmart Webhook -> Supabase (v2.2 TRIAL-SAFE)
-// - Mapeia eventos Hotmart (ON/OFF/IGNORED) conforme lista do painel
+// LIORA — Hotmart Webhook -> Supabase (Robusto + logs seguros)
 // - Usa RPC get_uid_by_email para achar uid com precisão
 // - Se uid existe: upsert em profiles (id = uid)
 // - Se uid não existe: upsert em premium_pending
 //
-// Eventos (Hotmart):
-//  ON  : Compra aprovada | Compra completa | Primeiro acesso | Troca de plano | Atualização de Data de Cobrança de Assinatura
-//  OFF : Cancelamento de Assinatura | Compra reembolsada | Pedido de reembolso | Chargeback | Compra cancelada | Compra expirada
-//  IGN : Aguardando pagamento | Compra atrasada | Abandono de carrinho (e outros não reconhecidos)
+// Melhorias:
+// ✅ logs seguros (mascara email, não loga payload bruto)
+// ✅ "trial-friendly": tenta inferir enable/disable por status no payload
+// ✅ eventos enable/disable configuráveis por ENV (sem redeploy)
+//
+// ENVs esperadas (Vercel):
+// - HOTMART_WEBHOOK_TOKEN
+// - SUPABASE_URL
+// - SUPABASE_SERVICE_ROLE_KEY
+//
+// Opcional:
+// - HOTMART_ENABLE_EVENTS  (csv, ex: "Compra aprovada,Compra completa,Primeiro acesso")
+// - HOTMART_DISABLE_EVENTS (csv, ex: "Cancelamento de Assinatura,Compra reembolsada,Chargeback")
 // ==========================================================
 
 function json(res, status, data) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(data));
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function maskEmail(email) {
+  const e = String(email || "").trim().toLowerCase();
+  const at = e.indexOf("@");
+  if (at <= 1) return e ? "***@***" : "";
+  const user = e.slice(0, at);
+  const dom = e.slice(at + 1);
+  return `${user[0]}***${user[user.length - 1]}@${dom}`;
+}
+
+function safeStr(x, max = 180) {
+  const s = String(x ?? "").replace(/\s+/g, " ").trim();
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+function normalize(s) {
+  return String(s || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function csvToList(envValue) {
+  const raw = String(envValue || "").trim();
+  if (!raw) return null;
+  return raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 function extractBuyerEmail(payload) {
@@ -38,6 +81,7 @@ function extractBuyerEmail(payload) {
     if (e && e.includes("@")) return e;
   }
 
+  // fallback: acha qualquer email no JSON stringify (último recurso)
   try {
     const flat = JSON.stringify(p);
     const m = flat.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
@@ -60,45 +104,70 @@ function extractEventName(payload) {
   ).trim();
 }
 
-function normalizeEventName(s) {
-  // Normaliza para bater “cancelamento de assinatura” vs “Cancelamento de Assinatura”, etc.
-  return String(s || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+// tenta capturar algum "status" útil do payload para ajudar em trial/assinatura
+function extractPurchaseStatus(payload) {
+  const p = payload || {};
+  const candidates = [
+    p?.data?.purchase?.status,
+    p?.purchase?.status,
+    p?.data?.subscription?.status,
+    p?.subscription?.status,
+    p?.data?.transaction?.status,
+    p?.transaction?.status
+  ];
+
+  for (const c of candidates) {
+    const s = String(c || "").trim();
+    if (s) return s;
+  }
+  return "";
 }
 
-function premiumActionFromEvent(eventNameRaw) {
-  const e = normalizeEventName(eventNameRaw);
+function premiumActionFromEventAndStatus(eventNameRaw, statusRaw, envEnableList, envDisableList) {
+  const e = normalize(eventNameRaw);
+  const st = normalize(statusRaw);
 
-  // 🔓 Libera Premium (inclui trial via “Primeiro acesso” e casos de assinatura ativa)
-  const enable = [
+  // Defaults (bons para começar)
+  const enableDefaults = [
     "compra aprovada",
     "compra completa",
     "primeiro acesso",
-    "troca de plano",
-    "atualização de data de cobrança de assinatura"
+    "assinatura ativa",
+    "pagamento aprovado",
+    "compra paga",
+    "renovacao de assinatura",
+    "ativacao de assinatura",
+    "liberacao de acesso"
   ];
 
-  // 🔒 Remove Premium (perda de direito)
-  const disable = [
+  const disableDefaults = [
     "cancelamento de assinatura",
     "compra reembolsada",
-    "pedido de reembolso",
-    "chargeback",
     "compra cancelada",
-    "compra expirada"
+    "chargeback",
+    "compra expirada",
+    "compra atrasada",
+    "assinatura suspensa",
+    "inadimplente"
   ];
 
-  // 💤 Eventos informativos (não mudam premium)
-  const ignored = ["aguardando pagamento", "compra atrasada", "abandono de carrinho"];
+  const enable = (envEnableList?.length ? envEnableList : enableDefaults).map(normalize);
+  const disable = (envDisableList?.length ? envDisableList : disableDefaults).map(normalize);
 
-  if (enable.some((k) => e.includes(k))) return { premium: true, reason: "enable", matched: enable.find((k) => e.includes(k)) };
-  if (disable.some((k) => e.includes(k))) return { premium: false, reason: "disable", matched: disable.find((k) => e.includes(k)) };
-  if (ignored.some((k) => e.includes(k))) return { premium: null, reason: "ignored", matched: ignored.find((k) => e.includes(k)) };
+  // 1) Primeiro pelo nome do evento
+  if (enable.some((k) => e.includes(k))) return { premium: true, reason: "enable_by_event" };
+  if (disable.some((k) => e.includes(k))) return { premium: false, reason: "disable_by_event" };
 
-  // Qualquer coisa desconhecida: ignora (não quebra produção)
-  return { premium: null, reason: "ignored_unknown", matched: null };
+  // 2) Depois, por status (trial-friendly)
+  // Aqui a ideia é: se algum status vier como "approved/paid/active", liga.
+  // Se vier "canceled/refunded/chargeback/expired", desliga.
+  const statusEnable = ["approved", "paid", "active", "completed", "complete", "aprovada", "paga", "ativa"];
+  const statusDisable = ["canceled", "cancelled", "refunded", "chargeback", "expired", "reembolsada", "cancelada", "expirada"];
+
+  if (st && statusEnable.some((k) => st.includes(k))) return { premium: true, reason: "enable_by_status" };
+  if (st && statusDisable.some((k) => st.includes(k))) return { premium: false, reason: "disable_by_status" };
+
+  return { premium: null, reason: "ignored" };
 }
 
 async function rpcGetUidByEmail({ supabaseUrl, serviceKey, email }) {
@@ -115,11 +184,7 @@ async function rpcGetUidByEmail({ supabaseUrl, serviceKey, email }) {
 
   const text = await resp.text();
   let data = null;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
+  try { data = JSON.parse(text); } catch { data = text; }
 
   if (!resp.ok) {
     throw new Error(
@@ -129,49 +194,9 @@ async function rpcGetUidByEmail({ supabaseUrl, serviceKey, email }) {
     );
   }
 
-  // A função retorna uuid (string) ou null
+  // pode retornar uuid string ou null
   const uid = typeof data === "string" ? data : null;
   return uid && uid.length >= 10 ? uid : null;
-}
-
-function buildHotmartMeta(payload, eventName) {
-  const p = payload || {};
-  const planName =
-    p?.data?.purchase?.plan?.name ||
-    p?.data?.purchase?.subscription?.plan?.name ||
-    p?.data?.subscription?.plan?.name ||
-    p?.data?.plan?.name ||
-    p?.plan ||
-    null;
-
-  const purchaseId =
-    p?.data?.purchase?.transaction ||
-    p?.data?.purchase?.id ||
-    p?.data?.purchase_id ||
-    p?.data?.id ||
-    p?.id ||
-    null;
-
-  const subscriptionId =
-    p?.data?.subscription?.id ||
-    p?.data?.purchase?.subscription?.id ||
-    p?.data?.subscription_id ||
-    null;
-
-  const status =
-    p?.data?.purchase?.status ||
-    p?.data?.subscription?.status ||
-    p?.data?.status ||
-    null;
-
-  return {
-    hotmart_event: eventName,
-    hotmart_event_norm: normalizeEventName(eventName),
-    hotmart_plan: planName,
-    hotmart_purchase_id: purchaseId,
-    hotmart_subscription_id: subscriptionId,
-    hotmart_status: status
-  };
 }
 
 async function upsertProfilesById({ supabaseUrl, serviceKey, uid, email, premium, meta }) {
@@ -181,7 +206,7 @@ async function upsertProfilesById({ supabaseUrl, serviceKey, uid, email, premium
     email,
     premium: !!premium,
     premium_source: "hotmart",
-    premium_updated_at: new Date().toISOString(),
+    premium_updated_at: nowIso(),
     ...meta
   };
 
@@ -198,11 +223,7 @@ async function upsertProfilesById({ supabaseUrl, serviceKey, uid, email, premium
 
   const text = await resp.text();
   let data = null;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
+  try { data = JSON.parse(text); } catch { data = text; }
 
   if (!resp.ok) {
     throw new Error(
@@ -221,7 +242,7 @@ async function upsertPendingByEmail({ supabaseUrl, serviceKey, email, premium, m
     email,
     premium: !!premium,
     source: "hotmart",
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     ...meta
   };
 
@@ -238,11 +259,7 @@ async function upsertPendingByEmail({ supabaseUrl, serviceKey, email, premium, m
 
   const text = await resp.text();
   let data = null;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
+  try { data = JSON.parse(text); } catch { data = text; }
 
   if (!resp.ok) {
     throw new Error(
@@ -256,6 +273,8 @@ async function upsertPendingByEmail({ supabaseUrl, serviceKey, email, premium, m
 }
 
 export default async function handler(req, res) {
+  const reqId = `hm_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+
   try {
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use POST" });
 
@@ -271,27 +290,44 @@ export default async function handler(req, res) {
     const payload = req.body || {};
     const eventName = extractEventName(payload);
     const email = extractBuyerEmail(payload);
+    const status = extractPurchaseStatus(payload);
 
-    if (!eventName) return json(res, 200, { ok: false, error: "event_missing" });
-    if (!email) return json(res, 200, { ok: false, error: "email_missing", event: eventName });
+    const enableEnv = csvToList(process.env.HOTMART_ENABLE_EVENTS);
+    const disableEnv = csvToList(process.env.HOTMART_DISABLE_EVENTS);
 
-    const act = premiumActionFromEvent(eventName);
+    if (!eventName) return json(res, 200, { ok: false, error: "event_missing", reqId });
+    if (!email) return json(res, 200, { ok: false, error: "email_missing", event: eventName, reqId });
 
-    // Não altera premium para eventos ignorados/unknown
+    const act = premiumActionFromEventAndStatus(eventName, status, enableEnv, disableEnv);
+
+    // log seguro
+    console.log("🔔 hotmart-webhook", {
+      reqId,
+      at: nowIso(),
+      event: safeStr(eventName, 120),
+      status: safeStr(status, 60),
+      email: maskEmail(email),
+      decision: act.reason,
+      premium: act.premium
+    });
+
     if (act.premium === null) {
       return json(res, 200, {
         ok: true,
         ignored: true,
-        reason: act.reason,
-        matched: act.matched,
+        reqId,
         event: eventName,
-        email
+        status,
+        email: email
       });
     }
 
-    const meta = buildHotmartMeta(payload, eventName);
+    const meta = {
+      hotmart_event: safeStr(eventName, 120),
+      hotmart_status: safeStr(status, 60),
+      hotmart_payload_id: payload?.id || payload?.data?.id || null
+    };
 
-    // ✅ Lookup correto
     const uid = await rpcGetUidByEmail({ supabaseUrl, serviceKey, email });
 
     if (uid) {
@@ -306,8 +342,9 @@ export default async function handler(req, res) {
 
       return json(res, 200, {
         ok: true,
+        reqId,
         event: eventName,
-        matched: act.matched,
+        status,
         email,
         premium: act.premium,
         applied_to: "profiles",
@@ -316,26 +353,36 @@ export default async function handler(req, res) {
       });
     }
 
-    // Se não existe no Auth, vai para pending (para aplicar quando a pessoa logar 1ª vez)
+    // não existe no Auth -> pending
     const pending = await upsertPendingByEmail({
       supabaseUrl,
       serviceKey,
       email,
       premium: act.premium,
-      meta
+      meta: {
+        plan: payload?.data?.purchase?.plan?.name || payload?.plan || null,
+        last_event: eventName,
+        last_status: status || null,
+        payload_id: meta.hotmart_payload_id
+      }
     });
 
     return json(res, 200, {
       ok: true,
+      reqId,
       event: eventName,
-      matched: act.matched,
+      status,
       email,
       premium: act.premium,
       applied_to: "premium_pending",
       pending
     });
   } catch (err) {
-    console.error("❌ hotmart-webhook error:", err);
-    return json(res, 500, { ok: false, error: "internal_error", detail: String(err?.message || err) });
+    console.error("❌ hotmart-webhook error:", {
+      reqId,
+      at: nowIso(),
+      message: String(err?.message || err)
+    });
+    return json(res, 500, { ok: false, error: "internal_error", reqId, detail: String(err?.message || err) });
   }
 }
