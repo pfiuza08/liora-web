@@ -1,17 +1,16 @@
 // =============================================================
 // 🧠 LIORA — APP (Boot + Theme + Gates + Features)
-// Versão: v85.1-FREEMIUM-MVP (router.js único + pricing + eventos por rota + login mock)
+// Versão: v85.2-FREEMIUM-MVP (auth supabase + anti-duplicação listeners + demo tools)
 // -------------------------------------------------------------
 // ✔ Router por hash via ./router.js (telas: home, tema, pdf, simulados, dashboard, pricing)
 // ✔ Nav por [data-nav] e marca ativo (is-active) via router.js
 // ✔ Theme toggle (html.light / html.dark)
-// ✔ Store (localStorage) + UI helpers (toast/error simples)
+// ✔ Store (localStorage) + UI helpers (toast/error + loading overlay)
 // ✔ Gates (login/premium) via eventos canônicos
-// ✔ Boot com imports dinâmicos (não quebra se faltar módulo)
-// ✔ Integra Premium Modal (premium.js)
-// ✔ Carrega pricing (pricing.js)
-// ✔ Dispara eventos liora:open-* ao trocar rota (inclui pricing)
-// ✔ Login MOCK (modal simples) + header state (Visitante/Free/Premium)
+// ✔ Boot com imports dinâmicos
+// ✔ Auth via Supabase Magic Link (auth.js)
+// ✔ Premium via profiles/pending (auth.js)
+// ✔ Reset demo + badge (só com ?demo=1)
 // =============================================================
 
 /* -----------------------------
@@ -46,7 +45,7 @@ function createStore(prefix = "liora:") {
 }
 
 /* -----------------------------
-   UI (toast + error simples)
+   UI (toast + error + loading)
 ----------------------------- */
 function createUI() {
   const toastElId = "liora-toast";
@@ -101,7 +100,7 @@ function createUI() {
   }
 
   // Loading overlay (compat com features antigas)
-    function loading(a = true, b = "Processando…") {
+  function loading(a = true, b = "Processando…") {
     // aceita: loading(true, "texto"), loading(false), loading("texto")
     let show = true;
     let text = "Processando…";
@@ -129,13 +128,11 @@ function createUI() {
     }
   }
 
-
   function hideLoading() {
     loading(false);
   }
 
   return { toast, error, loading, hideLoading };
-
 }
 
 /* -----------------------------
@@ -260,60 +257,57 @@ function wireRouteEvents(router) {
 }
 
 /* -----------------------------
-   LOGIN MOCK (modal simples + header state)
+   LOGIN (modal + header state)
 ----------------------------- */
 function wireLoginMock(ctx) {
   function ensureLoginModal() {
-  // ✅ garante que não existe “modal duplicado” no DOM
-  const all = document.querySelectorAll("#liora-login");
-  if (all.length > 1) {
-    all.forEach((n, idx) => {
-      if (idx > 0) n.remove();
+    // ✅ garante que não existe “modal duplicado” no DOM
+    const all = document.querySelectorAll("#liora-login");
+    if (all.length > 1) {
+      all.forEach((n, idx) => {
+        if (idx > 0) n.remove();
+      });
+    }
+
+    if (document.getElementById("liora-login")) return;
+
+    const el = document.createElement("div");
+    el.id = "liora-login";
+    el.className = "liora-modal hidden";
+    el.innerHTML = `
+      <div class="liora-modal-backdrop" data-login-action="close"></div>
+
+      <div class="liora-modal-card" style="max-width:520px;">
+        <div class="liora-modal-head">
+          <div>
+            <div class="liora-modal-title">Entrar</div>
+            <div class="liora-modal-sub muted">Receba um link por e-mail para acessar.</div>
+          </div>
+          <button class="btn-secondary" data-login-action="close">Fechar</button>
+        </div>
+
+        <div class="liora-modal-body">
+          <label class="label">E-mail</label>
+          <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
+
+          <div class="muted small" style="margin-top:10px;">
+            Dica: verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
+          </div>
+        </div>
+
+        <div class="liora-modal-actions">
+          <button class="btn-primary" data-login-action="magic">Enviar link de acesso</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
+
+    // ✅ se alguma versão antiga injetar botões close extras, remove
+    const closes = el.querySelectorAll(".liora-modal-card [data-login-action='close']");
+    closes.forEach((c, i) => {
+      if (i > 0) c.remove();
     });
   }
-
-  // se já existe 1, não recria
-  if (document.getElementById("liora-login")) return;
-
-  const el = document.createElement("div");
-  el.id = "liora-login";
-  el.className = "liora-modal hidden";
-  el.innerHTML = `
-    <div class="liora-modal-backdrop" data-login-action="close"></div>
-
-    <div class="liora-modal-card" style="max-width:520px;">
-      <div class="liora-modal-head">
-        <div>
-          <div class="liora-modal-title">Entrar</div>
-          <div class="liora-modal-sub muted">Receba um link por e-mail para acessar.</div>
-        </div>
-        <button class="btn-secondary" data-login-action="close">Fechar</button>
-      </div>
-
-      <div class="liora-modal-body">
-        <label class="label">E-mail</label>
-        <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
-
-        <div class="muted small" style="margin-top:10px;">
-          Dica: verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
-        </div>
-      </div>
-
-      <div class="liora-modal-actions">
-        <button class="btn-primary" data-login-action="magic">Enviar link de acesso</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(el);
-
-  // ✅ se alguma versão antiga injetar botões "close" extras no card, remove
-  const closes = el.querySelectorAll(".liora-modal-card [data-login-action='close']");
-  closes.forEach((c, i) => {
-    if (i > 0) c.remove();
-  });
-}
-
-
 
   function openLogin() {
     ensureLoginModal();
@@ -321,7 +315,7 @@ function wireLoginMock(ctx) {
     if (!modal) return;
     modal.classList.remove("hidden");
     document.body.classList.add("liora-modal-open");
-    setTimeout(() => document.getElementById("liora-login-name")?.focus(), 50);
+    setTimeout(() => document.getElementById("liora-login-email")?.focus(), 50);
   }
 
   function closeLogin() {
@@ -334,12 +328,6 @@ function wireLoginMock(ctx) {
   function getUserSafe() {
     const u = ctx?.store?.get?.("user");
     return u && typeof u === "object" ? u : null;
-  }
-
-  function setUserSafe(u) {
-    ctx?.store?.set?.("user", u);
-    window.dispatchEvent(new Event("liora:user-changed"));
-    window.dispatchEvent(new Event("liora:dashboard-refresh"));
   }
 
   function clearUserSafe() {
@@ -386,121 +374,230 @@ function wireLoginMock(ctx) {
     btnLogout?.classList.remove("hidden");
   }
 
-  // header buttons
-  document.getElementById("btn-login")?.addEventListener("click", () => openLogin());
-  document.getElementById("btn-logout")?.addEventListener("click", async () => {
-    try {
-      if (ctx?.auth?.signOut) await ctx.auth.signOut();
-    } catch (e) {}
+  // header buttons (usa guard para não duplicar listeners)
+  if (!window.__lioraLoginWired) {
+    window.__lioraLoginWired = true;
 
-    clearUserSafe();
-    ctx?.ui?.toast?.("Sessão encerrada.");
-    ctx?.router?.go?.("home");
-  });
+    document.getElementById("btn-login")?.addEventListener("click", () => openLogin());
 
+    document.getElementById("btn-logout")?.addEventListener("click", async () => {
+      try {
+        if (ctx?.auth?.signOut) await ctx.auth.signOut();
+      } catch {}
 
-  // eventos canônicos
-  window.addEventListener("liora:open-login", () => openLogin());
-  window.addEventListener("liora:login-required", () => openLogin());
-  window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
+      clearUserSafe();
+      ctx?.ui?.toast?.("Sessão encerrada.");
+      ctx?.router?.go?.("home");
+    });
 
- // modal actions
-  document.addEventListener("click", (ev) => {
-  const modal = document.getElementById("liora-login");
-  if (!modal || modal.classList.contains("hidden")) return;
+    // eventos canônicos
+    window.addEventListener("liora:open-login", () => openLogin());
+    window.addEventListener("liora:login-required", () => openLogin());
+    window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
 
-  const a = ev.target.closest("[data-login-action]");
-  if (!a) return;
+    // modal actions (1 listener só)
+    document.addEventListener("click", (ev) => {
+      const modal = document.getElementById("liora-login");
+      if (!modal || modal.classList.contains("hidden")) return;
 
-  const act = a.getAttribute("data-login-action");
-  if (act === "close") return closeLogin();
+      const a = ev.target.closest("[data-login-action]");
+      if (!a) return;
 
- if (act === "magic") {
-  const email = (document.getElementById("liora-login-email")?.value || "").trim();
-  if (!email) {
-    ctx?.ui?.toast?.("Digite seu e-mail.");
-    return;
-  }
+      const act = a.getAttribute("data-login-action");
+      if (act === "close") return closeLogin();
 
-  // ✅ trava global (mesmo se existirem listeners duplicados)
-  window.__lioraMagic = window.__lioraMagic || { busy: false, lastAt: 0, cooldownMs: 60000, tries: 0 };
+      if (act === "magic") {
+        const email = (document.getElementById("liora-login-email")?.value || "").trim();
+        if (!email) {
+          ctx?.ui?.toast?.("Digite seu e-mail.");
+          return;
+        }
 
-  const now = Date.now();
-  const left = window.__lioraMagic.lastAt
-    ? window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)
-    : 0;
+        if (!ctx?.auth?.sendMagicLink) {
+          ctx?.ui?.toast?.("Auth não carregou. Recarregue a página.");
+          return;
+        }
 
-  // se ainda está no cooldown, nem tenta enviar
-  if (left > 0) {
-    const s = Math.ceil(left / 1000);
-    ctx?.ui?.toast?.(`Aguarde ${s}s para reenviar o link.`);
-    return;
-  }
+        // ✅ trava global
+        window.__lioraMagic = window.__lioraMagic || {
+          busy: false,
+          lastAt: 0,
+          cooldownMs: 60000,
+          tries: 0
+        };
 
-  if (window.__lioraMagic.busy) {
-    ctx?.ui?.toast?.("Enviando link…");
-    return;
-  }
+        const now = Date.now();
+        const left = window.__lioraMagic.lastAt
+          ? window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)
+          : 0;
 
-  window.__lioraMagic.busy = true;
-  window.__lioraMagic.lastAt = now;
-  window.__lioraMagic.tries++;
+        if (left > 0) {
+          const s = Math.ceil(left / 1000);
+          ctx?.ui?.toast?.(`Aguarde ${s}s para reenviar o link.`);
+          return;
+        }
 
-  const btn = a;
-  btn.disabled = true;
+        if (window.__lioraMagic.busy) {
+          ctx?.ui?.toast?.("Enviando link…");
+          return;
+        }
 
-  const unlock = () => {
-    window.__lioraMagic.busy = false;
-    window.setTimeout(() => {
-      btn.disabled = false;
-    }, 800); // libera o botão, mas mantém cooldown pelo lastAt
-  };
+        window.__lioraMagic.busy = true;
+        window.__lioraMagic.lastAt = now;
+        window.__lioraMagic.tries++;
 
-  ctx?.ui?.loading?.("Enviando link…");
+        const btn = a;
+        btn.disabled = true;
 
-  // ✅ log de diagnóstico (mostra duplicação fácil)
-  console.log("🔐 magic link attempt", {
-    email,
-    tries: window.__lioraMagic.tries,
-    at: new Date().toISOString()
-  });
+        const unlock = () => {
+          window.__lioraMagic.busy = false;
+          window.setTimeout(() => {
+            btn.disabled = false;
+          }, 800);
+        };
 
-  ctx.auth.sendMagicLink(email).then(({ error }) => {
-    ctx?.ui?.loading?.(false);
+        ctx?.ui?.loading?.("Enviando link…");
 
-    if (error) {
-      console.warn("⚠️ magic link error:", error);
+        console.log("🔐 magic link attempt", {
+          email,
+          tries: window.__lioraMagic.tries,
+          at: new Date().toISOString()
+        });
 
-      // Se rate-limit, aumenta cooldown para reduzir sofrimento
-      const isRate =
-        String(error?.message || "").toLowerCase().includes("rate limit") ||
-        String(error?.status || "").includes("429");
+        ctx.auth.sendMagicLink(email).then(({ error }) => {
+          ctx?.ui?.loading?.(false);
 
-      if (isRate) {
-        window.__lioraMagic.cooldownMs = 120000; // 2 min após rate-limit
-        ctx?.ui?.toast?.("Muitos pedidos em pouco tempo. Aguarde 2 minutos e tente novamente.");
-      } else {
-        window.__lioraMagic.cooldownMs = 60000;
-        ctx?.ui?.toast?.("Falha ao enviar link. Tente novamente.");
+          if (error) {
+            console.warn("⚠️ magic link error:", error);
+
+            const msg = String(error?.message || "").toLowerCase();
+            const status = String(error?.status || "");
+
+            const isRate = msg.includes("rate limit") || status.includes("429");
+
+            if (isRate) {
+              window.__lioraMagic.cooldownMs = 120000; // 2 min
+              ctx?.ui?.toast?.("Limite de envios atingido. Aguarde 2 minutos e tente novamente.");
+            } else {
+              window.__lioraMagic.cooldownMs = 60000;
+              ctx?.ui?.toast?.("Falha ao enviar link. Tente novamente.");
+            }
+
+            unlock();
+            return;
+          }
+
+          window.__lioraMagic.cooldownMs = 60000;
+          ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
+          unlock();
+        });
+
+        return;
       }
-
-      unlock();
-      return;
-    }
-
-    // sucesso
-    window.__lioraMagic.cooldownMs = 60000;
-    ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
-    unlock();
-  });
-
-  return;
-}
-});
+    });
+  }
 
   // init
   ensureLoginModal();
   updateHeaderAuthUI();
+}
+
+/* -----------------------------
+   DEMO tools (só com ?demo=1)
+----------------------------- */
+function isDemoMode() {
+  try {
+    return new URLSearchParams(location.search).get("demo") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function demoResetInit() {
+  if (window.__lioraDemoResetWired) return;
+  window.__lioraDemoResetWired = true;
+
+  function showDemoTools() {
+    const box = document.getElementById("demo-tools");
+    if (!box) return;
+    box.classList.toggle("hidden", !isDemoMode());
+  }
+
+  function resetLioraStorage() {
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith("liora:")) keysToRemove.push(k);
+        if (k === "liora_stats:v1") keysToRemove.push(k);
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn("⚠️ reset demo falhou:", e);
+    }
+  }
+
+  function wire() {
+    showDemoTools();
+
+    const btn = document.getElementById("btn-reset-demo");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      if (!isDemoMode()) return;
+      const ok = window.confirm("Resetar a demo? Isso apaga os dados locais da Liora neste navegador.");
+      if (!ok) return;
+
+      resetLioraStorage();
+
+      try { location.hash = "#home"; } catch {}
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set("demo", "1");
+        location.replace(url.toString());
+      } catch {
+        location.reload();
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wire);
+  } else {
+    wire();
+  }
+}
+
+function demoBadgeInit() {
+  if (window.__lioraDemoBadgeWired) return;
+  window.__lioraDemoBadgeWired = true;
+
+  function ensureBadge() {
+    const host = document.querySelector(".header-actions");
+    if (!host) return;
+
+    let badge = document.getElementById("liora-demo-badge");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.id = "liora-demo-badge";
+      badge.className = "pill pill-base";
+      badge.style.marginRight = "8px";
+      badge.style.opacity = "0.9";
+      badge.style.borderStyle = "dashed";
+      badge.textContent = "DEMO";
+      host.insertBefore(badge, host.firstChild);
+    }
+    badge.classList.toggle("hidden", !isDemoMode());
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ensureBadge);
+  } else {
+    ensureBadge();
+  }
+
+  window.addEventListener("hashchange", ensureBadge);
 }
 
 /* -----------------------------
@@ -536,21 +633,18 @@ function wireLoginMock(ctx) {
   } else {
     console.warn("⚠️ auth.js não carregou (verifique ./auth.js em /app/scripts)");
   }
- 
+
   // -----------------------------
   // ✅ Router (único) via módulo
   // -----------------------------
   const routerMod = await loadFeature("./router.js", "router");
   if (routerMod?.init) {
     routerMod.init();
-    window.router = routerMod; // para features chamarem window.router.go(...)
+    window.router = routerMod;
     ctx.router = routerMod;
-
-    // liga eventos por rota (inclui pricing)
     wireRouteEvents(routerMod);
   } else {
     console.warn("⚠️ router.js não carregou. Verifique o caminho ./router.js");
-    // fallback mínimo: não quebra tudo
     window.router = {
       go(r) {
         const rr = String(r || "home");
@@ -566,30 +660,34 @@ function wireLoginMock(ctx) {
   }
 
   // -----------------------------
-  // NAV fallback por data-action (se sua UI tiver)
+  // NAV fallback por data-action
   // -----------------------------
-  document.addEventListener("click", (ev) => {
-    const a = ev.target.closest("[data-action]");
-    if (!a) return;
+  if (!window.__lioraNavFallbackWired) {
+    window.__lioraNavFallbackWired = true;
 
-    const act = a.getAttribute("data-action");
-    if (!act) return;
+    document.addEventListener("click", (ev) => {
+      const a = ev.target.closest("[data-action]");
+      if (!a) return;
 
-    if (act === "openDashboard") return ctx.router.go("dashboard");
-    if (act === "openSimulados") return ctx.router.go("simulados");
-    if (act === "openTema") return ctx.router.go("tema");
-    if (act === "openPdf") return ctx.router.go("pdf");
-    if (act === "openPricing") return ctx.router.go("pricing");
-    if (act === "goHome") return ctx.router.go("home");
-  });
+      const act = a.getAttribute("data-action");
+      if (!act) return;
+
+      if (act === "openDashboard") return ctx.router.go("dashboard");
+      if (act === "openSimulados") return ctx.router.go("simulados");
+      if (act === "openTema") return ctx.router.go("tema");
+      if (act === "openPdf") return ctx.router.go("pdf");
+      if (act === "openPricing") return ctx.router.go("pricing");
+      if (act === "goHome") return ctx.router.go("home");
+    });
+  }
 
   // -----------------------------
-  // ✅ Login Mock (MVP)
+  // ✅ Login modal + header state
   // -----------------------------
   wireLoginMock(ctx);
 
   // -----------------------------
-  // Features (não quebra se faltar)
+  // Features
   // -----------------------------
   const premium = await loadFeature("./premium.js", "premium");
   premium?.init?.(ctx);
@@ -603,19 +701,13 @@ function wireLoginMock(ctx) {
   const pricing = await loadFeature("./features/pricing.js", "pricing");
   pricing?.init?.(ctx);
 
-  // opcionais (se existirem no seu repo)
   const planos = await loadFeature("./features/planos.js", "planos");
   planos?.init?.(ctx);
 
   const pdf = await loadFeature("./features/pdf.js", "pdf");
   pdf?.init?.(ctx);
 
-  //const estudos = await loadFeature("./features/estudos.js", "estudos");
-  //estudos?.init?.(ctx);
-
-  // -----------------------------
-  // conveniência: quando user muda, re-render do dashboard
-  // -----------------------------
+  // conveniência
   window.addEventListener("liora:user-changed", () => {
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   });
@@ -644,134 +736,27 @@ function wireLoginMock(ctx) {
         source: String(detail.source || "app")
       });
 
-      // guarda só as últimas 1200 sessões
       if (data.sessions.length > 1200) data.sessions = data.sessions.slice(-1200);
 
       localStorage.setItem(key, JSON.stringify(data));
 
-      // eventos que o dashboard já escuta
-      window.dispatchEvent(
-        new CustomEvent("liora:stats-changed", { detail: { type: "session" } })
-      );
+      window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "session" } }));
       window.dispatchEvent(new Event("liora:dashboard-refresh"));
     } catch (e) {
       console.warn("⚠️ Falha ao salvar session:", e);
     }
   });
 
-  // ✅ render inicial do dashboard
+  // render inicial
   window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
+  // demo tools
+  demoResetInit();
+  demoBadgeInit();
 
   console.log("✅ LIORA boot ok", {
     route: ctx.router?.getInitialRoute?.() || (location.hash || "#home"),
     premium: gates.isPremium(),
     logged: gates.isLogged()
   });
-// =============================================================
-// 🧼 Reset Demo (aparece só com ?demo=1)
-// - Limpa apenas: liora:* e liora_stats:v1
-// - Volta para #home e recarrega
-// =============================================================
-(function demoReset() {
-  function isDemo() {
-    try {
-      const p = new URLSearchParams(location.search);
-      return p.get("demo") === "1";
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function showDemoTools() {
-    const box = document.getElementById("demo-tools");
-    if (!box) return;
-    if (isDemo()) box.classList.remove("hidden");
-    else box.classList.add("hidden");
-  }
-
-  function resetLioraStorage() {
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k) continue;
-        if (k.startsWith("liora:")) keysToRemove.push(k);
-        if (k === "liora_stats:v1") keysToRemove.push(k);
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-    } catch (e) {
-      console.warn("⚠️ reset demo falhou:", e);
-    }
-  }
-
-  function wire() {
-    showDemoTools();
-
-    const btn = document.getElementById("btn-reset-demo");
-    if (!btn) return;
-
-    btn.addEventListener("click", () => {
-      if (!isDemo()) return; // segurança extra
-      const ok = window.confirm("Resetar a demo? Isso apaga os dados locais da Liora neste navegador.");
-      if (!ok) return;
-
-      resetLioraStorage();
-
-      try { location.hash = "#home"; } catch (e) {}
-      try {
-        // mantém o modo demo na URL
-        const url = new URL(location.href);
-        url.searchParams.set("demo", "1");
-        location.replace(url.toString());
-      } catch (e) {
-        location.reload();
-      }
-    });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
-})();
-// =============================================================
-// 🏷️ Selo DEMO no header (só com ?demo=1)
-// =============================================================
-(function demoBadge() {
-  function isDemo() {
-    try {
-      return new URLSearchParams(location.search).get("demo") === "1";
-    } catch {
-      return false;
-    }
-  }
-
-  function ensureBadge() {
-    const host = document.querySelector(".header-actions");
-    if (!host) return;
-
-    let badge = document.getElementById("liora-demo-badge");
-    if (!badge) {
-      badge = document.createElement("span");
-      badge.id = "liora-demo-badge";
-      badge.className = "pill pill-base";
-      badge.style.marginRight = "8px";
-      badge.style.opacity = "0.9";
-      badge.style.borderStyle = "dashed";
-      badge.textContent = "DEMO";
-      host.insertBefore(badge, host.firstChild);
-    }
-    badge.classList.toggle("hidden", !isDemo());
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", ensureBadge);
-  } else {
-    ensureBadge();
-  }
-
-  window.addEventListener("hashchange", ensureBadge);
-})();
-   
 })();
