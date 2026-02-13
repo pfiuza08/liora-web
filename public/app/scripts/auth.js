@@ -265,4 +265,46 @@ export const auth = {
   isLogged() {
     return !!this.user?.id;
   }
+    // ---------------------------------------------------------
+  // 🔄 Rebusca profiles (premium) e atualiza store
+  // Útil para testes: sem depender de reload
+  // ---------------------------------------------------------
+  async refreshProfile(ctx) {
+    try {
+      if (!this.sb || !this.user?.id) return { ok: false, error: "not_logged" };
+
+      const fallbackName =
+        this.user?.user_metadata?.full_name ||
+        this.user?.user_metadata?.name ||
+        "";
+
+      const fallbackEmail = this.user?.email || "";
+
+      let premium = false;
+      let name = fallbackName;
+      let email = fallbackEmail;
+
+      const { data, error } = await this.sb
+        .from("profiles")
+        .select("premium, name, email")
+        .eq("id", this.user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        premium = !!data.premium;
+        const pName = String(data.name || "").trim();
+        const pEmail = String(data.email || "").trim().toLowerCase();
+        if (pName) name = pName;
+        if (pEmail) email = pEmail;
+      }
+
+      ctx?.store?.set?.("user", { uid: this.user.id, name, email, premium });
+      window.dispatchEvent(new Event("liora:user-changed"));
+      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+
+      return { ok: true, premium };
+    } catch (e) {
+      return { ok: false, error: String(e?.message || e) };
+    }
+  },
 };
