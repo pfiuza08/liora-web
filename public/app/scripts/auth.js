@@ -1,7 +1,7 @@
 // /app/scripts/auth.js
 // =============================================================
-// 🔐 LIORA — AUTH (Supabase Magic Link) v1.3
-// (profiles + premium + pending + throttle + logs)
+// 🔐 LIORA — AUTH (Supabase Magic Link) v1.4
+// (profiles + premium + pending + throttle robusto + logs + refreshProfile)
 // Exporta: auth
 // =============================================================
 export const auth = {
@@ -9,7 +9,7 @@ export const auth = {
   session: null,
   user: null,
 
-  // throttle local (evita martelar e cair em rate limit)
+  // throttle padrão local (evita martelar)
   THROTTLE_MS: 2 * 60 * 1000, // 2 min
 
   init(ctx) {
@@ -65,25 +65,47 @@ export const auth = {
     } catch {}
   },
 
+  _throttleWindowMs(email) {
+    const t = this._readThrottle(email);
+    // ✅ se houver forcedMs, usa. Se não, usa o padrão.
+    const forced = Number(t?.forcedMs);
+    if (!Number.isNaN(forced) && forced > 0) return forced;
+    return this.THROTTLE_MS;
+  },
+
   _msLeftThrottle(email) {
     const t = this._readThrottle(email);
     if (!t?.at) return 0;
-    const left = (t.at + this.THROTTLE_MS) - Date.now();
+
+    const windowMs = this._throttleWindowMs(email);
+    const left = (t.at + windowMs) - Date.now();
     return left > 0 ? left : 0;
   },
 
   _fmtMs(ms) {
-    const s = Math.ceil(ms / 1000);
+    const s = Math.max(0, Math.ceil(ms / 1000));
     const m = Math.floor(s / 60);
     const r = s % 60;
+    if (m <= 0) return `${r}s`;
     return `${m}:${String(r).padStart(2, "0")}`;
+  },
+
+  _isRateLimitError(error) {
+    const msg = String(error?.message || "").toLowerCase();
+    const code = String(error?.code || "").toLowerCase();
+    const status = String(error?.status || "");
+    // supabase costuma usar 429; nem sempre vem "rate limit" no texto
+    return (
+      msg.includes("rate limit") ||
+      msg.includes("too many") ||
+      msg.includes("exceeded") ||
+      code.includes("rate") ||
+      status.includes("429")
+    );
   },
 
   /* ---------------------------------------------------------
      ✅ Consome premium pendente (compra antes do login)
-     - procura em premium_pending por email
-     - se premium=true, aplica em profiles (id = auth user id)
-     - remove o pending
   --------------------------------------------------------- */
   async _consumePendingPremium(email) {
     try {
@@ -105,11 +127,9 @@ export const auth = {
         return { consumed: false, error: e1.message };
       }
 
-      if (!pending || pending.premium !== true) {
-        return { consumed: false };
-      }
+      if (!pending || pending.premium !== true) return { consumed: false };
 
-      // 2) aplica em profiles (respeita FK: profiles.id = auth.users.id)
+      // 2) aplica em profiles (FK: profiles.id = auth.users.id)
       const { error: e2 } = await sb
         .from("profiles")
         .upsert(
@@ -146,7 +166,6 @@ export const auth = {
     this.user = session?.user || null;
 
     if (!this.user) {
-      // desloga no store local (para não ficar "Free/Premium" falso)
       ctx?.store?.remove?.("user");
       window.dispatchEvent(new Event("liora:user-changed"));
       window.dispatchEvent(new Event("liora:dashboard-refresh"));
@@ -160,17 +179,13 @@ export const auth = {
 
     const fallbackEmail = (this.user?.email || "").trim().toLowerCase();
 
-    // ---------------------------------------------------------
-    // ✅ Se houver compra antes do login, promove pending -> profiles
-    // ---------------------------------------------------------
+    // Se houver compra antes do login, promove pending -> profiles
     if (fallbackEmail) {
       const pend = await this._consumePendingPremium(fallbackEmail);
       if (pend?.consumed) console.log("✅ Premium pendente aplicado (Hotmart → profiles).");
     }
 
-    // ---------------------------------------------------------
-    // ✅ Busca profile (premium) e espelha no store do MVP
-    // ---------------------------------------------------------
+    // Busca profiles e espelha no store
     let premium = false;
     let name = fallbackName;
     let email = fallbackEmail;
@@ -191,69 +206,84 @@ export const auth = {
       }
     } catch {}
 
-    ctx?.store?.set?.("user", {
-      uid: this.user.id,
-      name,
-      email,
-      premium
-    });
+    ctx?.store?.set?.("user", { uid: this.user.id, name, email, premium });
 
     window.dispatchEvent(new Event("liora:user-changed"));
     window.dispatchEvent(new Event("liora:dashboard-refresh"));
   },
 
   /* ---------------------------------------------------------
-     ✉️ Magic Link (com throttle + logs + mensagens úteis)
+     ✉️ Magic Link (throttle robusto + mensagens úteis)
   --------------------------------------------------------- */
   async sendMagicLink(email) {
     const sb = this.sb;
     const e = String(email || "").trim().toLowerCase();
 
-    if (!sb) {
-      return { data: null, error: { message: "Supabase não inicializado." } };
-    }
-
-    if (!e || !e.includes("@")) {
-      return { data: null, error: { message: "Digite um e-mail válido." } };
-    }
+    if (!sb) return { data: null, error: { message: "Supabase não inicializado." } };
+    if (!e || !e.includes("@")) return { data: null, error: { message: "Digite um e-mail válido." } };
 
     // throttle local
     const left = this._msLeftThrottle(e);
     if (left > 0) {
       return {
         data: null,
-        error: {
-          message: `Aguarde ${this._fmtMs(left)} para pedir outro link (evita bloqueio).`
-        }
+        error: { message: `Aguarde ${this._fmtMs(left)} para reenviar o link.` }
       };
     }
 
     // registra tentativa local imediatamente (evita duplo clique)
-    const stamp = { at: Date.now(), tries: (this._readThrottle(e)?.tries || 0) + 1 };
+    const prev = this._readThrottle(e);
+    const stamp = {
+      at: Date.now(),
+      tries: (prev?.tries || 0) + 1,
+      forcedMs: 0
+    };
     this._writeThrottle(e, stamp);
-    console.log("🔐 magic link attempt", { email: e, ...stamp });
+
+    console.log("🔐 magic link attempt", { email: e, tries: stamp.tries, at: new Date(stamp.at).toISOString() });
 
     const { data, error } = await sb.auth.signInWithOtp({
       email: e,
       options: {
-        // precisa estar permitido em Auth → URL Configuration → Redirect URLs
+        // permitido em Auth → URL Configuration → Redirect URLs
         emailRedirectTo: location.origin + "/app/"
       }
     });
 
-    // log completo pra diagnóstico
     console.log("🔐 magic link result", { email: e, data, error });
 
-    // se deu erro, mantém throttle por um tempo (pra não martelar)
     if (error) {
-      // se for rate limit, aumenta um pouco o throttle local
-      const msg = String(error.message || "").toLowerCase();
-      if (msg.includes("rate limit")) {
-        // estica para 5 min (somente local)
+      const isRate = this._isRateLimitError(error);
+
+      // ✅ ajusta throttle local conforme tipo de erro
+      if (isRate) {
+        // 5 min local, para não fritar seu limite e nem o usuário
         this._writeThrottle(e, { at: Date.now(), tries: stamp.tries, forcedMs: 5 * 60 * 1000 });
+
+        return {
+          data,
+          error: {
+            ...error,
+            message:
+              "Limite de envios atingido. Aguarde 5 minutos e tente novamente (ou use outro e-mail/aba anônima para testes)."
+          }
+        };
       }
-      return { data, error };
+
+      // erro comum (smtp, config, etc): throttle curto só para evitar spam de clique
+      this._writeThrottle(e, { at: Date.now(), tries: stamp.tries, forcedMs: 30 * 1000 });
+
+      return {
+        data,
+        error: {
+          ...error,
+          message: error?.message || "Falha ao enviar link. Tente novamente."
+        }
+      };
     }
+
+    // sucesso: mantém throttle padrão (2 min) para UX mais estável
+    this._writeThrottle(e, { at: Date.now(), tries: stamp.tries, forcedMs: 0 });
 
     return { data, error: null };
   },
@@ -264,8 +294,9 @@ export const auth = {
 
   isLogged() {
     return !!this.user?.id;
-  }
-    // ---------------------------------------------------------
+  },
+
+  // ---------------------------------------------------------
   // 🔄 Rebusca profiles (premium) e atualiza store
   // Útil para testes: sem depender de reload
   // ---------------------------------------------------------
@@ -306,5 +337,5 @@ export const auth = {
     } catch (e) {
       return { ok: false, error: String(e?.message || e) };
     }
-  },
+  }
 };
