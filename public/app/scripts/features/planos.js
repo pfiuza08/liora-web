@@ -8,7 +8,6 @@ export const planos = {
 
   _currentSessaoId: null,
 
-
   init(ctx) {
     this.ctx = ctx;
 
@@ -28,92 +27,114 @@ export const planos = {
     console.log("planos.js iniciado");
   },
 
-
   // -----------------------------
   // 🔥 Geração por Tema (robusta)
   // ✅ com barra de progresso
+  // ✅ trava Free: 3/dia (via ctx.limits)
   // -----------------------------
-   async gerarTema() {
+  async gerarTema() {
     const { store, ui } = this.ctx;
-  
+
     const tema = (document.getElementById("inp-tema")?.value || "").trim();
     const nivel = document.getElementById("sel-nivel")?.value || "iniciante";
     const status = document.getElementById("tema-status");
-  
+
     if (!tema) {
       ui.error("Digite um tema para gerar o plano.");
       return;
     }
-  
+
+    // ✅ TRAVA FREE (3/dia)
+    // - Premium passa direto
+    // - Se bater limite, manda pro pricing
+    try {
+      if (this.ctx?.limits && !this.ctx?.gates?.isPremium?.()) {
+        if (!this.ctx.limits.can("tema")) {
+          ui?.toast?.("Limite do Free atingido: 3 planos por tema por dia. Vá em Planos para liberar.");
+          this.ctx?.router?.go?.("pricing");
+          return;
+        }
+      }
+    } catch (e) {
+      // se algo falhar no limiter, não bloqueia a geração
+    }
+
     let stopSim = null;
-  
+
     try {
       ui.loading(true, "Gerando plano e sessões…");
-  
+
       // ✅ barra viva desde o início
       this._progressShow();
       this._progressSet(6, "Preparando…");
-  
+
       // etapa 1: chamando IA
       this._progressSet(14, "Chamando IA…");
-  
+
       // ✅ simula progresso enquanto espera IA (evita sensação de travado)
       stopSim = this._progressSimulateDuringAi(16, 88);
-  
+
       const res = await fetch("/api/gerarPlano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tema, nivel })
       });
-  
+
       const text = await res.text();
       let data = null;
-  
+
       try {
         data = JSON.parse(text);
       } catch (err) {
         console.error("Resposta não-JSON:", text);
         throw new Error("Servidor retornou resposta inválida (não JSON).");
       }
-  
+
       if (!res.ok) {
         throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       }
-  
+
       if (!data?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
       }
-  
+
       // ✅ IA terminou, para simulação
       if (stopSim) stopSim();
       stopSim = null;
-  
+
       // etapa 2: normaliza + salva
       this._progressSet(92, "Organizando sessões…");
-  
+
       data = this._normalizePlano(data, { tema, nivel });
-  
+
       store.set("planoTema", data);
-  
+
       // reset de progresso quando gera plano novo
       this._resetStateForNewPlan(data);
-  
+
       // limpa cache/uso de aprofundar do plano (não apaga contagem diária)
       this.ctx.store.set("planoTemaAprofCache", {});
-  
+
       // etapa 3: render
       this._progressSet(97, "Renderizando conteúdo…");
-  
+
       this.render(data);
-  
+
+      // ✅ contabiliza uso (apenas se gerou mesmo)
+      try {
+        if (this.ctx?.limits && !this.ctx?.gates?.isPremium?.()) {
+          this.ctx.limits.hit("tema");
+        }
+      } catch {}
+
       // final
       this._progressSet(100, "Plano gerado!");
       if (status) status.textContent = "Plano gerado!";
-  
+
       setTimeout(() => this._progressHide(), 700);
     } catch (e) {
       if (stopSim) stopSim();
-  
+
       console.error(e);
       ui.error(e?.message || "Falha ao gerar plano por tema.");
       if (status) status.textContent = "";
@@ -122,7 +143,6 @@ export const planos = {
       ui.loading(false);
     }
   },
-
 
   limparPlano() {
     const { store } = this.ctx;
@@ -193,7 +213,7 @@ export const planos = {
   // -----------------------------
   // 🧭 Navegação + Progresso
   // -----------------------------
-    _setCurrentIndex(i, opts = {}) {
+  _setCurrentIndex(i, opts = {}) {
     const lista = document.getElementById("lista-sessoes");
     const n = this._sessoes.length;
     if (!n) return;
@@ -216,15 +236,16 @@ export const planos = {
     }
 
     // ✅ start timer da sessão (para stats)
-    try { this.ctx?.store?.set?.("liora_session_start_ts", Date.now()); } catch {}
-   
+    try {
+      this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
+    } catch {}
+
     this.renderSessao(sessao);
 
     if (!opts.silentSave) {
       this._saveState({ currentId: sessao?.id });
     }
   },
-
 
   _goPrev() {
     this._setCurrentIndex(this._idxAtual - 1);
@@ -234,58 +255,58 @@ export const planos = {
     this._setCurrentIndex(this._idxAtual + 1);
   },
 
- _toggleDoneCurrent() {
-  const sessao = this._sessoes[this._idxAtual];
-  if (!sessao?.id) return;
+  _toggleDoneCurrent() {
+    const sessao = this._sessoes[this._idxAtual];
+    if (!sessao?.id) return;
 
-  const st = this._getState();
-  const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
+    const st = this._getState();
+    const done = new Set(Array.isArray(st.doneIds) ? st.doneIds : []);
 
-  const wasDone = done.has(sessao.id);
+    const wasDone = done.has(sessao.id);
 
-  if (wasDone) done.delete(sessao.id);
-  else done.add(sessao.id);
+    if (wasDone) done.delete(sessao.id);
+    else done.add(sessao.id);
 
-  const isDoneNow = !wasDone;
+    const isDoneNow = !wasDone;
 
-  this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
+    this._saveState({ doneIds: Array.from(done), currentId: sessao.id });
 
-  // ✅ Se acabou de CONCLUIR (e não “desconcluir”), registra stats + refresh dashboard
-  if (isDoneNow) {
-    try {
-      const startTs = Number(this.ctx?.store?.get?.("liora_session_start_ts") || 0);
-      const timeSec = startTs ? Math.max(0, Math.round((Date.now() - startTs) / 1000)) : 0;
+    // ✅ Se acabou de CONCLUIR (e não “desconcluir”), registra stats + refresh dashboard
+    if (isDoneNow) {
+      try {
+        const startTs = Number(this.ctx?.store?.get?.("liora_session_start_ts") || 0);
+        const timeSec = startTs ? Math.max(0, Math.round((Date.now() - startTs) / 1000)) : 0;
 
-      const plano = this.ctx?.store?.get?.("planoTema") || null;
-      const tema =
-        (plano?.tema || "").trim() ||
-        (this.ctx?.store?.get?.("temaAtual") || "").trim() ||
-        "—";
+        const plano = this.ctx?.store?.get?.("planoTema") || null;
+        const tema =
+          (plano?.tema || "").trim() ||
+          (this.ctx?.store?.get?.("temaAtual") || "").trim() ||
+          "—";
 
-      const sessaoTitle =
-        (sessao?.titulo || sessao?.title || sessao?.nome || "").trim() ||
-        `Sessão ${Number(this._idxAtual || 0) + 1}`;
+        const sessaoTitle =
+          (sessao?.titulo || sessao?.title || sessao?.nome || "").trim() ||
+          `Sessão ${Number(this._idxAtual || 0) + 1}`;
 
-      // evento canônico (quem ouvir, grava em stats)
-      window.dispatchEvent(
-        new CustomEvent("liora:study-session-done", {
-          detail: { tema, sessao: sessaoTitle, timeSec, source: "planos" }
-        })
-      );
+        // evento canônico (quem ouvir, grava em stats)
+        window.dispatchEvent(
+          new CustomEvent("liora:study-session-done", {
+            detail: { tema, sessao: sessaoTitle, timeSec, source: "planos" }
+          })
+        );
 
-      // força atualizar dashboard imediatamente
-      window.dispatchEvent(new Event("liora:dashboard-refresh"));
+        // força atualizar dashboard imediatamente
+        window.dispatchEvent(new Event("liora:dashboard-refresh"));
 
-      // reinicia relógio da próxima sessão
-      this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
-    } catch (e) {
-      console.warn("⚠️ Falha ao emitir liora:study-session-done", e);
+        // reinicia relógio da próxima sessão
+        this.ctx?.store?.set?.("liora_session_start_ts", Date.now());
+      } catch (e) {
+        console.warn("⚠️ Falha ao emitir liora:study-session-done", e);
+      }
     }
-  }
 
-  this._refreshListChecks();
-  this.renderSessao(sessao);
-},
+    this._refreshListChecks();
+    this.renderSessao(sessao);
+  },
 
   _refreshListChecks() {
     const lista = document.getElementById("lista-sessoes");
@@ -951,7 +972,7 @@ export const planos = {
     window.addEventListener("keydown", (ev) => this._onKeydown(ev));
   },
 
-   _onKeydown(ev) {
+  _onKeydown(ev) {
     const tag = (ev.target?.tagName || "").toLowerCase();
     if (tag === "input" || tag === "textarea" || tag === "select") return;
 
