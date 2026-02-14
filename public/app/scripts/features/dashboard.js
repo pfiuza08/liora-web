@@ -1,22 +1,27 @@
 // =============================================================
 // 📊 LIORA — DASHBOARD (MVP local, de verdade)
-// Versão: v1.4 (Opção A: demo só no estado inicial; sem "Atualizar" no UI)
+// Versão: v1.5 (integra Simulados v3.0: Review Queue + Abrir revisão do último resultado)
+// - Mantém Opção A (demo só no empty state; sem "Atualizar" no UI)
+// - Corrige Premium real: usa ctx.gates.isPremium() quando existir (fallback user.premium)
+// - Nav robusta: tenta ctx.router.go -> window.router.go
+// - Botões de revisão: "Revisar agora" abre modo review queue no Simulados (liora_review_start=1)
+// - "Ver revisão" abre a revisão do último resultado (liora_sim_open_review=1)
+// =============================================================
 //
 // HTML esperado em #screen-dashboard:
-// - #dash-kpis       (grid de KPIs)
-// - #dash-insights   (grid 2 colunas)
-// - #dash-tables     (grid 2 colunas)
-// - #dash-empty      (panel hidden)
+// - #dash-kpis
+// - #dash-insights
+// - #dash-tables
+// - #dash-empty
 // Opcional (JS cria se não existir):
-// - #dash-top        (painéis extras: resumo, revisões, último resultado)
+// - #dash-top
 //
 // Fonte: localStorage "liora_stats:v1"
 // - attempts: { ts, date, banca, tema, dificuldade, mode, total, correct, timeSec }
-// - sessions: (fica para Tema/PDF depois)
-//
 // Extras:
 // - revisão pendente: localStorage "liora_review_queue:v1" { items: [] }
 // - último resultado: localStorage "liora_sim_last_result"
+//
 // =============================================================
 
 export const dashboard = {
@@ -36,7 +41,7 @@ export const dashboard = {
 
     this.ensureShell();
     this.bindOnce();
-    console.log("📊 dashboard.js iniciado (v1.4 opA)");
+    console.log("📊 dashboard.js iniciado (v1.5)");
   },
 
   showScreen() {
@@ -45,7 +50,7 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // DOM helpers (usa HTML existente)
+  // DOM helpers
   // -----------------------------
   ensureShell() {
     const screen = document.getElementById("screen-dashboard");
@@ -56,11 +61,8 @@ export const dashboard = {
       top.id = "dash-top";
 
       const head = screen.querySelector(".screen-head");
-      if (head && head.nextSibling) {
-        screen.insertBefore(top, head.nextSibling);
-      } else {
-        screen.prepend(top);
-      }
+      if (head && head.nextSibling) screen.insertBefore(top, head.nextSibling);
+      else screen.prepend(top);
     }
   },
 
@@ -121,6 +123,11 @@ export const dashboard = {
   },
 
   isPremium() {
+    // prefer ctx.gates.isPremium() (padrão novo)
+    try {
+      if (this.ctx?.gates?.isPremium) return !!this.ctx.gates.isPremium();
+    } catch {}
+    // fallback: user.premium
     const u = this.getUser();
     return !!u?.premium;
   },
@@ -140,7 +147,6 @@ export const dashboard = {
       `;
     }
 
-    // usuário existe e não é premium
     return `
       <div class="actions-row" style="margin-top:10px;">
         <button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>
@@ -148,7 +154,6 @@ export const dashboard = {
     `;
   },
 
-  
   // -----------------------------
   // Compute KPIs
   // -----------------------------
@@ -223,7 +228,7 @@ export const dashboard = {
   },
 
   // -----------------------------
-  // Render (preenche placeholders do HTML)
+  // Render
   // -----------------------------
   render() {
     this.ensureShell();
@@ -257,13 +262,12 @@ export const dashboard = {
 
     const userLine = (() => {
       if (!u) return `<div class="muted small">Status: visitante</div>`;
-      if (u.premium) return `<div class="muted small">Status: Premium</div>`;
+      if (premium) return `<div class="muted small">Status: Premium</div>`;
       return `<div class="muted small">Status: Free</div>`;
     })();
 
-
     // -----------------------------
-    // EMPTY (Opção A): mostra CTA + demo, sem parecer "botão perdido"
+    // EMPTY (Opção A)
     // -----------------------------
     if (!k.totalAttempts) {
       elEmpty.classList.remove("hidden");
@@ -298,7 +302,7 @@ export const dashboard = {
     elEmpty.classList.add("hidden");
 
     // -----------------------------
-    // TOP (com dados): sem botões de dev
+    // TOP (com dados)
     // -----------------------------
     if (elTop) {
       const reviewHtml = `
@@ -361,7 +365,6 @@ export const dashboard = {
         `;
       })();
 
-      // (sem “Atualizar” e sem “Gerar exemplo”)
       elTop.innerHTML = `
         <div class="panel" style="margin-bottom:12px;">
           <div class="card-title">Resumo</div>
@@ -520,15 +523,17 @@ export const dashboard = {
       const act = btn.getAttribute("data-action");
 
       if (act === "dashUpgrade") {
+        // manda evento padrão do app (modal premium, etc.)
         window.dispatchEvent(new Event("liora:premium-bloqueado"));
+        // se existir rota direta
+        this.nav("pricing");
         return;
       }
 
-           if (act === "dashLogin") {
+      if (act === "dashLogin") {
         return window.dispatchEvent(new Event("liora:login-required"));
       }
 
-      
       // Opção A: demo só no estado inicial
       if (act === "dashDemo") {
         this.seedMock();
@@ -539,7 +544,6 @@ export const dashboard = {
 
       if (act === "dashStartFirst") {
         this.nav("simulados");
-        // pede start direto (simulados já escuta)
         window.dispatchEvent(new Event("liora:start-simulado"));
         return;
       }
@@ -559,6 +563,7 @@ export const dashboard = {
       if (act === "dashClearReview") {
         try { localStorage.setItem("liora_review_queue:v1", JSON.stringify({ items: [] })); } catch {}
         window.dispatchEvent(new CustomEvent("liora:stats-changed", { detail: { type: "review-queue" } }));
+        window.dispatchEvent(new Event("liora:dashboard-refresh"));
         this.render();
         return;
       }
@@ -572,9 +577,14 @@ export const dashboard = {
     });
   },
 
+  // nav robusta
   nav(to) {
-    try { window.router?.go?.(to); } catch {}
-    window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to } }));
+    const dest = String(to || "");
+    try {
+      if (this.ctx?.router?.go) this.ctx.router.go(dest);
+      else window.router?.go?.(dest);
+    } catch {}
+    window.dispatchEvent(new CustomEvent("liora:nav", { detail: { to: dest } }));
   },
 
   // -----------------------------
