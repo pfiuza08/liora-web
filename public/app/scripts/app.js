@@ -692,6 +692,8 @@ function demoBadgeInit() {
 
   // Contexto padrão para features
   const ctx = { store, gates, ui, theme };
+    // ✅ Limites Free (diário)
+  ctx.limits = createLimiter(store, gates);
 
   // -----------------------------
   // 🔐 Supabase Auth (Magic Link)
