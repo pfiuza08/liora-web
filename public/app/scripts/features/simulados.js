@@ -1,6 +1,7 @@
+// /scripts/features/simulados.js
 // =============================================================
 // 🧠 LIORA — SIMULADOS (PRODUCT MODE)
-// Versão: v2.9-PRODUCT (OBJ + DISC + métricas + review queue + revisão 1x1)
+// Versão: v3.0-PRODUCT (OBJ + DISC + métricas + review queue + revisão 1x1 + gates ctx.limits)
 //
 // ✔ SCREEN como runtime
 // ✔ MODAL apenas para configuração
@@ -13,6 +14,8 @@
 // ✔ ✅ MÉTRICAS: grava tentativas em liora_stats:v1 + eventos canônicos
 // ✔ ✅ REVIEW QUEUE: erradas + marcadas (OBJ/CE) e marcadas (DISC)
 // ✔ ✅ REVIEW MODE: consome fila 1 por vez
+// ✔ ✅ FREE GATE: 2 simulados/dia via ctx.limits.can("sim") + hit("sim") no sucesso
+// ✔ ✅ FREE CAP: max 10 questões (config + runtime + payload API)
 // =============================================================
 
 export const simulados = {
@@ -84,7 +87,7 @@ export const simulados = {
       return JSON.parse(JSON.stringify(s));
     };
 
-    console.log("📝 simulados.js v2.9 — iniciado");
+    console.log("📝 simulados.js v3.0 — iniciado");
   },
 
   // -----------------------------
@@ -168,66 +171,65 @@ export const simulados = {
       this.showScreen();
       // não inicia automaticamente
     });
-    
+
     window.addEventListener("liora:start-simulado", () => {
       this.showScreen();
       this.start();
     });
-
   },
 
   // -----------------------------
   // SCREEN CONTROL
   // -----------------------------
   showScreen() {
-  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  document.getElementById("screen-simulados")?.classList.add("active");
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    document.getElementById("screen-simulados")?.classList.add("active");
 
-  try {
-    // (A) pedido do dashboard: abrir revisão do último resultado
-    const flag = localStorage.getItem("liora_sim_open_review");
-    if (flag === "1") {
-      localStorage.removeItem("liora_sim_open_review");
+    try {
+      // (A) pedido do dashboard: abrir revisão do último resultado
+      const flag = localStorage.getItem("liora_sim_open_review");
+      if (flag === "1") {
+        localStorage.removeItem("liora_sim_open_review");
 
-      const last = JSON.parse(localStorage.getItem("liora_sim_last_result") || "null");
-      if (last && typeof last === "object") {
-        this.closeConfig?.();
-        this.renderResult(last);
+        const last = JSON.parse(localStorage.getItem("liora_sim_last_result") || "null");
+        if (last && typeof last === "object") {
+          this.closeConfig?.();
+          this.renderResult(last);
 
-        setTimeout(() => {
-          const el = document.getElementById("sim-review");
-          if (el) el.classList.remove("hidden");
-        }, 50);
+          setTimeout(() => {
+            const el = document.getElementById("sim-review");
+            if (el) el.classList.remove("hidden");
+          }, 50);
+        }
       }
+
+      // (B) pedido do dashboard: iniciar revisão da fila (1 por vez)
+      const start = localStorage.getItem("liora_review_start");
+      if (start === "1") {
+        localStorage.removeItem("liora_review_start");
+        this.startReviewQueue();
+        return;
+      }
+    } catch (e) {
+      console.warn("⚠️ showScreen falhou:", e);
     }
 
-    // (B) pedido do dashboard: iniciar revisão da fila (1 por vez)
-    const start = localStorage.getItem("liora_review_start");
-    if (start === "1") {
-      localStorage.removeItem("liora_review_start");
-      this.startReviewQueue();
+    // (C) sempre re-renderiza a UI correta ao entrar em Simulados
+    if (this.STATE.review?.active) {
+      this.renderReviewQueueOne();
       return;
     }
-  } catch (e) {
-    console.warn("⚠️ showScreen falhou:", e);
-  }
 
-  // (C) 🔥 sempre re-renderiza a UI correta ao entrar em Simulados
-  if (this.STATE.review?.active) {
-    this.renderReviewQueueOne();
-    return;
-  }
+    if (this.STATE.running) {
+      this.renderRunning();
+      this.renderQuestion();
+      this.renderButtonsState();
+      return;
+    }
 
-  if (this.STATE.running) {
-    this.renderRunning();
-    this.renderQuestion();
-    this.renderButtonsState();
-    return;
-  }
-
-  // inclui caso _savedRun exista (renderIdle já mostra o card “Simulado em andamento”)
-  this.renderIdle();
-},
+    // inclui caso _savedRun exista (renderIdle já mostra o card “Simulado em andamento”)
+    this.renderIdle();
+  },
 
   // -----------------------------
   // MODAL CONFIG
@@ -294,6 +296,27 @@ export const simulados = {
     return this.STATE?.config?.mode || "obj";
   },
 
+  // ✅ CAP do Free: max 10 (vale para OBJ e DISC)
+  _capQtdForPlan(mode, qtd) {
+    let out = Number(qtd || 0);
+
+    // limites base
+    out = mode === "disc" ? this.clamp(out, 1, 10) : this.clamp(out, 3, 30);
+
+    try {
+      const isPremium =
+        !!this.ctx?.gates?.isPremium?.() ||
+        !!(this.ctx?.store?.get?.("user")?.premium);
+
+      if (!isPremium) {
+        const min = mode === "disc" ? 1 : 3;
+        out = this.clamp(out, min, 10);
+      }
+    } catch {}
+
+    return out;
+  },
+
   saveConfig() {
     const banca = this.getValue("sim-banca") || "FGV";
     const qtdRaw = Number(this.getValue("sim-qtd") || 5);
@@ -304,9 +327,7 @@ export const simulados = {
     const timerMode = this.getValue("sim-timer-mode") || "on";
     const mode = this.getModeFromUI();
 
-    const qtd = mode === "disc"
-      ? this.clamp(qtdRaw, 1, 10)
-      : this.clamp(qtdRaw, 3, 30);
+    const qtd = this._capQtdForPlan(mode, qtdRaw);
 
     this.STATE.config = {
       ...this.STATE.config,
@@ -337,9 +358,24 @@ export const simulados = {
     // reset guard anti-duplo-finish
     this.STATE._finishedOnce = false;
 
-    // -----------------------------
-    // 🔒 GATES: limite free / premium (sem import)
-    // -----------------------------
+    // ✅ TRAVA FREE: 2 simulados/dia via ctx.limits.can("sim")
+    try {
+      const isPremium =
+        !!this.ctx?.gates?.isPremium?.() ||
+        !!(this.ctx?.store?.get?.("user")?.premium);
+
+      if (!isPremium && this.ctx?.limits?.can) {
+        if (!this.ctx.limits.can("sim")) {
+          this.toast("Limite do Free atingido: 2 simulados por dia. Vá em Planos para liberar.");
+          this.ctx?.router?.go?.("pricing");
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Gate ctx.limits falhou:", e);
+    }
+
+    // fallback (se você ainda usa o lioraGates antigo)
     try {
       const g = this.getGates();
       if (g?.canStartSimulado) {
@@ -355,20 +391,21 @@ export const simulados = {
             return;
           }
         }
-      } else {
-        console.warn("⚠️ lioraGates não disponível. (start simulado) seguindo sem trava.");
       }
     } catch (e) {
-      console.warn("⚠️ Gates falhou (start simulado):", e);
+      console.warn("⚠️ Gates (legacy) falhou (start simulado):", e);
     }
 
     // snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
     runConfig.mode = String(runConfig.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
+
+    // ✅ aplica CAP no snapshot (blindagem extra)
+    runConfig.qtd = this._capQtdForPlan(runConfig.mode, runConfig.qtd);
+
     this.STATE._runConfig = runConfig;
 
     console.log("🚦 START snapshot mode =", runConfig.mode, runConfig);
-
     window.dispatchEvent(new CustomEvent("liora:simulado-start", { detail: { ...runConfig } }));
 
     // reset runtime
@@ -402,6 +439,19 @@ export const simulados = {
       console.warn("⚠️ Falha na API do simulado. Usando mock.", err);
       this.toast("Não foi possível gerar agora. Usando modo offline.");
       this.STATE.questoes = this.buildMockQuestions(runConfig);
+    }
+
+    // ✅ hit no Free só quando realmente carregou questões
+    try {
+      const isPremium =
+        !!this.ctx?.gates?.isPremium?.() ||
+        !!(this.ctx?.store?.get?.("user")?.premium);
+
+      if (!isPremium && this.ctx?.limits?.hit && (this.STATE.questoes?.length || 0) > 0) {
+        this.ctx.limits.hit("sim");
+      }
+    } catch (e) {
+      console.warn("⚠️ hit(sim) falhou:", e);
     }
 
     this.persistRun();
@@ -1237,6 +1287,10 @@ export const simulados = {
     const mode = String(config?.mode || "obj").toLowerCase() === "disc" ? "disc" : "obj";
     console.log("🛰️ fetchQuestoesAPI mode =", mode);
 
+    // ✅ CAP do Free também aqui (blindagem do payload)
+    let qtdCfg = Number(config?.qtd || (mode === "disc" ? 3 : 10));
+    qtdCfg = this._capQtdForPlan(mode, qtdCfg);
+
     const payload =
       mode === "disc"
         ? {
@@ -1244,10 +1298,10 @@ export const simulados = {
             banca: config.banca,
             dificuldade: config.dificuldade,
             tema: config.tema || "",
-            qtdDiscursivas: this.clamp(Number(config.qtd || 3), 1, 10)
+            qtdDiscursivas: this.clamp(qtdCfg, 1, 10)
           }
         : (() => {
-            const qtd = this.clamp(Number(config.qtd || 10), 3, 30);
+            const qtd = this.clamp(qtdCfg, 3, 30);
             const qtdCE = Math.max(0, Math.min(Math.floor(qtd * 0.35), qtd - 3));
             return {
               mode: "obj",
@@ -1330,7 +1384,7 @@ export const simulados = {
     const mode = String(config.mode || "obj");
 
     if (mode === "disc") {
-      const qtd = this.clamp(Number(config.qtd || 3), 1, 10);
+      const qtd = this._capQtdForPlan("disc", Number(config.qtd || 3));
       const out = [];
       for (let i = 0; i < qtd; i++) {
         out.push({
@@ -1343,7 +1397,7 @@ export const simulados = {
       return out;
     }
 
-    const qtd = this.clamp(Number(config.qtd || 5), 3, 30);
+    const qtd = this._capQtdForPlan("obj", Number(config.qtd || 5));
 
     const base = [
       {
@@ -1693,7 +1747,7 @@ export const simulados = {
   },
 
   // -----------------------------
-  // GATES (global)
+  // GATES (legacy global)
   // -----------------------------
   getGates() {
     try {
@@ -1929,18 +1983,16 @@ export const simulados = {
     this.renderReviewQueueOne();
   },
 
-    reviewQueueExit() {
+  reviewQueueExit() {
     this.STATE.review.active = false;
     this.STATE.review.items = [];
     this.STATE.review.idx = 0;
     this.STATE.review.reveal = false;
-  
-    // ✅ importantíssimo: limpa a tela de revisão do DOM
-    // assim, quando você voltar em Simulados, aparece o “Simulado” normal
-    this.renderIdle();
-  
-    // volta para dashboard
-    window.router?.go?.("dashboard");
-  },
 
+    // limpa a tela de revisão do DOM: volta para a UI normal do Simulado
+    this.renderIdle();
+
+    // volta para dashboard (se existir)
+    window.router?.go?.("dashboard");
+  }
 };
