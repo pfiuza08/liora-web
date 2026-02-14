@@ -200,6 +200,76 @@ function createGates(store) {
 }
 
 /* -----------------------------
+   LIMITES (Free vs Premium) — diário
+   - Tema: 3/dia
+   - PDF: 1/dia
+   - Simulados: 2/dia (e max 10 questões Free)
+----------------------------- */
+function createLimiter(store, gates) {
+  const KEY = "usage:v1";
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  function read() {
+    const raw = store.get(KEY);
+    if (!raw || typeof raw !== "object") return { day: today(), tema: 0, pdf: 0, simulados: 0 };
+    return raw;
+  }
+
+  function write(obj) {
+    store.set(KEY, obj);
+  }
+
+  function ensureToday() {
+    const u = read();
+    const d = today();
+    if (u.day !== d) {
+      const reset = { day: d, tema: 0, pdf: 0, simulados: 0 };
+      write(reset);
+      return reset;
+    }
+    return u;
+  }
+
+  const LIMITS = {
+    tema: 3,
+    pdf: 1,
+    simulados: 2
+  };
+
+  function left(feature) {
+    if (gates.isPremium()) return Infinity;
+    const u = ensureToday();
+    const used = Number(u[feature] || 0);
+    const max = Number(LIMITS[feature] || 0);
+    return Math.max(0, max - used);
+  }
+
+  function can(feature) {
+    if (gates.isPremium()) return true;
+    return left(feature) > 0;
+  }
+
+  function hit(feature) {
+    if (gates.isPremium()) return { ok: true, left: Infinity };
+    const u = ensureToday();
+    u[feature] = Number(u[feature] || 0) + 1;
+    write(u);
+    return { ok: true, left: left(feature) };
+  }
+
+  function label(feature) {
+    const u = ensureToday();
+    const used = Number(u[feature] || 0);
+    const max = Number(LIMITS[feature] || 0);
+    return `${used}/${max} hoje`;
+  }
+
+  return { can, hit, left, label };
+}
+
+
+/* -----------------------------
    IMPORT dinâmico (robusto)
 ----------------------------- */
 async function loadFeature(path, exportName) {
