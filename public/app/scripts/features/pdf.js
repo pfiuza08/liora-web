@@ -173,9 +173,11 @@ export const pdf = {
         }
       }
     
-      // 3) Se bloqueou, mostra mensagem e pergunta antes de abrir login/plans
+     // 3) Se bloqueou, mostra mensagem e pergunta antes de abrir login/plans
       if (check && check.ok === false) {
-        const blocked = await (window.gatesUX?.explainAndRoute?.({
+        const ux = this._gatesUX || window.gatesUX || null;
+      
+        const blocked = await (ux?.explainAndRoute?.({
           ctx: this.ctx,
           check,
           source: "pdf",
@@ -189,9 +191,10 @@ export const pdf = {
                 : "Você já gerou um plano por PDF hoje no modo visitante/Free. Para gerar outro, entre ou desbloqueie o Premium."
           }
         }) ?? true);
-    
+      
         if (blocked) return;
       }
+
     } catch (e) {
       console.warn("⚠️ Gates falhou (PDF):", e);
     }
