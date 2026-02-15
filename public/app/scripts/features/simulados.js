@@ -61,6 +61,13 @@ export const simulados = {
   // -----------------------------
   init(ctx) {
     this.ctx = ctx;
+    try {
+      if (!window.gatesUX?.explainAndRoute) {
+        import("../core/gates-ux.js").then((m) => {
+          if (m?.gatesUX) window.gatesUX = m.gatesUX;
+        }).catch(() => {});
+      }
+    } catch {}
     this.bindUI();
     this.restoreIfAny();
 
