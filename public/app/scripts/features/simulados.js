@@ -358,43 +358,53 @@ export const simulados = {
     // reset guard anti-duplo-finish
     this.STATE._finishedOnce = false;
 
-    // ✅ TRAVA FREE: 2 simulados/dia via ctx.limits.can("sim")
+    // 🔒 GATE (UX padrão): explica primeiro, depois oferece ação (sem teleporte)
     try {
-      const isPremium =
-        !!this.ctx?.gates?.isPremium?.() ||
-        !!(this.ctx?.store?.get?.("user")?.premium);
-
-      if (!isPremium && this.ctx?.limits?.can) {
-        if (!this.ctx.limits.can("sim")) {
-          this.toast("Limite do Free atingido: 2 simulados por dia. Vá em Planos para liberar.");
-          this.ctx?.router?.go?.("pricing");
-          return;
+      const g = window.lioraGates || this.ctx?.gates || null;
+    
+      // 1) Gate moderno (se existir)
+      let check =
+        g?.canStartSimulado
+          ? g.canStartSimulado(this.ctx?.store)
+          : (g?.canRunSimulados
+              ? g.canRunSimulados(this.ctx?.store)
+              : (g?.canGeneratePlan ? g.canGeneratePlan(this.ctx?.store, { source: "simulados" }) : null)
+            );
+    
+      // 2) Fallback: limits antigo (2 simulados/dia no Free)
+      if (!check) {
+        const isPremium =
+          !!this.ctx?.gates?.isPremium?.() ||
+          !!(this.ctx?.store?.get?.("user")?.premium);
+    
+        if (!isPremium && this.ctx?.limits?.can) {
+          const ok = !!this.ctx.limits.can("sim");
+          if (!ok) check = { ok: false, reason: "limit" };
         }
       }
-    } catch (e) {
-      console.warn("⚠️ Gate ctx.limits falhou:", e);
-    }
-
-    // fallback (se você ainda usa o lioraGates antigo)
-    try {
-      const g = this.getGates();
-      if (g?.canStartSimulado) {
-        const check = g.canStartSimulado(this.ctx?.store);
-
-        if (!check?.ok) {
-          if (check.reason === "login") {
-            window.dispatchEvent(new CustomEvent("liora:login-required", { detail: check }));
-            return;
+    
+      // 3) Se bloqueou, mostra mensagem e pergunta antes de abrir login/plans
+      if (check && check.ok === false) {
+        const blocked = await (window.gatesUX?.explainAndRoute?.({
+          ctx: this.ctx,
+          check,
+          source: "simulados",
+          statusElId: "sim-hint", // usa o hint como “status inline” (não quebra se não existir)
+          mode: "ask",
+          copy: {
+            body:
+              (check.reason || "").toLowerCase().includes("login")
+                ? "Para iniciar mais simulados, você precisa entrar (é rapidinho)."
+                : "Você já fez 2 simulados hoje no Free/visitante. Para continuar, entre ou desbloqueie o Premium."
           }
-          if (check.reason === "limit") {
-            window.dispatchEvent(new CustomEvent("liora:premium-bloqueado", { detail: check }));
-            return;
-          }
-        }
+        }) ?? true);
+    
+        if (blocked) return;
       }
     } catch (e) {
-      console.warn("⚠️ Gates (legacy) falhou (start simulado):", e);
+      console.warn("⚠️ Gates falhou (start simulado):", e);
     }
+
 
     // snapshot blindado do config no momento do start
     const runConfig = JSON.parse(JSON.stringify(this.STATE.config || {}));
