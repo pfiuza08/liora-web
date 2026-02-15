@@ -131,18 +131,49 @@ export const pdf = {
       return;
     }
 
-    // ✅ TRAVA FREE (1 PDF/dia)
-    // - Premium passa direto
-    // - Se bater limite, manda pro pricing
+    // 🔒 GATE (UX padrão): explica primeiro, depois oferece ação (sem teleporte)
     try {
-      if (this.ctx?.limits && !this.ctx?.gates?.isPremium?.()) {
-        if (!this.ctx.limits.can("pdf")) {
-          ui?.toast?.("Limite do Free atingido: 1 plano por PDF por dia. Vá em Planos para liberar.");
-          this.ctx?.router?.go?.("pricing");
-          return;
+      // Preferência: gates unificado (lioraGates). Fallback: gates do ctx. Fallback final: limits legado.
+      const g = window.lioraGates || this.ctx?.gates || null;
+    
+      // 1) Se existir gate moderno, usa.
+      let check =
+        g?.canGeneratePdfPlan
+          ? g.canGeneratePdfPlan(this.ctx?.store)
+          : (g?.canGeneratePlan ? g.canGeneratePlan(this.ctx?.store, { source: "pdf" }) : null);
+    
+      // 2) Fallback: limits antigo (1 PDF/dia no Free)
+      if (!check) {
+        const isPremium = !!this.ctx?.gates?.isPremium?.();
+        if (this.ctx?.limits && !isPremium) {
+          const ok = !!this.ctx.limits.can?.("pdf");
+          if (!ok) check = { ok: false, reason: "limit" };
         }
       }
-    } catch {}
+    
+      // 3) Se bloqueou, mostra mensagem e pergunta antes de abrir login/plans
+      if (check && check.ok === false) {
+        const blocked = await (window.gatesUX?.explainAndRoute?.({
+          ctx: this.ctx,
+          check,
+          source: "pdf",
+          statusElId: "pdf-status",
+          mode: "ask", // 👈 humano: explica e só abre se a pessoa quiser
+          // copy opcional (se quiser fixar o texto do PDF)
+          copy: {
+            body:
+              (check.reason || "").toLowerCase().includes("login")
+                ? "Para gerar mais planos por PDF, você precisa entrar (é rapidinho)."
+                : "Você já gerou um plano por PDF hoje no modo visitante/Free. Para gerar outro, entre ou desbloqueie o Premium."
+          }
+        }) ?? true);
+    
+        if (blocked) return;
+      }
+    } catch (e) {
+      console.warn("⚠️ Gates falhou (PDF):", e);
+    }
+
 
     let stopSim = null;
 
