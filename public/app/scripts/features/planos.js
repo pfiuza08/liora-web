@@ -32,32 +32,62 @@ export const planos = {
   // ✅ com barra de progresso
   // ✅ trava Free: 3/dia (via ctx.limits)
   // -----------------------------
-  async gerarTema() {
-    const { store, ui } = this.ctx;
-
-    const tema = (document.getElementById("inp-tema")?.value || "").trim();
-    const nivel = document.getElementById("sel-nivel")?.value || "iniciante";
-    const status = document.getElementById("tema-status");
-
-    if (!tema) {
-      ui.error("Digite um tema para gerar o plano.");
-      return;
-    }
-
-    // ✅ TRAVA FREE (3/dia)
-    // - Premium passa direto
-    // - Se bater limite, manda pro pricing
-    try {
-      if (this.ctx?.limits && !this.ctx?.gates?.isPremium?.()) {
-        if (!this.ctx.limits.can("tema")) {
-          ui?.toast?.("Limite do Free atingido: 3 planos por tema por dia. Vá em Planos para liberar.");
-          this.ctx?.router?.go?.("pricing");
+      async gerarTema() {
+        const { store, ui } = this.ctx;
+    
+        const tema = (document.getElementById("inp-tema")?.value || "").trim();
+        const nivel = document.getElementById("sel-nivel")?.value || "iniciante";
+        const status = document.getElementById("tema-status");
+    
+        if (!tema) {
+          ui.error("Digite um tema para gerar o plano.");
           return;
         }
+    
+        // 🔒 GATE (UX padrão): explica primeiro, depois oferece ação (sem teleporte)
+    try {
+      const g = window.lioraGates || this.ctx?.gates || null;
+    
+      // 1) Gate moderno (se existir)
+      let check =
+        g?.canGenerateTemaPlan
+          ? g.canGenerateTemaPlan(this.ctx?.store)
+          : (g?.canGeneratePlan ? g.canGeneratePlan(this.ctx?.store, { source: "tema" }) : null);
+    
+      // 2) Fallback: limits antigo (3/dia no Free)
+      if (!check) {
+        const isPremium =
+          !!this.ctx?.gates?.isPremium?.() ||
+          !!(this.ctx?.store?.get?.("user")?.premium);
+    
+        if (!isPremium && this.ctx?.limits?.can) {
+          const ok = !!this.ctx.limits.can("tema");
+          if (!ok) check = { ok: false, reason: "limit" };
+        }
+      }
+    
+      // 3) Se bloqueou, explica e pergunta antes de abrir login/plans
+      if (check && check.ok === false) {
+        const blocked = await (window.gatesUX?.explainAndRoute?.({
+          ctx: this.ctx,
+          check,
+          source: "tema",
+          statusElId: "tema-status",
+          mode: "ask",
+          copy: {
+            body:
+              (check.reason || "").toLowerCase().includes("login")
+                ? "Para gerar mais planos por tema, você precisa entrar (é rapidinho)."
+                : "Você já gerou 3 planos por tema hoje no Free/visitante. Para gerar mais, entre ou desbloqueie o Premium."
+          }
+        }) ?? true);
+    
+        if (blocked) return;
       }
     } catch (e) {
-      // se algo falhar no limiter, não bloqueia a geração
+      console.warn("⚠️ Gates falhou (Tema):", e);
     }
+
 
     let stopSim = null;
 
