@@ -14,27 +14,49 @@ export const pdf = {
   // keyboard flag
   _keyboardBound: false,
 
-  async init(ctx) {
-    this.ctx = ctx;
+  // gates UX helper (carregado sob demanda)
+  _gatesUX: null,
 
-    const btn = document.getElementById("btn-gerar-pdf");
-    const limpar = document.getElementById("btn-limpar-pdf");
+ async init(ctx) {
+  this.ctx = ctx;
 
-    btn?.addEventListener("click", () => this.gerarPorPdfUltraFiel());
-    limpar?.addEventListener("click", () => this.limparPlano());
+  const btn = document.getElementById("btn-gerar-pdf");
+  const limpar = document.getElementById("btn-limpar-pdf");
 
-    // fechar viewer
-    document
-      .getElementById("btn-pdf-close")
-      ?.addEventListener("click", () => this._closeViewer());
+  btn?.addEventListener("click", () => this.gerarPorPdfUltraFiel());
+  limpar?.addEventListener("click", () => this.limparPlano());
 
-    const saved = this.ctx.store.get("planoPdf");
-    if (saved?.sessoes?.length) this.render(saved);
+  // fechar viewer
+  document
+    .getElementById("btn-pdf-close")
+    ?.addEventListener("click", () => this._closeViewer());
 
-    this._bindKeyboard();
+  const saved = this.ctx.store.get("planoPdf");
+  if (saved?.sessoes?.length) this.render(saved);
 
-    console.log("pdf.js iniciado (Ultra Fiel + viewer + progresso + aprofundar)");
-  },
+  this._bindKeyboard();
+
+  // 🔒 carrega gatesUX cedo (sem travar se falhar)
+  try {
+    // 1) se já existe no window, usa
+    if (window.gatesUX?.explainAndRoute) {
+      this._gatesUX = window.gatesUX;
+    } else {
+      // 2) tenta importar do core (ajuste o path se necessário)
+      const mod = await import("../core/gates-ux.js");
+      this._gatesUX = mod?.gatesUX || null;
+      if (this._gatesUX) {
+        try { window.gatesUX = this._gatesUX; } catch {}
+      }
+    }
+  } catch (e) {
+    console.warn("⚠️ gatesUX não carregou (PDF):", e);
+    this._gatesUX = null;
+  }
+
+  console.log("pdf.js iniciado (Ultra Fiel + viewer + progresso + aprofundar)");
+},
+
 
   // =========================================================
   // ✅ PROGRESS UI (barra com % + etapas)
