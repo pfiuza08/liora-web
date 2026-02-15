@@ -8,24 +8,46 @@ export const planos = {
 
   _currentSessaoId: null,
 
-  init(ctx) {
-    this.ctx = ctx;
+ async init(ctx) {
+  this.ctx = ctx;
 
-    const btn = document.getElementById("btn-gerar-tema");
-    const limpar = document.getElementById("btn-limpar-plano");
+  const btn = document.getElementById("btn-gerar-tema");
+  const limpar = document.getElementById("btn-limpar-plano");
 
-    btn?.addEventListener("click", () => this.gerarTema());
-    limpar?.addEventListener("click", () => this.limparPlano());
+  btn?.addEventListener("click", () => this.gerarTema());
+  limpar?.addEventListener("click", () => this.limparPlano());
 
-    // se existir plano salvo, renderiza
-    const saved = this.ctx.store.get("planoTema");
-    if (saved?.sessoes?.length) {
-      this.render(saved);
+  // se existir plano salvo, renderiza
+  const saved = this.ctx.store.get("planoTema");
+  if (saved?.sessoes?.length) {
+    this.render(saved);
+  }
+
+  this._bindKeyboard();
+
+  // 🔒 carrega gatesUX cedo (sem travar se falhar)
+  try {
+    // 1) se já existe no window, usa
+    if (window.gatesUX?.explainAndRoute) {
+      this._gatesUX = window.gatesUX;
+    } else {
+      // 2) tenta importar do core (ajuste o path se necessário)
+      const mod = await import("../core/gates-ux.js");
+      this._gatesUX = mod?.gatesUX || null;
+
+      // cache no window (opcional)
+      if (this._gatesUX) {
+        try { window.gatesUX = this._gatesUX; } catch {}
+      }
     }
+  } catch (e) {
+    console.warn("⚠️ gatesUX não carregou (Tema):", e);
+    this._gatesUX = null;
+  }
 
-    this._bindKeyboard();
-    console.log("planos.js iniciado");
-  },
+  console.log("planos.js iniciado (Tema + gatesUX)");
+},
+
 
   // -----------------------------
   // 🔥 Geração por Tema (robusta)
@@ -68,7 +90,9 @@ export const planos = {
     
       // 3) Se bloqueou, explica e pergunta antes de abrir login/plans
       if (check && check.ok === false) {
-        const blocked = await (window.gatesUX?.explainAndRoute?.({
+        const ux = this._gatesUX || window.gatesUX || null;
+      
+        const blocked = await (ux?.explainAndRoute?.({
           ctx: this.ctx,
           check,
           source: "tema",
@@ -81,9 +105,10 @@ export const planos = {
                 : "Você já gerou 3 planos por tema hoje no Free/visitante. Para gerar mais, entre ou desbloqueie o Premium."
           }
         }) ?? true);
-    
+      
         if (blocked) return;
       }
+
     } catch (e) {
       console.warn("⚠️ Gates falhou (Tema):", e);
     }
@@ -711,19 +736,57 @@ export const planos = {
       return;
     }
 
-    // ✅ Limite Free
-    const user = store.get("user") || null;
-    const isPremium = !!user?.premium;
+    // 🔒 GATE (Aprofundar): UX padrão (explica e pergunta antes de ir pra login/plans)
+let isPremium = false;
 
-    if (!isPremium) {
-      const can = this._canUseAprofFree();
-      if (!can.ok) {
-        ui.error(
-          `Você já usou seus ${can.limit}/dia de Aprofundar no plano Free. Desbloqueie ilimitado no Premium.`
+try {
+  const g = window.lioraGates || this.ctx?.gates || null;
+
+  const check =
+    g?.canAprofundar
+      ? g.canAprofundar(this.ctx?.store)
+      : (g?.canUseAprofundar
+          ? g.canUseAprofundar(this.ctx?.store)
+          : (g?.canGeneratePlan
+              ? g.canGeneratePlan(this.ctx?.store, { source: "aprofundar" })
+              : { ok: true }
+            )
         );
-        return;
-      }
+
+  // tenta inferir premium (pra decidir depois se incrementa contador legado)
+  isPremium =
+    !!g?.isPremium?.() ||
+    !!(this.ctx?.store?.get?.("user")?.premium);
+
+  if (check && check.ok === false) {
+    const ux = this._gatesUX || window.gatesUX || null;
+
+    const blocked = await (ux?.explainAndRoute?.({
+      ctx: this.ctx,
+      check,
+      source: "aprofundar",
+      statusElId: "aprofundar-status", // se existir
+      mode: "ask"
+    }) ?? true);
+
+    if (blocked) return;
+  }
+} catch (e) {
+  console.warn("⚠️ Gates falhou (Aprofundar/Tema):", e);
+  // fallback legado se gates falhar
+  const user = store.get("user") || null;
+  isPremium = !!user?.premium;
+
+  if (!isPremium) {
+    const can = this._canUseAprofFree();
+    if (!can.ok) {
+      ui.error(
+        `Você já usou seus ${can.limit}/dia de Aprofundar no plano Free. Desbloqueie ilimitado no Premium.`
+      );
+      return;
     }
+  }
+}
 
     const slot = document.getElementById(`aprof-slot-${sid}-${ci}`);
     if (!slot) return;
@@ -772,15 +835,19 @@ export const planos = {
       store.set("planoTemaAprofCache", nextCache);
 
       // conta uso no Free
-      const userNow = store.get("user") || null;
-      if (!userNow?.premium) this._incAprofFreeUse();
+      if (!isPremium) this._incAprofFreeUse();
 
       // renderiza
       slot.innerHTML = this._renderAprof(data);
 
       // atualiza label do botão
-      const selector = `.btn-aprofundar[data-aprof-sid="${this._escapeAttr(sid)}"][data-aprof-ci="${ci}"]`;
-      const btn = document.querySelector(selector);
+      const safeSid =
+        window.CSS && typeof CSS.escape === "function" ? CSS.escape(sid) : this._escapeAttr(sid);
+      
+      const btn = document.querySelector(
+        `.btn-aprofundar[data-aprof-sid="${safeSid}"][data-aprof-ci="${ci}"]`
+      );
+
       if (btn) btn.textContent = "Ver aprofundamento";
     } catch (e) {
       console.error(e);
