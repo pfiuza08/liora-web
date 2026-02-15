@@ -802,100 +802,118 @@ export const pdf = {
     });
   },
 
-  // =========================================================
-  // 🔎 Aprofundar (PDF)
-  // Premium + limite Free (compartilha o mesmo contador diário)
-  // =========================================================
-  async _aprofundarConceito(sessao, sid, ci) {
-    const { store, ui } = this.ctx;
-
-    const conceitoTxt =
-      Array.isArray(sessao?.conteudo?.conceitos) ? sessao.conteudo.conceitos[ci] : null;
-
-    if (!conceitoTxt) {
-      ui.error("Conceito inválido para aprofundar.");
-      return;
-    }
-
-    const key = this._aprofundarKey(sid, ci);
-    const cache = this._getAprofCache();
-    if (cache?.[key]) {
-      this._toggleAprofSlot(sid, ci);
-      return;
-    }
-
-    // limite Free
-    const user = store.get("user") || null;
-    const isPremium = !!user?.premium;
-
-    if (!isPremium) {
-      const can = this._canUseAprofFree();
-      if (!can.ok) {
-        ui.error(
-          `Você já usou seus ${can.limit}/dia de Aprofundar no plano Free. Desbloqueie ilimitado no Premium.`
-        );
+    // =========================================================
+    // 🔎 Aprofundar (PDF)
+    // Gate unificado (Premium + limite Free via gates/limits)
+    // =========================================================
+    async _aprofundarConceito(sessao, sid, ci) {
+      const { store, ui } = this.ctx;
+    
+      const conceitoTxt =
+        Array.isArray(sessao?.conteudo?.conceitos) ? sessao.conteudo.conceitos[ci] : null;
+    
+      if (!conceitoTxt) {
+        ui.error("Conceito inválido para aprofundar.");
         return;
       }
-    }
-
-    const slot = document.getElementById(`pdf-aprof-slot-${sid}-${ci}`);
-    if (!slot) return;
-
-    try {
-      slot.style.display = "block";
-      slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
-
-      const metaTema = this._plano?.meta?.tema || "";
-      const metaNivel = this._plano?.meta?.nivel || "iniciante";
-
-      const res = await fetch("/api/aprofundar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tema: metaTema,
-          nivel: metaNivel,
-          sessaoId: sid,
-          sessaoTitulo: sessao?.titulo || "",
-          conceito: conceitoTxt
-        })
-      });
-
-      const text = await res.text();
-      let data = null;
+    
+      const key = this._aprofundarKey(sid, ci);
+      const cache = this._getAprofCache();
+      if (cache?.[key]) {
+        this._toggleAprofSlot(sid, ci);
+        return;
+      }
+    
+      // ✅ Gate + UX (explica e só redireciona se a pessoa quiser)
       try {
-        data = JSON.parse(text);
-      } catch {
-        console.error("Aprofundar PDF não-JSON:", text);
-        throw new Error("Resposta inválida do servidor (não JSON).");
+        const g = window.lioraGates || this.ctx?.gates || null;
+    
+        const check =
+          g?.canAprofundar
+            ? g.canAprofundar(this.ctx?.store, { source: "pdf" })
+            : (g?.canUseAprofundar
+                ? g.canUseAprofundar(this.ctx?.store, { source: "pdf" })
+                : (g?.canGeneratePlan
+                    ? g.canGeneratePlan(this.ctx?.store, { source: "aprofundar" })
+                    : { ok: true }
+                  )
+              );
+    
+        const ux = this._gatesUX || window.gatesUX || null;
+    
+        if (check && check.ok === false && ux?.explainAndRoute) {
+          const blocked = await ux.explainAndRoute({
+            ctx: this.ctx,
+            check,
+            source: "aprofundar",
+            statusElId: "pdf-status",
+            mode: "ask"
+          });
+    
+          if (blocked) return;
+        }
+      } catch (e) {
+        console.warn("⚠️ Gates falhou (Aprofundar PDF):", e);
       }
-
-      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-      if (!data?.topico || !data?.explicacaoLonga) {
-        throw new Error("Aprofundamento inválido (faltando campos).");
+    
+      const slot = document.getElementById(`pdf-aprof-slot-${sid}-${ci}`);
+      if (!slot) return;
+    
+      try {
+        slot.style.display = "block";
+        slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
+    
+        const metaTema = this._plano?.meta?.tema || "";
+        const metaNivel = this._plano?.meta?.nivel || "iniciante";
+    
+        const res = await fetch("/api/aprofundar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tema: metaTema,
+            nivel: metaNivel,
+            sessaoId: sid,
+            sessaoTitulo: sessao?.titulo || "",
+            conceito: conceitoTxt
+          })
+        });
+    
+        const text = await res.text();
+        let data = null;
+    
+        try {
+          data = JSON.parse(text);
+        } catch {
+          console.error("Aprofundar PDF não-JSON:", text);
+          throw new Error("Resposta inválida do servidor (não JSON).");
+        }
+    
+        if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+        if (!data?.topico || !data?.explicacaoLonga) {
+          throw new Error("Aprofundamento inválido (faltando campos).");
+        }
+    
+        const nextCache = { ...(cache || {}) };
+        nextCache[key] = data;
+        store.set("planoPdfAprofCache", nextCache);
+    
+        slot.innerHTML = this._renderAprof(data);
+    
+        // atualiza label do botão (robusto)
+        const safeSid =
+          window.CSS && typeof CSS.escape === "function" ? CSS.escape(sid) : this._escapeAttr(sid);
+    
+        const btn = document.querySelector(
+          `.btn-aprofundar[data-aprof-sid="${safeSid}"][data-aprof-ci="${ci}"]`
+        );
+        if (btn) btn.textContent = "Ver aprofundamento";
+      } catch (e) {
+        console.error(e);
+        slot.innerHTML = "";
+        ui.error(e?.message || "Falha ao gerar aprofundamento.");
       }
+    },
 
-      const nextCache = { ...(cache || {}) };
-      nextCache[key] = data;
-      store.set("planoPdfAprofCache", nextCache);
-
-      if (!isPremium) this._incAprofFreeUse();
-
-      slot.innerHTML = this._renderAprof(data);
-
-      // atualiza label botão (robusto)
-      const safeSid =
-        window.CSS && typeof CSS.escape === "function" ? CSS.escape(sid) : this._escapeAttr(sid);
-
-      const btn = document.querySelector(
-        `.btn-aprofundar[data-aprof-sid="${safeSid}"][data-aprof-ci="${ci}"]`
-      );
-      if (btn) btn.textContent = "Ver aprofundamento";
-    } catch (e) {
-      console.error(e);
-      slot.innerHTML = "";
-      ui.error(e?.message || "Falha ao gerar aprofundamento.");
-    }
-  },
 
   _renderAprof(data) {
     const topico = this._escapeHtml(data?.topico || "Aprofundamento");
