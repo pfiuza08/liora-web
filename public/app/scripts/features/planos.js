@@ -711,147 +711,129 @@ export const planos = {
     });
   },
 
-  // -----------------------------
-  // 🔎 Aprofundar (Premium + limite Free)
-  // -----------------------------
-  async _aprofundarConceito(sessao, sid, ci) {
-    const { store, ui } = this.ctx;
+// -----------------------------
+// 🔎 Aprofundar (com Gate UX "ask")
+// -----------------------------
+async _aprofundarConceito(sessao, sid, ci) {
+  const { store, ui } = this.ctx;
 
-    const conceitoTxt =
-      Array.isArray(sessao?.conteudo?.conceitos) ? sessao.conteudo.conceitos[ci] : null;
+  const conceitoTxt =
+    Array.isArray(sessao?.conteudo?.conceitos) ? sessao.conteudo.conceitos[ci] : null;
 
-    if (!conceitoTxt) {
-      ui.error("Conceito inválido para aprofundar.");
-      return;
-    }
+  if (!conceitoTxt) {
+    ui.error("Conceito inválido para aprofundar.");
+    return;
+  }
 
-    // ✅ Cache
-    const key = this._aprofundarKey(sid, ci);
-    const cache = this._getAprofCache();
-    if (cache?.[key]) {
-      this._toggleAprofSlot(sid, ci);
-      return;
-    }
+  // ✅ Cache
+  const key = this._aprofundarKey(sid, ci);
+  const cache = this._getAprofCache();
+  if (cache?.[key]) {
+    this._toggleAprofSlot(sid, ci);
+    return;
+  }
 
-    // 🔒 GATE (Aprofundar): UX padrão (explica e pergunta antes de ir pra login/plans)
-let isPremium = false;
-
-try {
-  const g = window.lioraGates || this.ctx?.gates || null;
-
-  const check =
-    g?.canAprofundar
-      ? g.canAprofundar(this.ctx?.store)
-      : (g?.canUseAprofundar
-          ? g.canUseAprofundar(this.ctx?.store)
-          : (g?.canGeneratePlan
-              ? g.canGeneratePlan(this.ctx?.store, { source: "aprofundar" })
-              : { ok: true }
-            )
-        );
-
-  // tenta inferir premium (pra decidir depois se incrementa contador legado)
-  isPremium =
-    !!g?.isPremium?.() ||
-    !!(this.ctx?.store?.get?.("user")?.premium);
-
-  if (check && check.ok === false) {
+  // 🔒 GATE (Aprofundar): explica e pergunta antes de abrir login/plans
+  try {
+    const g = window.lioraGates || this.ctx?.gates || null;
     const ux = this._gatesUX || window.gatesUX || null;
 
-    const blocked = await (ux?.explainAndRoute?.({
-      ctx: this.ctx,
-      check,
-      source: "aprofundar",
-      statusElId: "aprofundar-status", // se existir
-      mode: "ask"
-    }) ?? true);
+    const check =
+      g?.canAprofundar
+        ? g.canAprofundar(this.ctx?.store)
+        : (g?.canUseAprofundar
+            ? g.canUseAprofundar(this.ctx?.store)
+            : (g?.canGeneratePlan
+                ? g.canGeneratePlan(this.ctx?.store, { source: "aprofundar" })
+                : { ok: true })
+          );
 
-    if (blocked) return;
-  }
-} catch (e) {
-  console.warn("⚠️ Gates falhou (Aprofundar/Tema):", e);
-  // fallback legado se gates falhar
-  const user = store.get("user") || null;
-  isPremium = !!user?.premium;
+    if (check && check.ok === false) {
+      const blocked = await (ux?.explainAndRoute?.({
+        ctx: this.ctx,
+        check,
+        source: "aprofundar",
+        statusElId: "tema-status", // mantém no mesmo status do tema
+        mode: "ask",
+        copy: {
+          body:
+            (check.reason || "").toLowerCase().includes("login")
+              ? "Para usar o Aprofundar, você precisa entrar (é rapidinho)."
+              : "Você já usou seu limite diário de Aprofundar no Free/visitante. Para continuar, entre ou desbloqueie o Premium."
+        }
+      }) ?? true);
 
-  if (!isPremium) {
-    const can = this._canUseAprofFree();
-    if (!can.ok) {
-      ui.error(
-        `Você já usou seus ${can.limit}/dia de Aprofundar no plano Free. Desbloqueie ilimitado no Premium.`
-      );
-      return;
+      if (blocked) return;
     }
+  } catch (e) {
+    console.warn("⚠️ Gates falhou (Aprofundar/Tema):", e);
+    // Se gate falhar, não bloqueia.
+  }
+
+  const slot = document.getElementById(`aprof-slot-${sid}-${ci}`);
+  if (!slot) return;
+
+  try {
+    slot.style.display = "block";
+    slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
+
+    // infos do plano atual
+    const metaTema = this._plano?.meta?.tema || "";
+    const metaNivel = this._plano?.meta?.nivel || "iniciante";
+
+    const res = await fetch("/api/aprofundar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tema: metaTema,
+        nivel: metaNivel,
+        sessaoId: sid,
+        sessaoTitulo: sessao?.titulo || "",
+        conceito: conceitoTxt
+      })
+    });
+
+    const text = await res.text();
+    let data = null;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("Aprofundar não-JSON:", text);
+      throw new Error("Resposta inválida do servidor (não JSON).");
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    }
+
+    if (!data?.topico || !data?.explicacaoLonga) {
+      throw new Error("Aprofundamento inválido (faltando campos).");
+    }
+
+    // salva no cache
+    const nextCache = { ...(cache || {}) };
+    nextCache[key] = data;
+    store.set("planoTemaAprofCache", nextCache);
+
+    // renderiza
+    slot.innerHTML = this._renderAprof(data);
+
+    // atualiza label do botão (robusto)
+    const safeSid =
+      window.CSS && typeof CSS.escape === "function" ? CSS.escape(sid) : this._escapeAttr(sid);
+
+    const btn = document.querySelector(
+      `.btn-aprofundar[data-aprof-sid="${safeSid}"][data-aprof-ci="${ci}"]`
+    );
+    if (btn) btn.textContent = "Ver aprofundamento";
+  } catch (e) {
+    console.error(e);
+    slot.innerHTML = "";
+    ui.error(e?.message || "Falha ao gerar aprofundamento.");
   }
 }
 
-    const slot = document.getElementById(`aprof-slot-${sid}-${ci}`);
-    if (!slot) return;
-
-    try {
-      slot.style.display = "block";
-      slot.innerHTML = `<div class="muted small">Gerando aprofundamento…</div>`;
-
-      // infos do plano atual
-      const metaTema = this._plano?.meta?.tema || "";
-      const metaNivel = this._plano?.meta?.nivel || "iniciante";
-
-      const res = await fetch("/api/aprofundar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tema: metaTema,
-          nivel: metaNivel,
-          sessaoId: sid,
-          sessaoTitulo: sessao?.titulo || "",
-          conceito: conceitoTxt
-        })
-      });
-
-      const text = await res.text();
-      let data = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        console.error("Aprofundar não-JSON:", text);
-        throw new Error("Resposta inválida do servidor (não JSON).");
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-      }
-
-      // validação mínima
-      if (!data?.topico || !data?.explicacaoLonga) {
-        throw new Error("Aprofundamento inválido (faltando campos).");
-      }
-
-      // salva no cache
-      const nextCache = { ...(cache || {}) };
-      nextCache[key] = data;
-      store.set("planoTemaAprofCache", nextCache);
-
-      // conta uso no Free
-      if (!isPremium) this._incAprofFreeUse();
-
-      // renderiza
-      slot.innerHTML = this._renderAprof(data);
-
-      // atualiza label do botão
-      const safeSid =
-        window.CSS && typeof CSS.escape === "function" ? CSS.escape(sid) : this._escapeAttr(sid);
-      
-      const btn = document.querySelector(
-        `.btn-aprofundar[data-aprof-sid="${safeSid}"][data-aprof-ci="${ci}"]`
-      );
-
-      if (btn) btn.textContent = "Ver aprofundamento";
-    } catch (e) {
-      console.error(e);
-      slot.innerHTML = "";
-      ui.error(e?.message || "Falha ao gerar aprofundamento.");
-    }
-  },
 
   _renderAprof(data) {
     const topico = this._escapeHtml(data?.topico || "Aprofundamento");
