@@ -179,10 +179,25 @@ export const auth = {
 
     const fallbackEmail = (this.user?.email || "").trim().toLowerCase();
 
-    // Se houver compra antes do login, promove pending -> profiles
-    if (fallbackEmail) {
-      const pend = await this._consumePendingPremium(fallbackEmail);
-      if (pend?.consumed) console.log("✅ Premium pendente aplicado (Hotmart → profiles).");
+   // Se houver compra antes do login, pede para o backend consumir pending (server-side)
+    try {
+      const accessToken = this.session?.access_token || "";
+      if (accessToken) {
+        const resp = await fetch("/api/consume-pending", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+    
+        const out = await resp.json().catch(() => null);
+    
+        if (resp.ok && out?.consumed) {
+          console.log("✅ Premium pendente aplicado (API → profiles).");
+          // Rebusca profiles para refletir premium sem reload
+          await this.refreshProfile(ctx);
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ consume-pending falhou (segue o fluxo):", e);
     }
 
     // Busca profiles e espelha no store
