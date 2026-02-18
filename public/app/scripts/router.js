@@ -1,8 +1,8 @@
 // router.js — v4 (hash + nav ativo + clique [data-nav] + eventos canônicos)
 export const router = {
-  screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing"],
+ // router.js
+    screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing", "thanks"],
 
-  init() {
     // ✅ clique em qualquer [data-nav] em qualquer lugar da UI
     document.addEventListener("click", (ev) => {
       const el = ev.target.closest("[data-nav]");
