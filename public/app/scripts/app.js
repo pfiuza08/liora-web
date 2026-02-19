@@ -1,6 +1,6 @@
 // =============================================================
 // 🧠 LIORA — APP (Boot + Theme + Gates + Features)
-// Versão: v85.2-FREEMIUM-MVP (auth supabase + anti-duplicação listeners + demo tools)
+// Versão: v85.3-FREEMIUM-MVP (supabase auth + hotmart ready + anti-duplicação listeners)
 // -------------------------------------------------------------
 // ✔ Router por hash via ./router.js (telas: home, tema, pdf, simulados, dashboard, pricing)
 // ✔ Nav por [data-nav] e marca ativo (is-active) via router.js
@@ -9,7 +9,7 @@
 // ✔ Gates (login/premium) via eventos canônicos
 // ✔ Boot com imports dinâmicos
 // ✔ Auth via Supabase Magic Link (auth.js)
-// ✔ Premium via profiles/pending (auth.js)
+// ✔ Premium via profiles/pending (auth.js + /api/consume-pending)
 // ✔ Reset demo + badge (só com ?demo=1)
 // =============================================================
 
@@ -167,6 +167,8 @@ function createTheme(store) {
 
 /* -----------------------------
    GATES (login/premium)
+   - Preferir gates do seu módulo (window.lioraGates / ctx.gates real),
+     mas manter fallback local para não quebrar boot.
 ----------------------------- */
 function createGates(store) {
   function getUser() {
@@ -203,11 +205,10 @@ function createGates(store) {
    LIMITES (Free vs Premium) — diário
    - Tema: 3/dia
    - PDF: 1/dia
-   - Simulados: 2/dia (e max 10 questões Free)
+   - Simulados: 2/dia
 ----------------------------- */
 function createLimiter(store, gates) {
   const KEY = "usage:v1";
-
   const today = () => new Date().toISOString().slice(0, 10);
 
   function read() {
@@ -231,11 +232,7 @@ function createLimiter(store, gates) {
     return u;
   }
 
-  const LIMITS = {
-    tema: 3,
-    pdf: 1,
-    simulados: 2
-  };
+  const LIMITS = { tema: 3, pdf: 1, simulados: 2 };
 
   function left(feature) {
     if (gates.isPremium()) return Infinity;
@@ -267,7 +264,6 @@ function createLimiter(store, gates) {
 
   return { can, hit, left, label };
 }
-
 
 /* -----------------------------
    IMPORT dinâmico (robusto)
@@ -329,16 +325,11 @@ function wireRouteEvents(router) {
 /* -----------------------------
    LOGIN (modal + header state)
 ----------------------------- */
-function wireLoginMock(ctx) {
+function wireLogin(ctx) {
   function ensureLoginModal() {
-    // ✅ garante que não existe “modal duplicado” no DOM
+    // garante que não existe modal duplicado
     const all = document.querySelectorAll("#liora-login");
-    if (all.length > 1) {
-      all.forEach((n, idx) => {
-        if (idx > 0) n.remove();
-      });
-    }
-
+    if (all.length > 1) all.forEach((n, idx) => idx > 0 && n.remove());
     if (document.getElementById("liora-login")) return;
 
     const el = document.createElement("div");
@@ -371,12 +362,6 @@ function wireLoginMock(ctx) {
       </div>
     `;
     document.body.appendChild(el);
-
-    // ✅ se alguma versão antiga injetar botões close extras, remove
-    const closes = el.querySelectorAll(".liora-modal-card [data-login-action='close']");
-    closes.forEach((c, i) => {
-      if (i > 0) c.remove();
-    });
   }
 
   function openLogin() {
@@ -444,7 +429,6 @@ function wireLoginMock(ctx) {
     btnLogout?.classList.remove("hidden");
   }
 
-  // header buttons (usa guard para não duplicar listeners)
   if (!window.__lioraLoginWired) {
     window.__lioraLoginWired = true;
 
@@ -460,7 +444,6 @@ function wireLoginMock(ctx) {
       ctx?.router?.go?.("home");
     });
 
-    // eventos canônicos
     window.addEventListener("liora:open-login", () => openLogin());
     window.addEventListener("liora:login-required", () => openLogin());
     window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
@@ -478,88 +461,45 @@ function wireLoginMock(ctx) {
 
       if (act === "magic") {
         const email = (document.getElementById("liora-login-email")?.value || "").trim();
-        if (!email) {
-          ctx?.ui?.toast?.("Digite seu e-mail.");
-          return;
-        }
+        if (!email) return ctx?.ui?.toast?.("Digite seu e-mail.");
+        if (!ctx?.auth?.sendMagicLink) return ctx?.ui?.toast?.("Auth não carregou. Recarregue a página.");
 
-        if (!ctx?.auth?.sendMagicLink) {
-          ctx?.ui?.toast?.("Auth não carregou. Recarregue a página.");
-          return;
-        }
-
-        // ✅ trava global
-        window.__lioraMagic = window.__lioraMagic || {
-          busy: false,
-          lastAt: 0,
-          cooldownMs: 60000,
-          tries: 0
-        };
+        // trava global simples (evita duplo clique)
+        window.__lioraMagic = window.__lioraMagic || { busy: false, lastAt: 0, cooldownMs: 60000, tries: 0 };
 
         const now = Date.now();
-        const left = window.__lioraMagic.lastAt
-          ? window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)
-          : 0;
-
-        if (left > 0) {
-          const s = Math.ceil(left / 1000);
-          ctx?.ui?.toast?.(`Aguarde ${s}s para reenviar o link.`);
-          return;
-        }
-
-        if (window.__lioraMagic.busy) {
-          ctx?.ui?.toast?.("Enviando link…");
-          return;
-        }
+        const left = window.__lioraMagic.lastAt ? (window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)) : 0;
+        if (left > 0) return ctx?.ui?.toast?.(`Aguarde ${Math.ceil(left / 1000)}s para reenviar o link.`);
+        if (window.__lioraMagic.busy) return ctx?.ui?.toast?.("Enviando link…");
 
         window.__lioraMagic.busy = true;
         window.__lioraMagic.lastAt = now;
         window.__lioraMagic.tries++;
 
-        const btn = a;
-        btn.disabled = true;
-
-        const unlock = () => {
-          window.__lioraMagic.busy = false;
-          window.setTimeout(() => {
-            btn.disabled = false;
-          }, 800);
-        };
-
+        a.disabled = true;
         ctx?.ui?.loading?.("Enviando link…");
-
-        console.log("🔐 magic link attempt", {
-          email,
-          tries: window.__lioraMagic.tries,
-          at: new Date().toISOString()
-        });
 
         ctx.auth.sendMagicLink(email).then(({ error }) => {
           ctx?.ui?.loading?.(false);
 
           if (error) {
-            console.warn("⚠️ magic link error:", error);
-
             const msg = String(error?.message || "").toLowerCase();
             const status = String(error?.status || "");
+            const isRate = msg.includes("rate") || status.includes("429");
 
-            const isRate = msg.includes("rate limit") || status.includes("429");
+            window.__lioraMagic.cooldownMs = isRate ? 120000 : 60000;
+            ctx?.ui?.toast?.(isRate ? "Limite de envios atingido. Aguarde 2 minutos e tente novamente." : "Falha ao enviar link. Tente novamente.");
 
-            if (isRate) {
-              window.__lioraMagic.cooldownMs = 120000; // 2 min
-              ctx?.ui?.toast?.("Limite de envios atingido. Aguarde 2 minutos e tente novamente.");
-            } else {
-              window.__lioraMagic.cooldownMs = 60000;
-              ctx?.ui?.toast?.("Falha ao enviar link. Tente novamente.");
-            }
-
-            unlock();
+            window.__lioraMagic.busy = false;
+            setTimeout(() => { a.disabled = false; }, 800);
             return;
           }
 
           window.__lioraMagic.cooldownMs = 60000;
           ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
-          unlock();
+
+          window.__lioraMagic.busy = false;
+          setTimeout(() => { a.disabled = false; }, 800);
         });
 
         return;
@@ -567,7 +507,6 @@ function wireLoginMock(ctx) {
     });
   }
 
-  // init
   ensureLoginModal();
   updateHeaderAuthUI();
 }
@@ -632,11 +571,8 @@ function demoResetInit() {
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", wire);
-  } else {
-    wire();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  else wire();
 }
 
 function demoBadgeInit() {
@@ -661,11 +597,8 @@ function demoBadgeInit() {
     badge.classList.toggle("hidden", !isDemoMode());
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", ensureBadge);
-  } else {
-    ensureBadge();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ensureBadge);
+  else ensureBadge();
 
   window.addEventListener("hashchange", ensureBadge);
 }
@@ -676,8 +609,10 @@ function demoBadgeInit() {
 (async function boot() {
   const store = createStore("liora:");
   const ui = createUI();
-  const gates = createGates(store);
   const theme = createTheme(store);
+
+  // gates fallback local
+  const gatesFallback = createGates(store);
 
   // expõe para debug
   window.lioraStore = store;
@@ -685,15 +620,12 @@ function demoBadgeInit() {
   theme.init();
 
   // botão de tema (se existir)
-  const btnTheme =
-    document.getElementById("btn-theme") ||
-    document.querySelector("[data-action='toggleTheme']");
+  const btnTheme = document.getElementById("btn-theme") || document.querySelector("[data-action='toggleTheme']");
   btnTheme?.addEventListener("click", () => theme.toggle());
 
-  // Contexto padrão para features
-  const ctx = { store, gates, ui, theme };
-    // ✅ Limites Free (diário)
-  ctx.limits = createLimiter(store, gates);
+  // Contexto padrão para features (gates final será substituído quando o módulo gates existir)
+  const ctx = { store, gates: gatesFallback, ui, theme };
+  ctx.limits = createLimiter(store, ctx.gates);
 
   // -----------------------------
   // 🔐 Supabase Auth (Magic Link)
@@ -704,6 +636,21 @@ function demoBadgeInit() {
     authMod.init(ctx);
   } else {
     console.warn("⚠️ auth.js não carregou (verifique ./auth.js em /app/scripts)");
+  }
+
+  // -----------------------------
+  // 🔒 Gates (módulo real) — preferir o seu gates v2
+  // -----------------------------
+  const gatesMod = await loadFeature("./gates.js", "gates");
+  if (gatesMod) {
+    // gates do seu módulo espera store como argumento (recomendado)
+    ctx.gates = gatesMod;
+    // atualiza limiter para usar gates real
+    ctx.limits = createLimiter(store, { isPremium: () => !!gatesMod.isPremium?.(store) || !!gatesFallback.isPremium() });
+    console.log("🔒 gates.js ativo");
+  } else {
+    // fallback continua
+    console.log("🔒 gates fallback ativo");
   }
 
   // -----------------------------
@@ -756,7 +703,7 @@ function demoBadgeInit() {
   // -----------------------------
   // ✅ Login modal + header state
   // -----------------------------
-  wireLoginMock(ctx);
+  wireLogin(ctx);
 
   // -----------------------------
   // Features
@@ -828,7 +775,7 @@ function demoBadgeInit() {
 
   console.log("✅ LIORA boot ok", {
     route: ctx.router?.getInitialRoute?.() || (location.hash || "#home"),
-    premium: gates.isPremium(),
-    logged: gates.isLogged()
+    premium: (ctx.gates?.isPremium ? !!ctx.gates.isPremium(store) : gatesFallback.isPremium()),
+    logged: (ctx.gates?.isLogged ? !!ctx.gates.isLogged(store) : gatesFallback.isLogged())
   });
 })();
