@@ -1,8 +1,9 @@
 // /api/consume-pending.js
 // ==========================================================
-// LIORA — Consume Premium Pending (Server-side, seguro)
+// LIORA — Consume Premium Pending (Server-side, seguro) v1.2
 // - Recebe JWT do Supabase no header Authorization: Bearer <token>
 // - Valida usuário via Supabase Auth (server)
+// - (Opcional) aceita body.email e exige bater com user.email (anti-abuso)
 // - Busca premium_pending pelo email do user
 // - Se premium=true: upsert em profiles (id = user.id) + delete pending
 //
@@ -53,7 +54,11 @@ async function sbGetUser({ supabaseUrl, anonOrServiceKey, token }) {
 
   const text = await resp.text();
   let data = null;
-  try { data = JSON.parse(text); } catch { data = text; }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
 
   if (!resp.ok) {
     throw new Error(
@@ -67,7 +72,6 @@ async function sbGetUser({ supabaseUrl, anonOrServiceKey, token }) {
 }
 
 async function sbSelectPending({ supabaseUrl, serviceKey, email }) {
-  // maybeSingle: usamos accept: application/json; o supabase retorna [] ou objeto dependendo.
   const url =
     `${supabaseUrl}/rest/v1/premium_pending` +
     `?select=email,premium,plan,last_event,last_status,payload_id,updated_at` +
@@ -86,7 +90,11 @@ async function sbSelectPending({ supabaseUrl, serviceKey, email }) {
 
   const text = await resp.text();
   let data = null;
-  try { data = JSON.parse(text); } catch { data = text; }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
 
   if (!resp.ok) {
     throw new Error(
@@ -96,13 +104,13 @@ async function sbSelectPending({ supabaseUrl, serviceKey, email }) {
     );
   }
 
-  // Supabase REST retorna array
   const row = Array.isArray(data) ? data[0] : null;
   return row || null;
 }
 
 async function sbUpsertProfile({ supabaseUrl, serviceKey, uid, email, meta }) {
   const url = `${supabaseUrl}/rest/v1/profiles?on_conflict=id`;
+
   const payload = {
     id: uid,
     email,
@@ -128,7 +136,11 @@ async function sbUpsertProfile({ supabaseUrl, serviceKey, uid, email, meta }) {
 
   const text = await resp.text();
   let data = null;
-  try { data = JSON.parse(text); } catch { data = text; }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
 
   if (!resp.ok) {
     throw new Error(
@@ -156,10 +168,13 @@ async function sbDeletePending({ supabaseUrl, serviceKey, email }) {
 
   const text = await resp.text();
   let data = null;
-  try { data = JSON.parse(text); } catch { data = text; }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
 
   if (!resp.ok) {
-    // delete falhar não precisa matar tudo, mas aqui mantemos explícito:
     throw new Error(
       `pending delete failed ${resp.status}: ${
         typeof data === "string" ? data.slice(0, 250) : JSON.stringify(data).slice(0, 250)
@@ -190,12 +205,27 @@ export default async function handler(req, res) {
     try {
       user = await sbGetUser({ supabaseUrl, anonOrServiceKey: serviceKey, token });
     } catch (e) {
-      return json(res, 401, { ok: false, error: "invalid_session", reqId, detail: safeStr(e?.message || e) });
+      return json(res, 401, {
+        ok: false,
+        error: "invalid_session",
+        reqId,
+        detail: safeStr(e?.message || e)
+      });
     }
 
     const uid = String(user?.id || "").trim();
     const email = String(user?.email || "").trim().toLowerCase();
     if (!uid || !email) return json(res, 400, { ok: false, error: "user_missing_email", reqId });
+
+    // 1.1) (Opcional) se mandarem email no body, exige bater com o email do user logado
+    // Isso evita alguém logado tentar "ativar" outro email.
+    let bodyEmail = "";
+    try {
+      bodyEmail = String(req.body?.email || "").trim().toLowerCase();
+    } catch {}
+    if (bodyEmail && bodyEmail !== email) {
+      return json(res, 403, { ok: false, error: "email_mismatch", reqId });
+    }
 
     // 2) busca pending
     const pending = await sbSelectPending({ supabaseUrl, serviceKey, email });
@@ -209,8 +239,18 @@ export default async function handler(req, res) {
       pendingPremium: pending?.premium === true
     });
 
-    if (!pending || pending.premium !== true) {
-      return json(res, 200, { ok: true, reqId, consumed: false });
+    if (!pending) {
+      return json(res, 200, { ok: true, reqId, consumed: false, pending_found: false });
+    }
+
+    if (pending.premium !== true) {
+      return json(res, 200, {
+        ok: true,
+        reqId,
+        consumed: false,
+        pending_found: true,
+        pending_premium: false
+      });
     }
 
     // 3) aplica premium em profiles
@@ -223,16 +263,34 @@ export default async function handler(req, res) {
 
     await sbUpsertProfile({ supabaseUrl, serviceKey, uid, email, meta });
 
-    // 4) remove pending
-    await sbDeletePending({ supabaseUrl, serviceKey, email });
+    // 4) remove pending (se falhar, a pessoa pode tentar de novo sem perder premium em profiles)
+    try {
+      await sbDeletePending({ supabaseUrl, serviceKey, email });
+    } catch (e) {
+      console.warn("⚠️ pending delete falhou (não crítico):", {
+        reqId,
+        at: nowIso(),
+        message: safeStr(e?.message || e)
+      });
+    }
 
-    return json(res, 200, { ok: true, reqId, consumed: true, premium: true });
+    return json(res, 200, {
+      ok: true,
+      reqId,
+      consumed: true,
+      premium: true
+    });
   } catch (err) {
     console.error("❌ consume-pending error:", {
       reqId,
       at: nowIso(),
       message: safeStr(err?.message || err)
     });
-    return json(res, 500, { ok: false, error: "internal_error", reqId, detail: safeStr(err?.message || err) });
+    return json(res, 500, {
+      ok: false,
+      error: "internal_error",
+      reqId,
+      detail: safeStr(err?.message || err)
+    });
   }
 }
