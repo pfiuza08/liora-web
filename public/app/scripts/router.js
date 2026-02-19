@@ -1,81 +1,98 @@
-// router.js — v4 (hash + nav ativo + clique [data-nav] + eventos canônicos)
+// router.js — v4.1 (compat: sem optional chaining)
 export const router = {
- // router.js
-    screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing", "thanks"],
+  screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing"],
 
-    // ✅ clique em qualquer [data-nav] em qualquer lugar da UI
-    document.addEventListener("click", (ev) => {
-      const el = ev.target.closest("[data-nav]");
+  init: function () {
+    var self = this;
+
+    // clique em qualquer [data-nav]
+    document.addEventListener("click", function (ev) {
+      var t = ev && ev.target ? ev.target : null;
+      if (!t) return;
+
+      var el = t.closest ? t.closest("[data-nav]") : null;
       if (!el) return;
 
-      const to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
+      var to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
       if (!to) return;
 
-      this.go(to);
+      self.go(to);
     });
 
     // reage ao hash
-    window.addEventListener("hashchange", () => {
-      const r = this.getInitialRoute();
-      this.go(r, { pushHash: false });
+    window.addEventListener("hashchange", function () {
+      var r = self.getInitialRoute();
+      self.go(r, { pushHash: false });
     });
 
     // aplica rota inicial
-    this.go(this.getInitialRoute(), { pushHash: false });
+    self.go(self.getInitialRoute(), { pushHash: false });
   },
 
-  normalize(route) {
-    const r = String(route || "").trim().toLowerCase();
-    return this.screens.includes(r) ? r : "home";
+  normalize: function (route) {
+    var r = String(route || "").trim().toLowerCase();
+    return this.screens.indexOf(r) >= 0 ? r : "home";
   },
 
-  getInitialRoute() {
-    const h = (location.hash || "").replace("#", "").trim().toLowerCase();
+  getInitialRoute: function () {
+    var h = String(location.hash || "").replace("#", "").trim().toLowerCase();
     return this.normalize(h || "home");
   },
 
-  setActiveScreen(route) {
-    this.screens.forEach((r) => {
-      const el = document.getElementById(`screen-${r}`);
-      if (!el) return;
-      el.classList.toggle("active", r === route);
-    });
+  setActiveScreen: function (route) {
+    for (var i = 0; i < this.screens.length; i++) {
+      var r = this.screens[i];
+      var el = document.getElementById("screen-" + r);
+      if (!el) continue;
+      if (r === route) el.classList.add("active");
+      else el.classList.remove("active");
+    }
   },
 
-  setActiveNav(route) {
-    document.querySelectorAll("[data-nav]").forEach((el) => {
-      const to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
-      const active = to === route;
+  setActiveNav: function (route) {
+    var nodes = document.querySelectorAll("[data-nav]");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var to = (el.getAttribute("data-nav") || "").trim().toLowerCase();
+      var active = to === route;
 
-      el.classList.toggle("is-active", active);
-      if (active) el.setAttribute("aria-current", "page");
-      else el.removeAttribute("aria-current");
-    });
+      if (active) {
+        el.classList.add("is-active");
+        el.setAttribute("aria-current", "page");
+      } else {
+        el.classList.remove("is-active");
+        el.removeAttribute("aria-current");
+      }
+    }
   },
 
-  emitOpenEvent(route) {
-    window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route } }));
+  emitOpenEvent: function (route) {
+    window.dispatchEvent(new CustomEvent("liora:route-changed", { detail: { route: route } }));
 
     if (route === "simulados") window.dispatchEvent(new Event("liora:open-simulados"));
+
     if (route === "dashboard") {
       window.dispatchEvent(new Event("liora:open-dashboard"));
       window.dispatchEvent(new Event("liora:dashboard-refresh"));
     }
+
     if (route === "tema") window.dispatchEvent(new Event("liora:open-tema"));
     if (route === "pdf") window.dispatchEvent(new Event("liora:open-pdf"));
     if (route === "home") window.dispatchEvent(new Event("liora:open-home"));
     if (route === "pricing") window.dispatchEvent(new Event("liora:open-pricing"));
   },
 
-  go(route, opts = {}) {
-    const { pushHash = true } = opts;
-    const r = this.normalize(route);
+  go: function (route, opts) {
+    opts = opts || {};
+    var pushHash = opts.pushHash !== false;
+
+    var r = this.normalize(route);
 
     this.setActiveScreen(r);
     this.setActiveNav(r);
 
     if (pushHash) {
-      const next = `#${r}`;
+      var next = "#" + r;
       if (location.hash !== next) history.pushState(null, "", next);
     }
 
