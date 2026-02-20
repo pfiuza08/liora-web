@@ -96,9 +96,11 @@
       background: rgba(255,255,255,.04);
       transition: transform .06s ease, background .15s ease, border-color .15s ease;
       user-select:none;
+      cursor:pointer;
     }
     .btn:hover{background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16)}
     .btn:active{transform: translateY(1px)}
+    .btn[disabled]{opacity:.55; cursor:not-allowed}
     .btnPrimary{
       background: linear-gradient(135deg, #c44b04, #ff6a1a);
       border-color: transparent;
@@ -246,31 +248,34 @@
         </div>
       </div>
 
+      <!-- ✅ FOUNDER: agora é via /api/founder (sem action) -->
       <div class="card" id="founder">
         <div class="kicker">Founder</div>
         <p class="sub" style="margin-top:8px;">
           Quer garantir condição especial de lançamento? Entre na lista e receba o cupom Founder.
         </p>
 
-        <!-- FORM: substitua FORM_ACTION_AQUI pelo seu endpoint (Formspark, Google Forms, FormSubmit, Apps Script etc.) -->
-        <form class="form" method="POST" action="FORM_ACTION_AQUI" id="leadForm">
+        <form class="form" id="founderForm">
           <div class="row">
-            <input name="nome" placeholder="Seu nome" required />
-            <input name="email" placeholder="Seu e-mail" type="email" required />
-          </div>
-          <div class="row">
-            <select name="area" required>
-              <option value="" disabled selected>Área do concurso</option>
-              <option>Direito</option>
-              <option>TI</option>
-              <option>Saúde</option>
-              <option>Administração</option>
-              <option>Outro</option>
-            </select>
-            <input name="prova" placeholder="Prova-alvo (opcional)" />
+            <input id="founder-name" name="nome" placeholder="Seu nome" required />
+            <input id="founder-email" name="email" placeholder="Seu e-mail" type="email" required />
           </div>
 
-          <button class="btn btnPrimary" type="submit" data-ev="lead_submit">✉️ Quero cupom Founder</button>
+          <div class="row">
+            <select id="founder-niche" name="area" required>
+              <option value="" disabled selected>Área do concurso</option>
+              <option value="Direito">Direito</option>
+              <option value="TI">TI</option>
+              <option value="Saúde">Saúde</option>
+              <option value="Administração">Administração</option>
+              <option value="Outro">Outro</option>
+            </select>
+            <input id="founder-banca" name="banca" placeholder="Banca (opcional) ex: FGV, CEBRASPE" />
+          </div>
+
+          <button class="btn btnPrimary" id="btn-founder" type="button" data-ev="founder_click">✉️ Quero cupom Founder</button>
+
+          <div id="founder-status" class="tiny" style="margin-top:6px;"></div>
 
           <div class="tiny">
             Founder recomendado: <strong>FOUNDER30</strong> (30% OFF enquanto assinatura ativa), limite de vagas.
@@ -374,8 +379,134 @@
       });
     });
 
-    const form = document.getElementById("leadForm");
-    form?.addEventListener("submit", () => track("liora_lead_submit", { place: "landing" }));
+    // =============================
+    // Founder (botão funcional)
+    // =============================
+    (function bindFounder() {
+      const btn = document.getElementById("btn-founder");
+      if (!btn || btn.__bound) return;
+      btn.__bound = true;
+
+      const elName = document.getElementById("founder-name");
+      const elEmail = document.getElementById("founder-email");
+      const elNiche = document.getElementById("founder-niche");
+      const elBanca = document.getElementById("founder-banca");
+      const elStatus = document.getElementById("founder-status");
+
+      const setStatus = (msg) => {
+        if (elStatus) elStatus.textContent = msg || "";
+      };
+
+      function toast(msg, ms = 1800) {
+        // Toast simples aqui, sem depender do app.js
+        let el = document.getElementById("liora-toast");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "liora-toast";
+          el.style.position = "fixed";
+          el.style.left = "50%";
+          el.style.bottom = "18px";
+          el.style.transform = "translateX(-50%)";
+          el.style.zIndex = "999999";
+          el.style.maxWidth = "92vw";
+          el.style.padding = "10px 12px";
+          el.style.borderRadius = "14px";
+          el.style.border = "1px solid rgba(255,255,255,.14)";
+          el.style.background = "rgba(20,20,24,.92)";
+          el.style.color = "rgba(255,255,255,.92)";
+          el.style.boxShadow = "0 14px 50px rgba(0,0,0,.40)";
+          el.style.backdropFilter = "blur(10px)";
+          el.style.webkitBackdropFilter = "blur(10px)";
+          el.style.fontWeight = "800";
+          el.style.fontSize = "13px";
+          el.style.opacity = "0";
+          el.style.pointerEvents = "none";
+          el.style.transition = "opacity .18s ease, transform .18s ease";
+          el.style.transform = "translateX(-50%) translateY(6px)";
+          document.body.appendChild(el);
+        }
+
+        el.textContent = String(msg || "");
+        el.style.opacity = "1";
+        el.style.transform = "translateX(-50%) translateY(0px)";
+
+        window.clearTimeout(el.__t);
+        el.__t = window.setTimeout(() => {
+          el.style.opacity = "0";
+          el.style.transform = "translateX(-50%) translateY(6px)";
+        }, ms);
+      }
+
+      async function copy(txt) {
+        try {
+          await navigator.clipboard.writeText(txt);
+          return true;
+        } catch {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = txt;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      }
+
+      btn.addEventListener("click", async () => {
+        const name = (elName?.value || "").trim();
+        const email = (elEmail?.value || "").trim().toLowerCase();
+        const niche = (elNiche?.value || "").trim();
+        const banca = (elBanca?.value || "").trim();
+
+        if (!email || !email.includes("@")) {
+          toast("Digite um e-mail válido para receber o cupom.");
+          return;
+        }
+        if (!niche) {
+          toast("Selecione a área do concurso.");
+          return;
+        }
+
+        btn.disabled = true;
+        setStatus("Enviando…");
+
+        try {
+          const r = await fetch("/api/founder", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, niche, banca, page_url: location.href })
+          });
+
+          const data = await r.json().catch(() => null);
+          if (!r.ok || !data?.ok) {
+            throw new Error(data?.detail || data?.error || `HTTP ${r.status}`);
+          }
+
+          const coupon = String(data.coupon || "FOUNDER30");
+          const okCopy = await copy(coupon);
+
+          setStatus(okCopy ? `Cupom copiado: ${coupon}` : `Seu cupom: ${coupon}`);
+          toast(okCopy ? `Cupom ${coupon} copiado ✅` : `Seu cupom é ${coupon}`);
+
+          track("liora_founder_ok", { email });
+
+          // opcional: rolar até planos
+          const plans = document.getElementById("pricing");
+          plans?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+        } catch (e) {
+          console.warn("Founder error:", e);
+          setStatus("");
+          track("liora_founder_error", { message: String(e?.message || e) });
+          toast("Não consegui registrar agora. Tente novamente em 1 minuto.");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
 
     document.getElementById("yr").textContent = new Date().getFullYear();
   </script>
