@@ -125,41 +125,12 @@ export const dashboard = {
     }
   },
 
-  isPremium() {
-    // prefer ctx.gates.isPremium() (padrão novo)
-    try {
-      if (this.ctx?.gates?.isPremium) return !!this.ctx.gates.isPremium();
-    } catch {}
-    // fallback: user.premium
-    const u = this.getUser();
-    return !!u?.premium;
-  },
+  isPremium()
 
   // -----------------------------
   // CTA Premium (visitante vs free)
   // -----------------------------
-    premiumCTA() {
-    // ✅ se já é premium, não renderiza CTA nenhum
-    if (this.isPremium()) return "";
-  
-    const u = this.getUser();
-    const isVisitor = !u;
-  
-    if (isVisitor) {
-      return `
-        <div class="actions-row" style="margin-top:10px;">
-          <button class="btn-primary" data-action="dashLogin">Entrar para desbloquear</button>
-        </div>
-      `;
-    }
-  
-    return `
-      <div class="actions-row" style="margin-top:10px;">
-        <button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>
-      </div>
-    `;
-  },
-
+    premiumCTA()
   // -----------------------------
   // Compute KPIs
   // -----------------------------
