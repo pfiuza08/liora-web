@@ -28,17 +28,20 @@ export const dashboard = {
   ctx: null,
   _bound: false,
 
-  init(ctx) {
+   init(ctx) {
     this.ctx = ctx;
-
+  
     window.addEventListener("liora:dashboard-refresh", () => this.render());
     window.addEventListener("liora:stats-changed", () => this.render());
-
+  
+    // ✅ essencial: quando login/premium muda, re-renderiza a tela
+    window.addEventListener("liora:user-changed", () => this.render());
+  
     window.addEventListener("liora:open-dashboard", () => {
       this.showScreen();
       this.render();
     });
-
+  
     this.ensureShell();
     this.bindOnce();
     console.log("📊 dashboard.js iniciado (v1.5)");
@@ -135,10 +138,13 @@ export const dashboard = {
   // -----------------------------
   // CTA Premium (visitante vs free)
   // -----------------------------
-  premiumCTA() {
+    premiumCTA() {
+    // ✅ se já é premium, não renderiza CTA nenhum
+    if (this.isPremium()) return "";
+  
     const u = this.getUser();
     const isVisitor = !u;
-
+  
     if (isVisitor) {
       return `
         <div class="actions-row" style="margin-top:10px;">
@@ -146,7 +152,7 @@ export const dashboard = {
         </div>
       `;
     }
-
+  
     return `
       <div class="actions-row" style="margin-top:10px;">
         <button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>
