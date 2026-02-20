@@ -1,8 +1,9 @@
 // =============================================================
 // 📊 LIORA — DASHBOARD (MVP local, de verdade)
-// Versão: v1.5 (integra Simulados v3.0: Review Queue + Abrir revisão do último resultado)
+// Versão: v1.6 (fix premium gate compat + re-render em user-changed)
 // - Mantém Opção A (demo só no empty state; sem "Atualizar" no UI)
-// - Corrige Premium real: usa ctx.gates.isPremium() quando existir (fallback user.premium)
+// - ✅ Premium robusto: suporta ctx.gates.isPremium() e ctx.gates.isPremium(store)
+// - ✅ CTA Premium nunca aparece quando premium=true
 // - Nav robusta: tenta ctx.router.go -> window.router.go
 // - Botões de revisão: "Revisar agora" abre modo review queue no Simulados (liora_review_start=1)
 // - "Ver revisão" abre a revisão do último resultado (liora_sim_open_review=1)
@@ -21,30 +22,29 @@
 // Extras:
 // - revisão pendente: localStorage "liora_review_queue:v1" { items: [] }
 // - último resultado: localStorage "liora_sim_last_result"
-//
 // =============================================================
 
 export const dashboard = {
   ctx: null,
   _bound: false,
 
-   init(ctx) {
+  init(ctx) {
     this.ctx = ctx;
-  
+
     window.addEventListener("liora:dashboard-refresh", () => this.render());
     window.addEventListener("liora:stats-changed", () => this.render());
-  
+
     // ✅ essencial: quando login/premium muda, re-renderiza a tela
     window.addEventListener("liora:user-changed", () => this.render());
-  
+
     window.addEventListener("liora:open-dashboard", () => {
       this.showScreen();
       this.render();
     });
-  
+
     this.ensureShell();
     this.bindOnce();
-    console.log("📊 dashboard.js iniciado (v1.5)");
+    console.log("📊 dashboard.js iniciado (v1.6)");
   },
 
   showScreen() {
@@ -125,12 +125,48 @@ export const dashboard = {
     }
   },
 
-  isPremium()
+  // ✅ Premium robusto (compat com gates do app.js e gates.js v2)
+  isPremium() {
+    try {
+      const g = this.ctx?.gates;
+
+      // (A) createGates do app.js: isPremium() sem args
+      // (B) gates.js v2: isPremium(store) com args
+      if (g?.isPremium && typeof g.isPremium === "function") {
+        if (g.isPremium.length >= 1) return !!g.isPremium(this.ctx?.store);
+        return !!g.isPremium();
+      }
+    } catch {}
+
+    // fallback: user.premium
+    const u = this.getUser();
+    return !!u?.premium;
+  },
 
   // -----------------------------
   // CTA Premium (visitante vs free)
   // -----------------------------
-    premiumCTA()
+  premiumCTA() {
+    if (this.isPremium()) return ""; // ✅ premium nunca vê CTA
+
+    const u = this.getUser();
+    const isVisitor = !u;
+
+    if (isVisitor) {
+      return `
+        <div class="actions-row" style="margin-top:10px;">
+          <button class="btn-primary" data-action="dashLogin">Entrar para desbloquear</button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="actions-row" style="margin-top:10px;">
+        <button class="btn-primary" data-action="dashUpgrade">Desbloquear Premium</button>
+      </div>
+    `;
+  },
+
   // -----------------------------
   // Compute KPIs
   // -----------------------------
@@ -500,9 +536,7 @@ export const dashboard = {
       const act = btn.getAttribute("data-action");
 
       if (act === "dashUpgrade") {
-        // manda evento padrão do app (modal premium, etc.)
         window.dispatchEvent(new Event("liora:premium-bloqueado"));
-        // se existir rota direta
         this.nav("pricing");
         return;
       }
