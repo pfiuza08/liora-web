@@ -1,6 +1,6 @@
 // =============================================================
 // 💳 LIORA — PRICING (Hotmart Checkout)
-// Versão: v1.7 (Em breve para trimestral/vitalício + free central + sem premium fake)
+// Versão: v1.8 (Hotmart 2 ofertas: normal vs founder + em breve trimestral/vitalício)
 // -------------------------------------------------------------
 // ✔ Usa HTML existente (não sobrescreve)
 // ✔ Botões: data-action="pricingChoose" (free/monthly/quarterly/lifetime)
@@ -10,16 +10,18 @@
 // ✔ Login: opcional (você decide via REQUIRE_LOGIN_BEFORE_PAY)
 // ✔ Abre Hotmart em nova aba (mais confiável)
 // ✔ Trimestral/Vitalício: "Em breve" (não abre checkout)
+// ✔ Link normal (app): off=6mzlvtiy
+// ✔ Founder fica só na landing: off=oplx5hku
 // =============================================================
 
 export const pricing = {
   ctx: null,
   _bound: false,
 
-  // ✅ seu link base da Hotmart
-  HOTMART_PAY_URL: "https://pay.hotmart.com/I104401854N",
+  // ✅ Link "preço normal" (OFERTA NORMAL)
+  HOTMART_PAY_URL: "https://pay.hotmart.com/I104401854N?off=6mzlvtiy",
 
-  // ✅ exigir login ANTES de pagar?
+  // ✅ defina se quer exigir login ANTES de pagar
   REQUIRE_LOGIN_BEFORE_PAY: false,
 
   // ✅ planos ainda não implementados
@@ -35,7 +37,7 @@ export const pricing = {
     this.bindOnce();
     this.render();
 
-    console.log("💳 pricing.js iniciado (v1.7 Hotmart + em breve)");
+    console.log("💳 pricing.js iniciado (v1.8 Hotmart normal + em breve)");
   },
 
   // -----------------------------
@@ -105,15 +107,9 @@ export const pricing = {
       } else {
         btn.disabled = false;
         btn.classList.remove("is-disabled");
+        btn.classList.remove("is-comingsoon");
         btn.removeAttribute("title");
       }
-    });
-
-    // Marcação visual "Em breve" no card (se existir)
-    // (Opcional: coloca um selo se tiver um elemento com data-comingsoon-badge)
-    screen.querySelectorAll("[data-comingsoon-badge]").forEach((el) => {
-      const p = (el.getAttribute("data-plan") || "").trim().toLowerCase();
-      if (this.COMING_SOON_PLANS.has(p)) el.textContent = "Em breve";
     });
   },
 
@@ -134,7 +130,7 @@ export const pricing = {
       const act = btn.getAttribute("data-action");
       if (!act) return;
 
-      // ✅ evita que <a> navegue antes do handler
+      // ✅ evita que algum <a> navegue antes do handler
       ev.preventDefault();
 
       if (act === "pricingLearnMore") {
@@ -155,7 +151,7 @@ export const pricing = {
         return;
       }
 
-      // Em breve
+      // Em breve: trimestral e vitalício
       if (this.COMING_SOON_PLANS.has(plan)) {
         this.toast("Esse plano ainda está em implementação. Por enquanto, só o Mensal está disponível.");
         return;
@@ -175,7 +171,7 @@ export const pricing = {
         return;
       }
 
-      // ✅ abre Hotmart (nova aba)
+      // ✅ abre Hotmart (nova aba) - link normal do app (off=6mzlvtiy)
       const url = this._buildHotmartUrl(plan);
       this.toast("Abrindo checkout seguro…");
 
@@ -188,14 +184,14 @@ export const pricing = {
   },
 
   _buildHotmartUrl(plan) {
+    // ✅ já vem com off=6mzlvtiy no HOTMART_PAY_URL
     const u = new URL(this.HOTMART_PAY_URL);
 
-    // se você tiver oferta, coloque aqui. se não tiver, REMOVA esta linha.
-    // u.searchParams.set("off", "SUA_OFERTA_AQUI");
-
+    // marcação simples:
     u.searchParams.set("src", "liora_app");
     u.searchParams.set("plan", String(plan || "monthly"));
 
+    // Se quiser capturar usuário (email):
     try {
       const user = this.getUser();
       if (user?.email) u.searchParams.set("email", user.email);
