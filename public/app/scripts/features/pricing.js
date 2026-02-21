@@ -1,6 +1,6 @@
 // =============================================================
 // 💳 LIORA — PRICING (Hotmart Checkout)
-// Versão: v1.6 (Hotmart link + login opcional + sem premium fake)
+// Versão: v1.7 (Em breve para trimestral/vitalício + free central + sem premium fake)
 // -------------------------------------------------------------
 // ✔ Usa HTML existente (não sobrescreve)
 // ✔ Botões: data-action="pricingChoose" (free/monthly/quarterly/lifetime)
@@ -9,17 +9,21 @@
 // ✔ Premium real: usa ctx.gates.isPremium() quando existir (fallback user.premium)
 // ✔ Login: opcional (você decide via REQUIRE_LOGIN_BEFORE_PAY)
 // ✔ Abre Hotmart em nova aba (mais confiável)
+// ✔ Trimestral/Vitalício: "Em breve" (não abre checkout)
 // =============================================================
 
 export const pricing = {
   ctx: null,
   _bound: false,
 
-  // ✅ seu link base da Hotmart (o mesmo para todos, se você estiver usando 1 produto/checkout)
+  // ✅ seu link base da Hotmart
   HOTMART_PAY_URL: "https://pay.hotmart.com/I104401854N",
 
-  // ✅ defina se quer exigir login ANTES de pagar
+  // ✅ exigir login ANTES de pagar?
   REQUIRE_LOGIN_BEFORE_PAY: false,
+
+  // ✅ planos ainda não implementados
+  COMING_SOON_PLANS: new Set(["quarterly", "lifetime"]),
 
   init(ctx) {
     this.ctx = ctx;
@@ -31,7 +35,7 @@ export const pricing = {
     this.bindOnce();
     this.render();
 
-    console.log("💳 pricing.js iniciado (v1.6 Hotmart)");
+    console.log("💳 pricing.js iniciado (v1.7 Hotmart + em breve)");
   },
 
   // -----------------------------
@@ -74,11 +78,26 @@ export const pricing = {
 
     const premium = this.isPremium();
 
-    // Se já é premium, desabilita compra
     screen.querySelectorAll('[data-action="pricingChoose"]').forEach((btn) => {
-      const plan = (btn.getAttribute("data-plan") || "").trim().toLowerCase();
+      const raw = (btn.getAttribute("data-plan") || "").trim().toLowerCase();
+      const plan = raw === "premium" ? "monthly" : raw;
       const isFree = plan === "free";
+      const isComingSoon = this.COMING_SOON_PLANS.has(plan);
 
+      // Label do Free
+      if (isFree) {
+        btn.textContent = premium ? "Continuar (Premium ativo)" : "Continuar no Free";
+      }
+
+      // Em breve: desabilita sempre
+      if (isComingSoon) {
+        btn.disabled = true;
+        btn.classList.add("is-disabled", "is-comingsoon");
+        btn.setAttribute("title", "Em breve");
+        return;
+      }
+
+      // Se já é premium, desabilita compra (exceto free)
       if (!isFree && premium) {
         btn.disabled = true;
         btn.classList.add("is-disabled");
@@ -88,10 +107,13 @@ export const pricing = {
         btn.classList.remove("is-disabled");
         btn.removeAttribute("title");
       }
+    });
 
-      if (isFree) {
-        btn.textContent = premium ? "Continuar (Premium ativo)" : "Continuar no Free";
-      }
+    // Marcação visual "Em breve" no card (se existir)
+    // (Opcional: coloca um selo se tiver um elemento com data-comingsoon-badge)
+    screen.querySelectorAll("[data-comingsoon-badge]").forEach((el) => {
+      const p = (el.getAttribute("data-plan") || "").trim().toLowerCase();
+      if (this.COMING_SOON_PLANS.has(p)) el.textContent = "Em breve";
     });
   },
 
@@ -112,7 +134,7 @@ export const pricing = {
       const act = btn.getAttribute("data-action");
       if (!act) return;
 
-      // ✅ evita que algum <a> navegue antes do handler
+      // ✅ evita que <a> navegue antes do handler
       ev.preventDefault();
 
       if (act === "pricingLearnMore") {
@@ -130,6 +152,12 @@ export const pricing = {
       if (plan === "free") {
         this.toast(this.isPremium() ? "Premium já está ativo." : "Ok. Você está no Free.");
         this.nav("home");
+        return;
+      }
+
+      // Em breve
+      if (this.COMING_SOON_PLANS.has(plan)) {
+        this.toast("Esse plano ainda está em implementação. Por enquanto, só o Mensal está disponível.");
         return;
       }
 
@@ -154,23 +182,20 @@ export const pricing = {
       try {
         window.open(url, "_blank", "noopener,noreferrer");
       } catch (e) {
-        // fallback: mesma aba
         location.href = url;
       }
     });
   },
 
   _buildHotmartUrl(plan) {
-    // Se você tiver UTMs, tracking e/ou múltiplos planos, coloque aqui.
-    // Por enquanto, um único checkout. Adiciono parâmetros úteis:
     const u = new URL(this.HOTMART_PAY_URL);
 
-    // exemplo de marcação simples:
-    u.searchParams.set("off", ""); // se você usar ofertas, substitua aqui
+    // se você tiver oferta, coloque aqui. se não tiver, REMOVA esta linha.
+    // u.searchParams.set("off", "SUA_OFERTA_AQUI");
+
     u.searchParams.set("src", "liora_app");
     u.searchParams.set("plan", String(plan || "monthly"));
 
-    // Se quiser capturar rota/usuário:
     try {
       const user = this.getUser();
       if (user?.email) u.searchParams.set("email", user.email);
