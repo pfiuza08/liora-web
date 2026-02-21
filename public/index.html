@@ -485,105 +485,284 @@
     </div>
   </div>
 
-  <script>
-    // =============================
-    // Tracking mínimo (opcional)
-    // =============================
-    window.lioraDebug = window.lioraDebug ?? false;
+ <script>
+  // =============================
+  // Tracking mínimo (opcional)
+  // =============================
+  window.lioraDebug = window.lioraDebug ?? false;
 
-    function track(ev, data = {}) {
-      try {
-        if (window.lioraDebug) console.log("📍", ev, data);
-        if (typeof window.gtag === "function") window.gtag("event", ev, data);
-        if (typeof window.fbq === "function") window.fbq("trackCustom", ev, data);
-      } catch (e) {}
-    }
+  function track(ev, data = {}) {
+    try {
+      if (window.lioraDebug) console.log("📍", ev, data);
+      if (typeof window.gtag === "function") window.gtag("event", ev, data);
+      if (typeof window.fbq === "function") window.fbq("trackCustom", ev, data);
+    } catch (e) {}
+  }
 
-    track("liora_lp_view", { path: location.pathname + location.hash });
+  track("liora_lp_view", { path: location.pathname + location.hash });
 
-    document.querySelectorAll("[data-ev]").forEach(el => {
-      el.addEventListener("click", () => track("liora_lp_click", { id: el.getAttribute("data-ev") }));
+  document.querySelectorAll("[data-ev]").forEach((el) => {
+    el.addEventListener("click", () => {
+      track("liora_lp_click", { id: el.getAttribute("data-ev") });
     });
+  });
 
-    document.getElementById("yr").textContent = new Date().getFullYear();
+  document.getElementById("yr").textContent = new Date().getFullYear();
 
-    // =============================
-    // Founder modal
-    // =============================
-    const COUPON = "FOUNDER30";
+  // =============================
+  // Founder modal (elegante)
+  // =============================
+  const COUPON = "FOUNDER30";
+  const CHECKOUT_URL = "https://pay.hotmart.com/I104401854N?off=oplx5hku";
+
+  const btnOpen = document.getElementById("btnFounder");
+  const form = document.getElementById("leadForm");
+
+  function ensureFounderModal() {
+    // Se você já tiver um modal no HTML com id="founderModal", reaproveita.
+    let modal = document.getElementById("founderModal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = "founderModal";
+    modal.className = "liora-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Cupom Founder");
+
+    // Estilo embutido só do modal (não mexe no resto do site)
+    const style = document.createElement("style");
+    style.id = "founderModalStyle";
+    style.textContent = `
+      #founderModal { position: fixed; inset: 0; display: none; z-index: 99999; }
+      #founderModal.is-open { display: block; }
+
+      #founderModal .fm-backdrop{
+        position:absolute; inset:0;
+        background: rgba(0,0,0,.55);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+
+      #founderModal .fm-card{
+        position:relative;
+        width:min(520px, 92vw);
+        margin: 10vh auto 0;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(18,18,22,.85);
+        box-shadow: 0 24px 80px rgba(0,0,0,.55);
+        overflow:hidden;
+      }
+
+      #founderModal .fm-head{
+        display:flex; align-items:flex-start; justify-content:space-between;
+        padding: 16px 16px 12px;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+      }
+
+      #founderModal .fm-title{
+        font-weight: 900;
+        letter-spacing: -.2px;
+        font-size: 16px;
+        margin: 0;
+      }
+
+      #founderModal .fm-sub{
+        color: rgba(255,255,255,.72);
+        font-size: 13px;
+        line-height: 1.5;
+        margin-top: 6px;
+        max-width: 46ch;
+      }
+
+      #founderModal .fm-body{
+        padding: 14px 16px 16px;
+      }
+
+      #founderModal .fm-coupon{
+        display:flex; gap:10px; align-items:center; justify-content:space-between;
+        padding: 12px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(196,75,4,.35);
+        background: rgba(196,75,4,.12);
+        margin-top: 10px;
+      }
+
+      #founderModal .fm-code{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-weight: 900;
+        letter-spacing: .14em;
+        font-size: 14px;
+      }
+
+      #founderModal .fm-actions{
+        display:flex; gap:10px; flex-wrap:wrap;
+        margin-top: 14px;
+      }
+
+      #founderModal .fm-note{
+        margin-top: 12px;
+        font-size: 12px;
+        color: rgba(255,255,255,.62);
+        line-height: 1.5;
+      }
+
+      #founderModal .fm-link{
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: rgba(255,255,255,.85);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+
+      #founderModal .fm-x{
+        display:inline-flex; align-items:center; justify-content:center;
+        width: 36px; height: 36px;
+        border-radius: 12px;
+      }
+    `;
+    document.head.appendChild(style);
+
+    modal.innerHTML = `
+      <div class="fm-backdrop" data-modal="close"></div>
+      <div class="fm-card" role="document">
+        <div class="fm-head">
+          <div>
+            <div class="fm-title">Cupom Founder</div>
+            <div class="fm-sub">
+              Use o cupom no checkout para ativar a condição especial do lote Founder.
+            </div>
+          </div>
+          <button class="btnLight fm-x" type="button" data-modal="close" aria-label="Fechar">
+            ✕
+          </button>
+        </div>
+
+        <div class="fm-body">
+          <div class="fm-coupon">
+            <div>
+              <div class="tiny" style="margin-bottom:4px; opacity:.9;">Seu cupom:</div>
+              <div class="fm-code" id="couponCode">${COUPON}</div>
+            </div>
+            <button class="btnLight" type="button" id="btnCopyCoupon">Copiar</button>
+          </div>
+
+          <div class="fm-actions">
+            <a class="btn btnPrimary" href="${CHECKOUT_URL}" target="_blank" rel="noopener noreferrer" data-ev="founder_checkout">
+              Ir para o checkout
+            </a>
+            <button class="btnLight" type="button" data-modal="close" id="btnFounderClose">Fechar</button>
+          </div>
+
+          <div class="fm-note">
+            Dica: se você estiver no celular, copie o cupom e cole no campo “Cupom de desconto” no checkout.
+          </div>
+
+          <a class="fm-link" href="${CHECKOUT_URL}" target="_blank" rel="noopener noreferrer">
+            Abrir link do checkout em nova aba
+          </a>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function openFounderModal() {
+    const modal = ensureFounderModal();
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+
+    // foco no botão copiar (experiência mais “redonda”)
+    setTimeout(() => {
+      modal.querySelector("#btnCopyCoupon")?.focus();
+    }, 20);
+
+    track("liora_founder_open", { coupon: COUPON });
+  }
+
+  function closeFounderModal() {
     const modal = document.getElementById("founderModal");
-    const btnOpen = document.getElementById("btnFounder");
-    const btnCopy = document.getElementById("btnCopyCoupon");
-    const couponEl = document.getElementById("couponCode");
+    if (!modal) return;
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
 
-    function openModal() {
-      if (!modal) return;
-      modal.classList.add("is-open");
-      modal.setAttribute("aria-hidden", "false");
-      document.body.style.overflow = "hidden";
-      track("liora_founder_open", { coupon: COUPON });
+    track("liora_founder_close", {});
+  }
+
+  // abre modal
+  btnOpen?.addEventListener("click", () => openFounderModal());
+
+  // fecha modal (overlay, botão X, botão Fechar)
+  document.addEventListener("click", (ev) => {
+    const modal = document.getElementById("founderModal");
+    if (!modal || !modal.classList.contains("is-open")) return;
+
+    const a = ev.target.closest("[data-modal]");
+    if (a?.getAttribute("data-modal") === "close") {
+      closeFounderModal();
+      return;
     }
 
-    function closeModal() {
-      if (!modal) return;
-      modal.classList.remove("is-open");
-      modal.setAttribute("aria-hidden", "true");
-      document.body.style.overflow = "";
-      track("liora_founder_close", {});
+    // copiar
+    const copyBtn = ev.target.closest("#btnCopyCoupon");
+    if (copyBtn) {
+      const codeEl = document.getElementById("couponCode");
+      const txt = (codeEl?.textContent || COUPON).trim();
+
+      copyText(txt)
+        .then(() => {
+          copyBtn.textContent = "Copiado";
+          track("liora_founder_copy", { coupon: txt });
+          setTimeout(() => (copyBtn.textContent = "Copiar"), 1200);
+        })
+        .catch(() => {
+          copyBtn.textContent = "Falhou";
+          setTimeout(() => (copyBtn.textContent = "Copiar"), 1200);
+        });
     }
+  });
 
-    btnOpen?.addEventListener("click", () => openModal());
+  // ESC fecha
+  window.addEventListener("keydown", (ev) => {
+    const modal = document.getElementById("founderModal");
+    if (ev.key === "Escape" && modal?.classList.contains("is-open")) closeFounderModal();
+  });
 
-    modal?.addEventListener("click", (ev) => {
-      const a = ev.target.closest("[data-modal]");
-      if (!a) return;
-      const act = a.getAttribute("data-modal");
-      if (act === "close") closeModal();
-    });
-
-    window.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape" && modal?.classList.contains("is-open")) closeModal();
-    });
-
-    function copyText(text) {
+  function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+    } catch {}
+    // fallback
+    return new Promise((resolve, reject) => {
       try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          return navigator.clipboard.writeText(text);
-        }
-      } catch {}
-      // fallback
-      return new Promise((resolve, reject) => {
-        try {
-          const ta = document.createElement("textarea");
-          ta.value = text;
-          ta.style.position = "fixed";
-          ta.style.left = "-9999px";
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand("copy");
-          ta.remove();
-          resolve();
-        } catch (e) { reject(e); }
-      });
-    }
-
-    btnCopy?.addEventListener("click", async () => {
-      const txt = couponEl?.textContent?.trim() || COUPON;
-      try {
-        await copyText(txt);
-        btnCopy.textContent = "Copiado";
-        track("liora_founder_copy", { coupon: txt });
-        setTimeout(() => btnCopy.textContent = "Copiar", 1200);
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        resolve();
       } catch (e) {
-        btnCopy.textContent = "Falhou";
-        setTimeout(() => btnCopy.textContent = "Copiar", 1200);
+        reject(e);
       }
     });
+  }
 
-    // Se você quiser impedir submit do form (já que o botão é type=button), ok.
-    // Se quiser salvar lead de verdade, aí a gente troca action e faz submit real.
-    const form = document.getElementById("leadForm");
-    form?.addEventListener("submit", () => track("liora_lead_submit", { place: "landing" }));
-  </script>
+  // Se o form existir e você quiser tracking do submit real (quando houver submit)
+  form?.addEventListener("submit", () => track("liora_lead_submit", { place: "landing" }));
+</script>
 </body>
 </html>
