@@ -2739,3 +2739,44 @@ body.liora-modal-open{
   opacity: .55;
   filter: grayscale(.15);
 }
+/* =============================
+   SELECT/OPTIONS no modo escuro
+   (Chrome/Edge/Windows friendly)
+============================= */
+
+/* Ajuda o browser a usar widgets "dark" quando possível */
+:root { color-scheme: dark; }
+:root.light { color-scheme: light; }
+
+/* Select em si */
+select.input {
+  background-color: rgba(0,0,0,.35);
+  color: rgba(255,255,255,.92);
+  border-color: rgba(255,255,255,.14);
+}
+
+/* Quando abre o dropdown (alguns browsers respeitam) */
+select.input option,
+select.input optgroup {
+  background-color: #121216;
+  color: rgba(255,255,255,.92);
+}
+
+/* Optgroup label tende a ficar “lavado” no dark */
+select.input optgroup {
+  color: rgba(255,255,255,.70);
+  font-weight: 700;
+}
+
+/* Melhora contraste do item selecionado (nem todo browser aplica) */
+select.input option:checked {
+  background-color: rgba(196,75,4,.35);
+  color: #fff;
+}
+
+/* Caso o seu .input seja aplicado a outros campos, mantém coerência */
+.input:focus {
+  outline: none;
+  border-color: rgba(196,75,4,.55);
+  box-shadow: 0 0 0 3px rgba(196,75,4,.18);
+}
