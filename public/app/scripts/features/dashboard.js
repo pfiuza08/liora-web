@@ -434,7 +434,7 @@ export const dashboard = {
     elInsights.innerHTML = premium
       ? `
         <div class="dash-card">
-          <div class="dash-title">Melhor banca</div>
+          <div class="dash-title">Melhor exame</div>
           <div class="dash-value">${this.escape(k.bestBanca)}</div>
           <div class="dash-sub">maior acurácia acumulada</div>
         </div>
@@ -465,7 +465,7 @@ export const dashboard = {
     elTables.innerHTML = premium
       ? `
         <div class="dash-card">
-          <div class="dash-title">Detalhes por banca</div>
+          <div class="dash-title">Detalhes por exame</div>
           <div class="dash-sub">Onde você mais ganha pontos</div>
           <div class="dash-list" style="margin-top:10px;">
             ${k.bancaRank.slice(0, 6).map((b) => `
