@@ -344,34 +344,32 @@
           Quer garantir condição especial de lançamento? Clique no botão e pegue seu cupom Founder.
         </p>
 
-        <!-- Se você quiser capturar lead também, mantenha o form.
-             Se não quiser, pode deixar o action como "#" (como está). -->
-        <form class="form" method="POST" action="#" id="leadForm" autocomplete="on">
-          <div class="row">
-            <input name="nome" placeholder="Seu nome" />
-            <input name="email" placeholder="Seu e-mail" type="email" />
-          </div>
-          <div class="row">
-            <select name="area">
-              <option value="" disabled selected>Área do concurso</option>
-              <option>Direito</option>
-              <option>TI</option>
-              <option>Saúde</option>
-              <option>Administração</option>
-              <option>Outro</option>
-            </select>
-            <input name="prova" placeholder="Prova-alvo (opcional)" />
-          </div>
-
-          <!-- ✅ Agora abre modal -->
-          <button class="btn btnPrimary" type="button" id="btnFounder" data-ev="founder_open">
-            Quero cupom Founder
-          </button>
-
-          <div class="tiny">
-            Cupom público (lote limitado). Você aplica no checkout.
-          </div>
-        </form>
+    <form class="form" id="leadForm" autocomplete="on">
+        <div class="row">
+          <input name="nome" placeholder="Seu nome" />
+          <input name="email" placeholder="Seu e-mail" type="email" required />
+        </div>
+      
+        <div class="row">
+          <select name="area">
+            <option value="" disabled selected>Área do concurso</option>
+            <option>Direito</option>
+            <option>TI</option>
+            <option>Saúde</option>
+            <option>Administração</option>
+            <option>Outro</option>
+          </select>
+          <input name="prova" placeholder="Prova-alvo (opcional)" />
+        </div>
+      
+        <button class="btn btnPrimary btnFounder" type="submit" id="btnFounder" data-ev="founder_submit">
+          Quero cupom Founder
+        </button>
+      
+        <div class="tiny" id="founderHint">
+          Cupom público (lote limitado). Você aplica no checkout.
+        </div>
+      </form>
       </div>
     </section>
 
