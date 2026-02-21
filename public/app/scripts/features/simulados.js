@@ -876,7 +876,7 @@ export const simulados = {
         <div class="card" style="margin-bottom:12px;">
           <div class="card-title">Simulado em andamento</div>
           <div class="muted">
-            Banca: <b>${this.escape(banca)}</b> · Tema: <b>${this.escape(tema)}</b><br>
+            Exame: <b>${this.escape(banca)}</b> · Tema: <b>${this.escape(tema)}</b><br>
             Tipo: <b>${this.escape(modeLabel)}</b><br>
             Progresso: <b>${answered}</b> / <b>${total}</b>
           </div>
@@ -900,7 +900,7 @@ export const simulados = {
       <div class="card">
         <div class="card-title">${hasRun ? "Novo simulado" : "Simulado"}</div>
         <div class="muted">
-          Configure banca, tipo, quantidade e tema (opcional).<br>
+          Configure exame, tipo, quantidade e tema (opcional).<br>
           Depois clique em <b>${hasRun ? "Iniciar novo" : "Iniciar"}</b>.
         </div>
 
@@ -911,7 +911,7 @@ export const simulados = {
 
         <div class="sim-meta">
           <div><span class="chip">Tipo</span> ${this.escape(modeLabel)}</div>
-          <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
+          <div><span class="chip">Exame</span> ${this.escape(this.STATE.config.banca)}</div>
           <div><span class="chip">${this.escape(qtdLabel)}</span> ${this.STATE.config.qtd}</div>
           <div><span class="chip">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
           <div><span class="chip">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
@@ -1112,7 +1112,7 @@ export const simulados = {
           <div><span class="chip">Objetivas</span> ${totalScored}</div>
           <div><span class="chip">Acertos</span> ${acertos}</div>
           <div><span class="chip">Erros</span> ${erros}</div>
-          <div><span class="chip">Banca</span> ${this.escape(this.STATE.config.banca)}</div>
+          <div><span class="chip">Exame</span> ${this.escape(this.STATE.config.banca)}</div>
           <div><span class="chip">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
         </div>
 
