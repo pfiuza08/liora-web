@@ -29,7 +29,7 @@
         <div class="logo">Li</div>
         <div class="brand-text">
           <h1>Liora</h1>
-          <p>Estudo Inteligente</p>
+          <p>Estudo guiado por IA</p>
         </div>
       </div>
 
@@ -64,7 +64,7 @@
 
             <button class="card-btn" data-nav="simulados">
               <div class="card-title">Simulados</div>
-              <div class="card-desc">Questões por banca e dificuldade</div>
+              <div class="card-desc">Questões por estilo e dificuldade</div>
               <span class="pill pill-ia">IA</span>
             </button>
 
@@ -247,14 +247,30 @@
             <div class="modal-body">
               <div class="grid-2">
                 <label class="field">
-                  <span class="label">Banca</span>
+                   <span class="label">Organizadora / Exame</span>
                   <select id="sim-banca" class="input">
-                    <option value="FGV">FGV</option>
-                    <option value="CESPE/CEBRASPE">CESPE/CEBRASPE</option>
-                    <option value="FCC">FCC</option>
-                    <option value="VUNESP">VUNESP</option>
-                    <option value="IBFC">IBFC</option>
-                    <option value="AOCP">AOCP</option>
+                    <optgroup label="Geral">
+                      <option value="Geral">Geral (estilo misto)</option>
+                    </optgroup>
+                      <optgroup label="Concursos (Organizadoras)">
+                      <option value="FGV">FGV</option>
+                      <option value="CESPE/CEBRASPE">CEBRASPE (CESPE)</option>
+                      <option value="FCC">FCC</option>
+                      <option value="VUNESP">VUNESP</option>
+                      <option value="IBFC">IBFC</option>
+                      <option value="AOCP">AOCP</option>
+                    </optgroup>
+                  
+                    <optgroup label="Mercado financeiro (Certificações)">
+                      <option value="ANBIMA_CPA10">CPA-10 (ANBIMA)</option>
+                      <option value="ANBIMA_CPA20">CPA-20 (ANBIMA)</option>
+                    </optgroup>
+                  
+                    <optgroup label="TI (Certificações)">
+                      <option value="AWS_CLF_C02">AWS Cloud Practitioner</option>
+                      <option value="AZ_900">Microsoft AZ-900 (Azure Fundamentals)</option>
+                      <option value="ITIL4_F">ITIL 4 Foundation</option>
+                    </optgroup>
                   </select>
                 </label>
 
