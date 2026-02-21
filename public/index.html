@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Liora — Estudo guiado por IA para concursos</title>
-  <meta name="description" content="Transforme tema ou PDF em plano, pratique com simulados e acompanhe evolução no dashboard. Liora: estudo guiado por IA para concursos." />
+  <title>Liora — Estudo guiado por IA</title>
+  <meta name="description" content="Transforme um tema em plano, pratique com simulados e acompanhe evolução no dashboard. Liora: estudo guiado por IA." />
   <meta name="theme-color" content="#0b0b0d" />
 
   <link rel="icon" href="/favicon.ico" />
 
   <!-- Open Graph -->
-  <meta property="og:title" content="Liora — Estudo guiado por IA para concursos" />
+  <meta property="og:title" content="Liora — Estudo guiado por IA" />
   <meta property="og:description" content="Plano + Simulados + Dashboard. Estude com direção e consistência." />
   <meta property="og:type" content="website" />
 
@@ -300,10 +300,10 @@
     </div>
 
     <section class="hero">
-      <div class="kicker">Estudo para concursos</div>
+      <div class="kicker">Estudo guiado por IA</div>
       <h1>Seu estudo com direção.<br>Seu progresso com prova.</h1>
       <p class="sub">
-        A Liora transforma <strong>tema</strong> ou <strong>PDF</strong> em plano de estudo,
+        A Liora transforma <strong>tema</strong> (e, em breve, seu material) em plano de estudo,
         te coloca para praticar com <strong>simulados</strong> e mostra sua evolução no <strong>dashboard</strong>.
       </p>
 
@@ -315,9 +315,9 @@
 
       <div class="pillRow">
         <div class="pill">Plano em minutos</div>
-        <div class="pill">Simulados por banca</div>
+        <div class="pill">Simulados por estilo</div>
         <div class="pill">Dashboard real</div>
-        <div class="pill">Founder (vagas limitadas)</div>
+        <div class="pill">Em breve: questões do seu material</div>
       </div>
     </section>
 
@@ -325,9 +325,9 @@
       <div class="card">
         <div class="kicker">Como funciona</div>
         <ul class="list">
-          <li class="li"><span class="check"></span><div><strong>1) Tema ou PDF</strong><br>Você escolhe um tópico ou sobe seu material.</div></li>
+          <li class="li"><span class="check"></span><div><strong>1) Tema</strong><br>Você escolhe um tópico para estudar.</div></li>
           <li class="li"><span class="check"></span><div><strong>2) Plano de estudo</strong><br>Sessões objetivas e navegáveis, sem sobrecarga.</div></li>
-          <li class="li"><span class="check"></span><div><strong>3) Simulados</strong><br>Banca, dificuldade e tempo. Feedback para ajustar rota.</div></li>
+          <li class="li"><span class="check"></span><div><strong>3) Prática</strong><br>Simulados por estilo e dificuldade. Feedback para ajustar rota.</div></li>
           <li class="li"><span class="check"></span><div><strong>4) Dashboard</strong><br>Acertos, tentativas e consistência ao longo do tempo.</div></li>
         </ul>
 
@@ -340,7 +340,7 @@
       <div class="card" id="founder">
         <div class="kicker">Founder</div>
         <p class="sub" style="margin-top:8px;">
-          Quer garantir condição especial de lançamento? Clique no botão e pegue seu cupom Founder.
+          Quer garantir uma condição especial de lançamento? Pegue seu Founder e finalize quando quiser.
         </p>
 
         <form class="form" id="leadForm" autocomplete="on">
@@ -351,23 +351,22 @@
 
           <div class="row">
             <select name="area">
-              <option value="" disabled selected>Área do concurso</option>
-              <option>Direito</option>
-              <option>TI</option>
-              <option>Saúde</option>
-              <option>Administração</option>
+              <option value="" disabled selected>Seu objetivo</option>
+              <option>Concurso</option>
+              <option>Certificação</option>
+              <option>Faculdade</option>
+              <option>Avaliação/Prova</option>
               <option>Outro</option>
             </select>
-            <input name="prova" placeholder="Prova-alvo (opcional)" />
+            <input name="prova" placeholder="Meta/Prova (opcional)" />
           </div>
 
-          <!-- Mantém submit, mas o JS impede reload e salva no Supabase -->
           <button class="btn btnPrimary btnFounder" type="submit" id="btnFounder" data-ev="founder_submit">
-            Quero cupom Founder
+            Quero Founder
           </button>
 
           <div class="tiny" id="founderHint">
-            Cupom público (lote limitado). Você aplica no checkout.
+            Você recebe o cupom e o link com desconto para finalizar a assinatura.
           </div>
         </form>
       </div>
@@ -404,7 +403,7 @@
             <a class="btn btnPrimary" href="/app#pricing" data-ev="pricing_ver_no_app">Ver planos no app</a>
           </div>
           <div class="tiny">
-            Founder: cupom <strong>FOUNDER30</strong> (lote limitado). Condição vale enquanto assinatura ativa.
+            Founder: desconto válido enquanto a assinatura permanecer ativa (lote limitado).
           </div>
         </div>
       </div>
@@ -414,9 +413,9 @@
       <div class="kicker">FAQ</div>
       <div class="faq">
         <details>
-          <summary>Serve para qualquer concurso?</summary>
+          <summary>Serve para qualquer objetivo?</summary>
           <div class="sub" style="margin-top:8px;">
-            Sim. O ciclo é universal: plano (tema/pdf) + prática + revisão por métricas.
+            Sim. O ciclo é universal: plano por tema + prática + revisão por métricas.
           </div>
         </details>
         <details>
@@ -426,9 +425,9 @@
           </div>
         </details>
         <details>
-          <summary>Como funciona o Founder?</summary>
+          <summary>O que é o Founder?</summary>
           <div class="sub" style="margin-top:8px;">
-            Founder é uma condição especial de lançamento. Cupom público: <strong>FOUNDER30</strong>.
+            Founder é uma condição especial de lançamento. Você recebe o cupom e o link com desconto.
             O desconto vale enquanto a assinatura permanecer ativa.
           </div>
         </details>
@@ -451,9 +450,9 @@
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="founderTitle">
       <div class="modalHead">
         <div>
-          <div class="modalTitle" id="founderTitle">Founder desbloqueado</div>
+          <div class="modalTitle" id="founderTitle">Seu Founder está pronto</div>
           <div class="modalSub">
-            Copie o cupom e use no checkout. Se preferir, clique no link Founder que já abre com desconto.
+            Use o link com desconto (recomendado) ou copie o cupom e cole no checkout.
           </div>
         </div>
 
@@ -469,13 +468,13 @@
         </div>
 
         <div class="modalNote">
-          Observação: cupom público (pode circular). Se você quiser “amarrar ao e-mail”, precisa de um fluxo de cupom individual (automação e lista), não só HTML.
+          Desconto Founder válido enquanto a assinatura permanecer ativa. Lote limitado.
         </div>
       </div>
 
       <div class="modalActions">
         <a class="btn btnPrimary" id="btnPayFounder" href="https://pay.hotmart.com/I104401854N?off=oplx5hku" target="_blank" rel="noopener noreferrer">
-          Ir para pagamento com Founder
+          Assinar com desconto Founder
         </a>
 
         <a class="btn btnSecondary" href="/app#pricing" id="btnPlansApp">
@@ -526,7 +525,6 @@
       modal.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
 
-      // Atualiza cupom e checkout (garante consistência)
       const couponEl = modal.querySelector("#couponCode");
       if (couponEl) couponEl.textContent = COUPON;
 
@@ -590,14 +588,14 @@
       };
 
       if (!payload.email) {
-        alert("Informe seu e-mail para liberar o cupom Founder.");
+        alert("Informe seu e-mail para liberar o Founder.");
         return;
       }
 
       const oldText = btnFounder?.textContent;
       if (btnFounder) {
         btnFounder.disabled = true;
-        btnFounder.textContent = "Liberando cupom...";
+        btnFounder.textContent = "Liberando...";
       }
 
       try {
@@ -617,7 +615,6 @@
 
         const coupon = (data.coupon || COUPON).toString().trim();
 
-        // Atualiza cupom na UI antes de abrir
         const modal = document.getElementById("founderModal");
         modal?.querySelector("#couponCode")?.replaceChildren(document.createTextNode(coupon));
 
@@ -626,12 +623,12 @@
         openFounderModal();
       } catch (err) {
         console.error("[Founder]", err);
-        alert("Não consegui liberar o cupom agora. Tente novamente em instantes.");
+        alert("Não consegui liberar agora. Tente novamente em instantes.");
         track("liora_founder_lead_fail", { msg: String(err?.message || err) });
       } finally {
         if (btnFounder) {
           btnFounder.disabled = false;
-          btnFounder.textContent = oldText || "Quero cupom Founder";
+          btnFounder.textContent = oldText || "Quero Founder";
         }
       }
     });
