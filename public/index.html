@@ -14,10 +14,6 @@
   <meta property="og:description" content="Plano + Simulados + Dashboard. Estude com direção e consistência." />
   <meta property="og:type" content="website" />
 
-  <!-- (Opcional) URL e imagem OG: ajuste quando tiver -->
-  <!-- <meta property="og:url" content="https://getliora.ia.br/" /> -->
-  <!-- <meta property="og:image" content="https://getliora.ia.br/og.jpg" /> -->
-
   <!-- Fonte -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -54,39 +50,16 @@
       box-shadow: var(--shadow);
       position: sticky; top: 14px; z-index: 10;
     }
-    .brand{
-      display:flex; gap:10px; align-items:center;
-      font-weight:800; letter-spacing:.2px;
-    }
+    .brand{display:flex; gap:10px; align-items:center; font-weight:800; letter-spacing:.2px;}
     .dot{width:10px; height:10px; border-radius:50%; background:var(--brand)}
     .navlinks{display:flex; gap:10px; align-items:center; color:var(--muted); font-size:14px}
-    .navlinks a{
-      padding:8px 10px; border-radius:999px;
-      border:1px solid transparent;
-    }
-    .navlinks a:hover{
-      background: rgba(255,255,255,.06);
-      border-color: rgba(255,255,255,.08);
-      color: var(--text);
-    }
+    .navlinks a{padding:8px 10px; border-radius:999px; border:1px solid transparent;}
+    .navlinks a:hover{background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.08); color: var(--text);}
+
     .hero{padding:34px 6px 12px; display:grid; gap:16px}
-    .kicker{
-      color:#ff6a1a; font-weight:900; font-size:12px;
-      letter-spacing:.14em; text-transform:uppercase;
-    }
-    h1{
-      margin:0;
-      font-size:44px;
-      line-height:1.06;
-      letter-spacing:-.8px;
-    }
-    .sub{
-      color:var(--muted);
-      font-size:16px;
-      line-height:1.6;
-      max-width:68ch;
-      margin:0;
-    }
+    .kicker{color:#ff6a1a; font-weight:900; font-size:12px; letter-spacing:.14em; text-transform:uppercase;}
+    h1{margin:0; font-size:44px; line-height:1.06; letter-spacing:-.8px;}
+    .sub{color:var(--muted); font-size:16px; line-height:1.6; max-width:68ch; margin:0;}
     .ctaRow{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:4px}
     .btn{
       display:inline-flex; align-items:center; gap:10px;
@@ -100,50 +73,26 @@
     }
     .btn:hover{background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16)}
     .btn:active{transform: translateY(1px)}
-    .btn[disabled]{opacity:.55; cursor:not-allowed}
     .btnPrimary{
       background: linear-gradient(135deg, #c44b04, #ff6a1a);
       border-color: transparent;
       color:#0b0b0d;
       font-weight:900;
     }
+    .btnSecondary{background: rgba(255,255,255,.04)}
+    .btn[disabled]{opacity:.55; cursor:not-allowed}
     .tiny{font-size:12px; color:var(--muted)}
     .pillRow{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
-    .pill{
-      padding:8px 12px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.03);
-      color: var(--muted);
-      font-size:13px;
-    }
-    .grid{
-      margin-top:18px;
-      display:grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap:14px;
-    }
-    @media (max-width: 920px){
-      .grid{grid-template-columns:1fr}
-      h1{font-size:38px}
-    }
-    .card{
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(18,18,22,.65);
-      border-radius: var(--radius);
-      padding:18px;
-      box-shadow: var(--shadow);
-    }
+    .pill{padding:8px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); color: var(--muted); font-size:13px;}
+    .grid{margin-top:18px; display:grid; grid-template-columns: 1.2fr .8fr; gap:14px;}
+    @media (max-width: 920px){ .grid{grid-template-columns:1fr} h1{font-size:38px} }
+
+    .card{border:1px solid rgba(255,255,255,.10); background: rgba(18,18,22,.65); border-radius: var(--radius); padding:18px; box-shadow: var(--shadow);}
     .list{margin:12px 0 0; padding:0; list-style:none; display:grid; gap:10px}
     .li{display:flex; gap:10px; align-items:flex-start; color:var(--muted); line-height:1.45}
-    .check{
-      width:18px; height:18px; border-radius:6px;
-      background: rgba(196,75,4,.18);
-      border:1px solid rgba(196,75,4,.35);
-      flex:0 0 auto;
-      margin-top:1px;
-    }
+    .check{width:18px; height:18px; border-radius:6px; background: rgba(196,75,4,.18); border:1px solid rgba(196,75,4,.35); flex:0 0 auto; margin-top:1px;}
     .li strong{color:var(--text)}
+
     .form{display:grid; gap:10px; margin-top:10px}
     .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
     @media (max-width:700px){ .row{grid-template-columns:1fr} }
@@ -158,47 +107,61 @@
     }
     input::placeholder{color:#8d8d8d}
     .section{margin-top:18px}
+
     .pricing{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px}
     @media (max-width:920px){ .pricing{grid-template-columns:1fr} }
-    .price{
-      border:1px solid rgba(255,255,255,.10);
-      border-radius: var(--radius);
-      background: rgba(18,18,22,.65);
-      padding:16px;
-    }
-    .tag{
-      display:inline-flex; align-items:center; gap:8px;
-      border:1px solid rgba(196,75,4,.35);
-      background: rgba(196,75,4,.14);
-      color: var(--text);
-      padding:6px 10px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:800;
-    }
+    .price{border:1px solid rgba(255,255,255,.10); border-radius: var(--radius); background: rgba(18,18,22,.65); padding:16px;}
+    .tag{display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(196,75,4,.35); background: rgba(196,75,4,.14); color: var(--text); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:800;}
     .big{font-size:28px; font-weight:950; letter-spacing:-.4px; margin:10px 0 6px}
     .faq{display:grid; gap:10px; margin-top:10px}
-    details{
+    details{border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); border-radius:14px; padding:12px 14px;}
+    summary{cursor:pointer; font-weight:800}
+
+    footer{margin-top:26px; color:var(--muted); font-size:12px; text-align:center}
+    .danger{border:1px solid rgba(255,106,26,.35); background: rgba(255,106,26,.08); border-radius: 14px; padding:12px 14px; color: var(--muted); margin-top:10px;}
+    code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+
+    /* =============================
+       Founder Modal
+    ============================= */
+    .modal{position:fixed; inset:0; z-index:999999; display:none;}
+    .modal.is-open{display:block;}
+    .modal-backdrop{position:absolute; inset:0; background: rgba(0,0,0,.62); backdrop-filter: blur(10px);}
+    .modal-card{
+      position:relative;
+      max-width:560px;
+      margin: 8vh auto;
+      padding:16px;
+      border-radius: 18px;
       border:1px solid rgba(255,255,255,.10);
+      background: rgba(18,18,22,.92);
+      box-shadow: var(--shadow);
+    }
+    .modal-head{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:4px 4px 10px;}
+    .modal-title{font-weight:950; letter-spacing:-.2px; font-size:18px;}
+    .modal-sub{color:var(--muted); font-size:13px; line-height:1.45; margin-top:4px;}
+    .xbtn{
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      padding:10px 12px;
+      cursor:pointer;
+    }
+    .modal-body{padding: 6px 4px 10px;}
+    .couponBox{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      border:1px dashed rgba(255,255,255,.18);
       background: rgba(255,255,255,.03);
       border-radius:14px;
-      padding:12px 14px;
-    }
-    summary{cursor:pointer; font-weight:800}
-    footer{margin-top:26px; color:var(--muted); font-size:12px; text-align:center}
-    .danger{
-      border:1px solid rgba(255,106,26,.35);
-      background: rgba(255,106,26,.08);
-      border-radius: 14px;
-      padding:12px 14px;
-      color: var(--muted);
+      padding:12px;
       margin-top:10px;
     }
-    code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+    .couponCode{font-size:18px; font-weight:950; letter-spacing:.14em;}
+    .modal-actions{display:flex; flex-wrap:wrap; gap:10px; padding: 10px 4px 6px;}
+    .hint{color:var(--muted); font-size:12px; margin-top:8px;}
   </style>
-
-  <!-- TODO: cole Pixel/GA aqui (opcional) -->
 </head>
+
 <body>
   <div class="wrap">
     <div class="nav">
@@ -248,37 +211,36 @@
         </div>
       </div>
 
-      <!-- ✅ FOUNDER: agora é via /api/founder (sem action) -->
       <div class="card" id="founder">
         <div class="kicker">Founder</div>
         <p class="sub" style="margin-top:8px;">
-          Quer garantir condição especial de lançamento? Entre na lista e receba o cupom Founder.
+          Quer garantir condição especial de lançamento? Clique no botão e pegue seu cupom Founder.
         </p>
 
-        <form class="form" id="founderForm">
+        <!-- Lead form opcional (mantém para capturar lead, mas não depende dele para entregar o cupom) -->
+        <form class="form" id="leadForm" onsubmit="return false;">
           <div class="row">
-            <input id="founder-name" name="nome" placeholder="Seu nome" required />
-            <input id="founder-email" name="email" placeholder="Seu e-mail" type="email" required />
+            <input name="nome" placeholder="Seu nome (opcional)" />
+            <input name="email" placeholder="Seu e-mail (opcional)" type="email" />
           </div>
-
           <div class="row">
-            <select id="founder-niche" name="area" required>
-              <option value="" disabled selected>Área do concurso</option>
-              <option value="Direito">Direito</option>
-              <option value="TI">TI</option>
-              <option value="Saúde">Saúde</option>
-              <option value="Administração">Administração</option>
-              <option value="Outro">Outro</option>
+            <select name="area">
+              <option value="" selected>Área do concurso (opcional)</option>
+              <option>Direito</option>
+              <option>TI</option>
+              <option>Saúde</option>
+              <option>Administração</option>
+              <option>Outro</option>
             </select>
-            <input id="founder-banca" name="banca" placeholder="Banca (opcional) ex: FGV, CEBRASPE" />
+            <input name="prova" placeholder="Prova-alvo (opcional)" />
           </div>
 
-          <button class="btn btnPrimary" id="btn-founder" type="button" data-ev="founder_click">✉️ Quero cupom Founder</button>
-
-          <div id="founder-status" class="tiny" style="margin-top:6px;"></div>
+          <button class="btn btnPrimary" type="button" id="btnFounder" data-ev="founder_open">
+            Quero cupom Founder
+          </button>
 
           <div class="tiny">
-            Founder recomendado: <strong>FOUNDER30</strong> (30% OFF enquanto assinatura ativa), limite de vagas.
+            Cupom público (lote limitado). Você aplica no checkout.
           </div>
         </form>
       </div>
@@ -313,9 +275,10 @@
           </ul>
           <div class="ctaRow" style="margin-top:12px;">
             <a class="btn btnPrimary" href="/app#pricing" data-ev="pricing_ver_no_app">Ver planos no app</a>
+            <button class="btn btnSecondary" type="button" id="btnFounder2" data-ev="founder_open_2">Cupom Founder</button>
           </div>
           <div class="tiny">
-            Founder: cupom <strong>FOUNDER30</strong> (lote limitado). Condição vale enquanto assinatura ativa.
+            Founder: cupom <strong id="founderCodeInline">FOUNDER30</strong> (lote limitado). Aplique no checkout.
           </div>
         </div>
       </div>
@@ -339,8 +302,7 @@
         <details>
           <summary>Como funciona o Founder?</summary>
           <div class="sub" style="margin-top:8px;">
-            Founder é uma condição especial de lançamento. Recomendado: <strong>FOUNDER30</strong> com vagas limitadas.
-            O desconto vale enquanto a assinatura permanecer ativa.
+            Você usa o link Founder ou aplica o cupom no checkout. É um cupom público com lote limitado.
           </div>
         </details>
       </div>
@@ -353,10 +315,52 @@
         Um produto da Intellih Tecnologia
       </a>
     </footer>
+  </div>
 
+  <!-- =============================
+       Founder Modal (cupom + link)
+  ============================= -->
+  <div class="modal" id="founderModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal="close"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="founderTitle">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title" id="founderTitle">Founder desbloqueado</div>
+          <div class="modal-sub">Copie o cupom e use no checkout. Se preferir, clique no link Founder que já abre com desconto.</div>
+        </div>
+        <button class="xbtn" type="button" data-modal="close">Fechar</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="couponBox">
+          <div>
+            <div class="tiny" style="margin-bottom:6px;">Cupom</div>
+            <div class="couponCode" id="founderCode">FOUNDER30</div>
+          </div>
+          <button class="btn btnSecondary" type="button" id="btnCopyFounder">Copiar</button>
+        </div>
+
+        <div class="hint">
+          Observação: cupom público (pode circular). Se você quiser “amarrar ao e-mail”, precisa de um fluxo de cupom individual (automação e lista), não só HTML.
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <a class="btn btnPrimary" id="btnGoFounderLink" href="https://pay.hotmart.com/I104401854N?off=oplx5hku" target="_blank" rel="noopener noreferrer">
+          Ir para pagamento com Founder
+        </a>
+        <a class="btn" href="/app#pricing">Ver planos no app</a>
+      </div>
+    </div>
   </div>
 
   <script>
+    // =============================
+    // Config
+    // =============================
+    const FOUNDER_CODE = "FOUNDER30";
+    const FOUNDER_LINK = "https://pay.hotmart.com/I104401854N?off=oplx5hku";
+
     // =============================
     // Tracking mínimo (opcional)
     // =============================
@@ -365,7 +369,6 @@
     function track(ev, data = {}) {
       try {
         if (window.lioraDebug) console.log("📍", ev, data);
-
         if (typeof window.gtag === "function") window.gtag("event", ev, data);
         if (typeof window.fbq === "function") window.fbq("trackCustom", ev, data);
       } catch (e) {}
@@ -374,141 +377,78 @@
     track("liora_lp_view", { path: location.pathname + location.hash });
 
     document.querySelectorAll("[data-ev]").forEach(el => {
-      el.addEventListener("click", () => {
-        track("liora_lp_click", { id: el.getAttribute("data-ev") });
-      });
+      el.addEventListener("click", () => track("liora_lp_click", { id: el.getAttribute("data-ev") }));
+    });
+
+    document.getElementById("yr").textContent = new Date().getFullYear();
+
+    // =============================
+    // Founder Modal logic
+    // =============================
+    const modal = document.getElementById("founderModal");
+    const btnFounder = document.getElementById("btnFounder");
+    const btnFounder2 = document.getElementById("btnFounder2");
+    const btnCopy = document.getElementById("btnCopyFounder");
+    const elCode = document.getElementById("founderCode");
+    const elInline = document.getElementById("founderCodeInline");
+    const btnGo = document.getElementById("btnGoFounderLink");
+
+    if (elCode) elCode.textContent = FOUNDER_CODE;
+    if (elInline) elInline.textContent = FOUNDER_CODE;
+    if (btnGo) btnGo.href = FOUNDER_LINK;
+
+    function openModal() {
+      if (!modal) return;
+      modal.classList.add("is-open");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      track("liora_founder_open", { code: FOUNDER_CODE });
+    }
+
+    function closeModal() {
+      if (!modal) return;
+      modal.classList.remove("is-open");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      track("liora_founder_close");
+    }
+
+    btnFounder?.addEventListener("click", openModal);
+    btnFounder2?.addEventListener("click", openModal);
+
+    modal?.addEventListener("click", (ev) => {
+      const a = ev.target.closest("[data-modal]");
+      if (a && a.getAttribute("data-modal") === "close") return closeModal();
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && modal?.classList.contains("is-open")) closeModal();
+    });
+
+    btnCopy?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(FOUNDER_CODE);
+        btnCopy.textContent = "Copiado!";
+        track("liora_founder_copy");
+        setTimeout(() => (btnCopy.textContent = "Copiar"), 1200);
+      } catch (e) {
+        // fallback simples
+        const tmp = document.createElement("textarea");
+        tmp.value = FOUNDER_CODE;
+        document.body.appendChild(tmp);
+        tmp.select();
+        try { document.execCommand("copy"); } catch {}
+        tmp.remove();
+        btnCopy.textContent = "Copiado!";
+        setTimeout(() => (btnCopy.textContent = "Copiar"), 1200);
+      }
     });
 
     // =============================
-    // Founder (botão funcional)
+    // Lead submit tracking (sem backend)
     // =============================
-    (function bindFounder() {
-      const btn = document.getElementById("btn-founder");
-      if (!btn || btn.__bound) return;
-      btn.__bound = true;
-
-      const elName = document.getElementById("founder-name");
-      const elEmail = document.getElementById("founder-email");
-      const elNiche = document.getElementById("founder-niche");
-      const elBanca = document.getElementById("founder-banca");
-      const elStatus = document.getElementById("founder-status");
-
-      const setStatus = (msg) => {
-        if (elStatus) elStatus.textContent = msg || "";
-      };
-
-      function toast(msg, ms = 1800) {
-        // Toast simples aqui, sem depender do app.js
-        let el = document.getElementById("liora-toast");
-        if (!el) {
-          el = document.createElement("div");
-          el.id = "liora-toast";
-          el.style.position = "fixed";
-          el.style.left = "50%";
-          el.style.bottom = "18px";
-          el.style.transform = "translateX(-50%)";
-          el.style.zIndex = "999999";
-          el.style.maxWidth = "92vw";
-          el.style.padding = "10px 12px";
-          el.style.borderRadius = "14px";
-          el.style.border = "1px solid rgba(255,255,255,.14)";
-          el.style.background = "rgba(20,20,24,.92)";
-          el.style.color = "rgba(255,255,255,.92)";
-          el.style.boxShadow = "0 14px 50px rgba(0,0,0,.40)";
-          el.style.backdropFilter = "blur(10px)";
-          el.style.webkitBackdropFilter = "blur(10px)";
-          el.style.fontWeight = "800";
-          el.style.fontSize = "13px";
-          el.style.opacity = "0";
-          el.style.pointerEvents = "none";
-          el.style.transition = "opacity .18s ease, transform .18s ease";
-          el.style.transform = "translateX(-50%) translateY(6px)";
-          document.body.appendChild(el);
-        }
-
-        el.textContent = String(msg || "");
-        el.style.opacity = "1";
-        el.style.transform = "translateX(-50%) translateY(0px)";
-
-        window.clearTimeout(el.__t);
-        el.__t = window.setTimeout(() => {
-          el.style.opacity = "0";
-          el.style.transform = "translateX(-50%) translateY(6px)";
-        }, ms);
-      }
-
-      async function copy(txt) {
-        try {
-          await navigator.clipboard.writeText(txt);
-          return true;
-        } catch {
-          try {
-            const ta = document.createElement("textarea");
-            ta.value = txt;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand("copy");
-            ta.remove();
-            return true;
-          } catch {
-            return false;
-          }
-        }
-      }
-
-      btn.addEventListener("click", async () => {
-        const name = (elName?.value || "").trim();
-        const email = (elEmail?.value || "").trim().toLowerCase();
-        const niche = (elNiche?.value || "").trim();
-        const banca = (elBanca?.value || "").trim();
-
-        if (!email || !email.includes("@")) {
-          toast("Digite um e-mail válido para receber o cupom.");
-          return;
-        }
-        if (!niche) {
-          toast("Selecione a área do concurso.");
-          return;
-        }
-
-        btn.disabled = true;
-        setStatus("Enviando…");
-
-        try {
-          const r = await fetch("/api/founder", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, email, niche, banca, page_url: location.href })
-          });
-
-          const data = await r.json().catch(() => null);
-          if (!r.ok || !data?.ok) {
-            throw new Error(data?.detail || data?.error || `HTTP ${r.status}`);
-          }
-
-          const coupon = String(data.coupon || "FOUNDER30");
-          const okCopy = await copy(coupon);
-
-          setStatus(okCopy ? `Cupom copiado: ${coupon}` : `Seu cupom: ${coupon}`);
-          toast(okCopy ? `Cupom ${coupon} copiado ✅` : `Seu cupom é ${coupon}`);
-
-          track("liora_founder_ok", { email });
-
-          // opcional: rolar até planos
-          const plans = document.getElementById("pricing");
-          plans?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-        } catch (e) {
-          console.warn("Founder error:", e);
-          setStatus("");
-          track("liora_founder_error", { message: String(e?.message || e) });
-          toast("Não consegui registrar agora. Tente novamente em 1 minuto.");
-        } finally {
-          btn.disabled = false;
-        }
-      });
-    })();
-
-    document.getElementById("yr").textContent = new Date().getFullYear();
+    const form = document.getElementById("leadForm");
+    form?.addEventListener("submit", () => track("liora_lead_submit", { place: "landing" }));
   </script>
 </body>
 </html>
