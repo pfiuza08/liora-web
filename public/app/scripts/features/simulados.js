@@ -325,34 +325,44 @@ export const simulados = {
   },
 
   saveConfig() {
-    const banca = this.getValue("sim-banca") || "FGV";
-    const qtdRaw = Number(this.getValue("sim-qtd") || 5);
-    const dificuldade = this.getValue("sim-dificuldade") || "misturado";
-    const tema = (this.getValue("sim-tema") || "").trim();
-    const tempo = Number(this.getValue("sim-tempo") || 20);
+  const banca = this.getValue("sim-banca") || "FGV";
+  const qtdRaw = Number(this.getValue("sim-qtd") || 5);
+  const dificuldade = this.getValue("sim-dificuldade") || "misturado";
+  const tema = (this.getValue("sim-tema") || "").trim();
+  const tempo = Number(this.getValue("sim-tempo") || 20);
 
-    const timerMode = this.getValue("sim-timer-mode") || "on";
-    const mode = this.getModeFromUI();
+  // ✅ Tema obrigatório (evita simulado "viajando")
+  if (!tema) {
+    this.toast("Informe um tema para o simulado.");
+    try {
+      const el = document.getElementById("sim-tema");
+      if (el) el.focus();
+    } catch {}
+    return;
+  }
 
-    const qtd = this._capQtdForPlan(mode, qtdRaw);
+  const timerMode = this.getValue("sim-timer-mode") || "on";
+  const mode = this.getModeFromUI();
 
-    this.STATE.config = {
-      ...this.STATE.config,
-      banca,
-      qtd,
-      dificuldade,
-      tema,
-      tempo: this.clamp(tempo, 5, 180),
-      mode
-    };
+  const qtd = this._capQtdForPlan(mode, qtdRaw);
 
-    this.STATE.timer.enabled = timerMode === "on";
+  this.STATE.config = {
+    ...this.STATE.config,
+    banca,
+    qtd,
+    dificuldade,
+    tema,
+    tempo: this.clamp(tempo, 5, 180),
+    mode
+  };
 
-    this.persistConfig();
-    this.toast("Configurações salvas.");
-    this.closeConfig();
-    this.renderIdle();
-  },
+  this.STATE.timer.enabled = timerMode === "on";
+
+  this.persistConfig();
+  this.toast("Configurações salvas.");
+  this.closeConfig();
+  this.renderIdle();
+},
 
   // -----------------------------
   // START / FLOW
@@ -361,7 +371,16 @@ export const simulados = {
     if (this.STATE.running) return;
 
     this.closeConfig();
-
+    const tema = String(this.STATE?.config?.tema || "").trim();
+      if (!tema) {
+        this.toast("Defina um tema antes de iniciar o simulado.");
+        this.openConfig();
+        try {
+          const el = document.getElementById("sim-tema");
+          if (el) el.focus();
+        } catch {}
+        return;
+      }
     // reset guard anti-duplo-finish
     this.STATE._finishedOnce = false;
 
@@ -868,7 +887,7 @@ export const simulados = {
       const total = r.questoes?.length || 0;
       const answered = r.respostas?.length || 0;
       const banca = r.config?.banca || this.STATE.config.banca;
-      const tema = r.config?.tema || this.STATE.config.tema || "Livre";
+      const tema = r.config?.tema || this.STATE.config.tema || "Não definido";
       const mode = r.config?.mode || this.STATE.config.mode || "obj";
       const modeLabel = mode === "disc" ? "Discursivas" : "Objetivas";
 
@@ -914,7 +933,7 @@ export const simulados = {
           <div><span class="chip">Exame</span> ${this.escape(this.STATE.config.banca)}</div>
           <div><span class="chip">${this.escape(qtdLabel)}</span> ${this.STATE.config.qtd}</div>
           <div><span class="chip">Dificuldade</span> ${this.escape(this.STATE.config.dificuldade)}</div>
-          <div><span class="chip">Tema</span> ${this.escape(this.STATE.config.tema || "Livre")}</div>
+          <div><span class="chip">Tema</span> ${this.escape(this.STATE.config.tema || "Não definido")}</div>
           <div><span class="chip">Tempo</span> ${this.STATE.timer.enabled ? `${this.STATE.config.tempo} min` : "Sem timer"}</div>
         </div>
       </div>
