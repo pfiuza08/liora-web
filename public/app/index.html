@@ -353,126 +353,121 @@
         </div>
       </section>
 
-      <!-- PRICING (Planos) -->
-      <section id="screen-pricing" class="screen">
-        <div class="screen-head">
-          <div>
-            <h2 class="screen-title">Planos</h2>
-            <p class="screen-subtitle">Escolha o plano ideal para você.</p>
-          </div>
-
-          <div class="screen-head-actions">
-            <button class="btn-secondary" data-nav="home">Voltar</button>
-          </div>
+     <!-- PRICING (Planos) -->
+    <section id="screen-pricing" class="screen">
+      <div class="screen-head">
+        <div>
+          <h2 class="screen-title">Planos</h2>
+          <p class="screen-subtitle">Escolha o plano ideal para você.</p>
         </div>
-
-        <div class="panel">
-          <div class="card-title">Planos Premium</div>
-          <div class="muted">O plano gratuito continua disponível. Premium libera insights e detalhes avançados.</div>
-
-          <div class="pricing-grid" style="margin-top:12px;">
-            <!-- Mensal -->
-            <div class="pricing-card">
-              <div class="pricing-top">
-                <div class="pricing-title">Mensal</div>
-                <div class="pricing-price">R$ 19,90</div>
-                <div class="pricing-sub">por mês</div>
-              </div>
-
-              <div class="pricing-list">
-                <div class="pricing-item">Insights avançados no dashboard</div>
-                <div class="pricing-item">Detalhes por banca (rank e métricas)</div>
-                <div class="pricing-item">Histórico recente com tempo</div>
-              </div>
-
-              <div class="pricing-actions">
-                <button class="btn-primary" data-action="pricingChoose" data-plan="monthly">Assinar mensal</button>
-                <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
-              </div>
+    
+        <div class="screen-head-actions">
+          <button class="btn-secondary" data-nav="home">Voltar</button>
+        </div>
+      </div>
+    
+      <div class="panel">
+        <div class="card-title">Planos Premium</div>
+        <div class="muted">O plano gratuito continua disponível. Premium libera insights e detalhes avançados.</div>
+    
+        <div class="pricing-grid" style="margin-top:12px;">
+          <!-- Mensal (ATIVO) -->
+          <div class="pricing-card">
+            <div class="pricing-top">
+              <div class="pricing-title">Mensal</div>
+              <div class="pricing-price">R$ 19,90</div>
+              <div class="pricing-sub">por mês</div>
             </div>
-
-            <!-- Trimestral -->
-            <div class="pricing-card pricing-featured">
-              <div class="pricing-badge">Recomendado</div>
-
-              <div class="pricing-top">
-                <div class="pricing-title">Trimestral</div>
-                <div class="pricing-price">R$ 49,90</div>
-                <div class="pricing-sub">a cada 3 meses</div>
-              </div>
-
-              <div class="pricing-list">
-                <div class="pricing-item">Melhor custo-benefício</div>
-                <div class="pricing-item">Acesso Premium completo</div>
-                <div class="pricing-item">Prioridade nas novidades</div>
-              </div>
-
-              <div class="pricing-actions">
-                <button class="btn-primary" data-action="pricingChoose" data-plan="quarterly">Assinar trimestral</button>
-                <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
-              </div>
+    
+            <div class="pricing-list">
+              <div class="pricing-item">Insights avançados no dashboard</div>
+              <div class="pricing-item">Detalhes por banca (rank e métricas)</div>
+              <div class="pricing-item">Histórico recente com tempo</div>
             </div>
-
-            <!-- Vitalício -->
-            <div class="pricing-card">
-              <div class="pricing-top">
-                <div class="pricing-title">Vitalício</div>
-                <div class="pricing-price">R$ 149,00</div>
-                <div class="pricing-sub">pagamento único</div>
-              </div>
-
-              <div class="pricing-list">
-                <div class="pricing-item">Premium para sempre</div>
-                <div class="pricing-item">Sem renovação</div>
-                <div class="pricing-item">Ideal para maratonas de estudo</div>
-              </div>
-
-              <div class="pricing-actions">
-                <button class="btn-primary" data-action="pricingChoose" data-plan="lifetime">Quero vitalício</button>
-                <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
-              </div>
+    
+            <div class="pricing-actions">
+              <button class="btn-primary" data-action="pricingChoose" data-plan="monthly">Assinar mensal</button>
+              <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
             </div>
           </div>
-
-          <div class="actions-row" style="margin-top:12px;">
-            <button class="btn-secondary" data-action="pricingChoose" data-plan="free">Continuar no Free</button>
+    
+          <!-- Trimestral (EM BREVE) -->
+          <div class="pricing-card pricing-featured is-comingsoon" aria-disabled="true">
+            <div class="pricing-badge">Em breve</div>
+    
+            <div class="pricing-top">
+              <div class="pricing-title">Trimestral</div>
+              <div class="pricing-price">R$ 49,90</div>
+              <div class="pricing-sub">a cada 3 meses</div>
+            </div>
+    
+            <div class="pricing-list">
+              <div class="pricing-item">Melhor custo-benefício</div>
+              <div class="pricing-item">Acesso Premium completo</div>
+              <div class="pricing-item">Prioridade nas novidades</div>
+            </div>
+    
+            <div class="pricing-actions">
+              <button class="btn-primary" type="button" disabled title="Em breve">Assinar trimestral</button>
+              <button class="btn-secondary" type="button" disabled title="Em breve">Ver benefícios</button>
+            </div>
+          </div>
+    
+          <!-- Vitalício (EM BREVE) -->
+          <div class="pricing-card is-comingsoon" aria-disabled="true">
+            <div class="pricing-badge">Em breve</div>
+    
+            <div class="pricing-top">
+              <div class="pricing-title">Vitalício</div>
+              <div class="pricing-price">R$ 149,00</div>
+              <div class="pricing-sub">pagamento único</div>
+            </div>
+    
+            <div class="pricing-list">
+              <div class="pricing-item">Premium para sempre</div>
+              <div class="pricing-item">Sem renovação</div>
+              <div class="pricing-item">Ideal para maratonas de estudo</div>
+            </div>
+    
+            <div class="pricing-actions">
+              <button class="btn-primary" type="button" disabled title="Em breve">Quero vitalício</button>
+              <button class="btn-secondary" type="button" disabled title="Em breve">Ver benefícios</button>
+            </div>
           </div>
         </div>
-
-        <div class="panel" style="margin-top:12px;">
-          <div class="card-title">Nota</div>
-          <div class="muted">
-            Nesta fase, “assinar” pode ser um toggle/localStorage para simular o produto.
-            Depois você pluga Hotmart/Stripe/Pagar.me sem reescrever a UI.
-          </div>
+    
+        <!-- Continuar no Free (CENTRALIZADO) -->
+        <div class="actions-row pricing-free-row" style="margin-top:12px;">
+          <button class="btn-secondary" data-action="pricingChoose" data-plan="free">Continuar no Free</button>
         </div>
-
-        <!-- DEMO TOOLS (aparece só com ?demo=1) -->
-        <div class="panel hidden" id="demo-tools" style="margin-top:12px;">
-          <div class="card-title">Ferramentas de demo</div>
-          <div class="muted">
-            Use isto para reiniciar a demo e testar o fluxo do zero.
-          </div>
-
-          <div class="actions-row" style="margin-top:12px;">
-            <button class="btn-secondary" id="btn-reset-demo">Reset demo</button>
-          </div>
-
-          <div class="muted small" style="margin-top:10px;">
-            Isso apaga apenas dados locais da Liora (<code>liora:*</code> e <code>liora_stats:v1</code>).
-          </div>
+      </div>
+    
+      <!-- DEMO TOOLS (aparece só com ?demo=1) -->
+      <div class="panel hidden" id="demo-tools" style="margin-top:12px;">
+        <div class="card-title">Ferramentas de demo</div>
+        <div class="muted">
+          Use isto para reiniciar a demo e testar o fluxo do zero.
         </div>
-        <div class="panel" style="margin-top:12px;">
-          <div class="muted small">
-            Um produto da
-            <a href="https://www.intellih.com.br/" target="_blank" rel="noopener noreferrer"
-               style="color:inherit; text-decoration:underline; text-underline-offset:3px;">
-              Intellih Tecnologia
-            </a>.
-          </div>
+    
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-secondary" id="btn-reset-demo">Reset demo</button>
         </div>
-     
-      </section>
+    
+        <div class="muted small" style="margin-top:10px;">
+          Isso apaga apenas dados locais da Liora (<code>liora:*</code> e <code>liora_stats:v1</code>).
+        </div>
+      </div>
+    
+      <div class="panel" style="margin-top:12px;">
+        <div class="muted small">
+          Um produto da
+          <a href="https://www.intellih.com.br/" target="_blank" rel="noopener noreferrer"
+             style="color:inherit; text-decoration:underline; text-underline-offset:3px;">
+            Intellih Tecnologia
+          </a>.
+        </div>
+      </div>
+    </section>
 
     </main>
 
