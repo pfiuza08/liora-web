@@ -2484,7 +2484,25 @@ body.liora-modal-open{
   font-weight: 900;
   letter-spacing: -0.02em;
 }
+/* Founder CTA: garante centralização e aparência consistente */
+.btnFounder{
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.1;
+}
 
+/* Se você tiver botões "copiar" e "fechar" no modal e estiverem escuros,
+   use uma base mais clara e legível (sem mexer no seu btnPrimary). */
+.btnLight{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.16);
+  color: rgba(255,255,255,.92);
+}
+.btnLight:hover{
+  background: rgba(255,255,255,.12);
+  border-color: rgba(255,255,255,.22);
+}
 #screen-pricing .pricing-sub{
   font-size: 13px;
   opacity: .82;
