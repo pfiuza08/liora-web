@@ -2716,4 +2716,26 @@ body.liora-modal-open{
     font-size: 16px;
   }
 }
+/* ===== Pricing: centralizar botão Free + estilo Em breve ===== */
+#screen-pricing .pricing-free-row{
+  display:flex;
+  justify-content:center;
+  width:100%;
+  margin-top: 14px;
+}
 
+#screen-pricing .pricing-free-row [data-plan="free"]{
+  width: min(520px, 100%);
+}
+
+/* Botões desabilitados */
+#screen-pricing .is-disabled{
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+/* Extra para "Em breve" */
+#screen-pricing .is-comingsoon{
+  opacity: .55;
+  filter: grayscale(.15);
+}
