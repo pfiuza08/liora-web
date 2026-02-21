@@ -86,7 +86,7 @@
     .ctaRow{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:4px}
 
     .btn{
-      display:inline-flex; align-items:center; justify-content:center; gap:10px; /* ✅ centraliza texto */
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
       padding:12px 16px;
       border-radius:999px;
       border:1px solid rgba(255,255,255,.10);
@@ -107,7 +107,6 @@
       color:#0b0b0d;
       font-weight:900;
     }
-    /* ✅ Botões secundários claros (resolve “pretão” no modal) */
     .btnSecondary{
       background: rgba(255,255,255,.06);
       border-color: rgba(255,255,255,.14);
@@ -212,7 +211,7 @@
     code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
 
     /* =============================
-       MODAL Founder
+       MODAL Founder (HTML fixo)
     ============================= */
     .modal{
       position:fixed; inset:0;
@@ -344,32 +343,33 @@
           Quer garantir condição especial de lançamento? Clique no botão e pegue seu cupom Founder.
         </p>
 
-    <form class="form" id="leadForm" autocomplete="on">
-        <div class="row">
-          <input name="nome" placeholder="Seu nome" />
-          <input name="email" placeholder="Seu e-mail" type="email" required />
-        </div>
-      
-        <div class="row">
-          <select name="area">
-            <option value="" disabled selected>Área do concurso</option>
-            <option>Direito</option>
-            <option>TI</option>
-            <option>Saúde</option>
-            <option>Administração</option>
-            <option>Outro</option>
-          </select>
-          <input name="prova" placeholder="Prova-alvo (opcional)" />
-        </div>
-      
-        <button class="btn btnPrimary btnFounder" type="submit" id="btnFounder" data-ev="founder_submit">
-          Quero cupom Founder
-        </button>
-      
-        <div class="tiny" id="founderHint">
-          Cupom público (lote limitado). Você aplica no checkout.
-        </div>
-      </form>
+        <form class="form" id="leadForm" autocomplete="on">
+          <div class="row">
+            <input name="nome" placeholder="Seu nome" />
+            <input name="email" placeholder="Seu e-mail" type="email" required />
+          </div>
+
+          <div class="row">
+            <select name="area">
+              <option value="" disabled selected>Área do concurso</option>
+              <option>Direito</option>
+              <option>TI</option>
+              <option>Saúde</option>
+              <option>Administração</option>
+              <option>Outro</option>
+            </select>
+            <input name="prova" placeholder="Prova-alvo (opcional)" />
+          </div>
+
+          <!-- Mantém submit, mas o JS impede reload e salva no Supabase -->
+          <button class="btn btnPrimary btnFounder" type="submit" id="btnFounder" data-ev="founder_submit">
+            Quero cupom Founder
+          </button>
+
+          <div class="tiny" id="founderHint">
+            Cupom público (lote limitado). Você aplica no checkout.
+          </div>
+        </form>
       </div>
     </section>
 
@@ -444,7 +444,7 @@
     </footer>
   </div>
 
-  <!-- ✅ Modal Founder -->
+  <!-- Modal Founder (único, fixo no HTML) -->
   <div class="modal" id="founderModal" aria-hidden="true">
     <div class="modalBack" data-modal="close"></div>
 
@@ -485,284 +485,192 @@
     </div>
   </div>
 
- <script>
-  // =============================
-  // Tracking mínimo (opcional)
-  // =============================
-  window.lioraDebug = window.lioraDebug ?? false;
+  <script>
+    // =============================
+    // Tracking mínimo (opcional)
+    // =============================
+    window.lioraDebug = window.lioraDebug ?? false;
 
-  function track(ev, data = {}) {
-    try {
-      if (window.lioraDebug) console.log("📍", ev, data);
-      if (typeof window.gtag === "function") window.gtag("event", ev, data);
-      if (typeof window.fbq === "function") window.fbq("trackCustom", ev, data);
-    } catch (e) {}
-  }
-
-  track("liora_lp_view", { path: location.pathname + location.hash });
-
-  document.querySelectorAll("[data-ev]").forEach((el) => {
-    el.addEventListener("click", () => {
-      track("liora_lp_click", { id: el.getAttribute("data-ev") });
-    });
-  });
-
-  document.getElementById("yr").textContent = new Date().getFullYear();
-
-  // =============================
-  // Founder modal (elegante)
-  // =============================
-  const COUPON = "FOUNDER30";
-  const CHECKOUT_URL = "https://pay.hotmart.com/I104401854N?off=oplx5hku";
-
-  const btnOpen = document.getElementById("btnFounder");
-  const form = document.getElementById("leadForm");
-
-  function ensureFounderModal() {
-    // Se você já tiver um modal no HTML com id="founderModal", reaproveita.
-    let modal = document.getElementById("founderModal");
-    if (modal) return modal;
-
-    modal = document.createElement("div");
-    modal.id = "founderModal";
-    modal.className = "liora-modal";
-    modal.setAttribute("aria-hidden", "true");
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-label", "Cupom Founder");
-
-    // Estilo embutido só do modal (não mexe no resto do site)
-    const style = document.createElement("style");
-    style.id = "founderModalStyle";
-    style.textContent = `
-      #founderModal { position: fixed; inset: 0; display: none; z-index: 99999; }
-      #founderModal.is-open { display: block; }
-
-      #founderModal .fm-backdrop{
-        position:absolute; inset:0;
-        background: rgba(0,0,0,.55);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-      }
-
-      #founderModal .fm-card{
-        position:relative;
-        width:min(520px, 92vw);
-        margin: 10vh auto 0;
-        border-radius: 18px;
-        border: 1px solid rgba(255,255,255,.14);
-        background: rgba(18,18,22,.85);
-        box-shadow: 0 24px 80px rgba(0,0,0,.55);
-        overflow:hidden;
-      }
-
-      #founderModal .fm-head{
-        display:flex; align-items:flex-start; justify-content:space-between;
-        padding: 16px 16px 12px;
-        border-bottom: 1px solid rgba(255,255,255,.08);
-      }
-
-      #founderModal .fm-title{
-        font-weight: 900;
-        letter-spacing: -.2px;
-        font-size: 16px;
-        margin: 0;
-      }
-
-      #founderModal .fm-sub{
-        color: rgba(255,255,255,.72);
-        font-size: 13px;
-        line-height: 1.5;
-        margin-top: 6px;
-        max-width: 46ch;
-      }
-
-      #founderModal .fm-body{
-        padding: 14px 16px 16px;
-      }
-
-      #founderModal .fm-coupon{
-        display:flex; gap:10px; align-items:center; justify-content:space-between;
-        padding: 12px 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(196,75,4,.35);
-        background: rgba(196,75,4,.12);
-        margin-top: 10px;
-      }
-
-      #founderModal .fm-code{
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-        font-weight: 900;
-        letter-spacing: .14em;
-        font-size: 14px;
-      }
-
-      #founderModal .fm-actions{
-        display:flex; gap:10px; flex-wrap:wrap;
-        margin-top: 14px;
-      }
-
-      #founderModal .fm-note{
-        margin-top: 12px;
-        font-size: 12px;
-        color: rgba(255,255,255,.62);
-        line-height: 1.5;
-      }
-
-      #founderModal .fm-link{
-        display:inline-flex;
-        align-items:center;
-        gap:8px;
-        margin-top: 10px;
-        font-size: 13px;
-        color: rgba(255,255,255,.85);
-        text-decoration: underline;
-        text-underline-offset: 3px;
-      }
-
-      #founderModal .fm-x{
-        display:inline-flex; align-items:center; justify-content:center;
-        width: 36px; height: 36px;
-        border-radius: 12px;
-      }
-    `;
-    document.head.appendChild(style);
-
-    modal.innerHTML = `
-      <div class="fm-backdrop" data-modal="close"></div>
-      <div class="fm-card" role="document">
-        <div class="fm-head">
-          <div>
-            <div class="fm-title">Cupom Founder</div>
-            <div class="fm-sub">
-              Use o cupom no checkout para ativar a condição especial do lote Founder.
-            </div>
-          </div>
-          <button class="btnLight fm-x" type="button" data-modal="close" aria-label="Fechar">
-            ✕
-          </button>
-        </div>
-
-        <div class="fm-body">
-          <div class="fm-coupon">
-            <div>
-              <div class="tiny" style="margin-bottom:4px; opacity:.9;">Seu cupom:</div>
-              <div class="fm-code" id="couponCode">${COUPON}</div>
-            </div>
-            <button class="btnLight" type="button" id="btnCopyCoupon">Copiar</button>
-          </div>
-
-          <div class="fm-actions">
-            <a class="btn btnPrimary" href="${CHECKOUT_URL}" target="_blank" rel="noopener noreferrer" data-ev="founder_checkout">
-              Ir para o checkout
-            </a>
-            <button class="btnLight" type="button" data-modal="close" id="btnFounderClose">Fechar</button>
-          </div>
-
-          <div class="fm-note">
-            Dica: se você estiver no celular, copie o cupom e cole no campo “Cupom de desconto” no checkout.
-          </div>
-
-          <a class="fm-link" href="${CHECKOUT_URL}" target="_blank" rel="noopener noreferrer">
-            Abrir link do checkout em nova aba
-          </a>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-    return modal;
-  }
-
-  function openFounderModal() {
-    const modal = ensureFounderModal();
-    modal.classList.add("is-open");
-    modal.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-
-    // foco no botão copiar (experiência mais “redonda”)
-    setTimeout(() => {
-      modal.querySelector("#btnCopyCoupon")?.focus();
-    }, 20);
-
-    track("liora_founder_open", { coupon: COUPON });
-  }
-
-  function closeFounderModal() {
-    const modal = document.getElementById("founderModal");
-    if (!modal) return;
-    modal.classList.remove("is-open");
-    modal.setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-
-    track("liora_founder_close", {});
-  }
-
-  // abre modal
-  btnOpen?.addEventListener("click", () => openFounderModal());
-
-  // fecha modal (overlay, botão X, botão Fechar)
-  document.addEventListener("click", (ev) => {
-    const modal = document.getElementById("founderModal");
-    if (!modal || !modal.classList.contains("is-open")) return;
-
-    const a = ev.target.closest("[data-modal]");
-    if (a?.getAttribute("data-modal") === "close") {
-      closeFounderModal();
-      return;
-    }
-
-    // copiar
-    const copyBtn = ev.target.closest("#btnCopyCoupon");
-    if (copyBtn) {
-      const codeEl = document.getElementById("couponCode");
-      const txt = (codeEl?.textContent || COUPON).trim();
-
-      copyText(txt)
-        .then(() => {
-          copyBtn.textContent = "Copiado";
-          track("liora_founder_copy", { coupon: txt });
-          setTimeout(() => (copyBtn.textContent = "Copiar"), 1200);
-        })
-        .catch(() => {
-          copyBtn.textContent = "Falhou";
-          setTimeout(() => (copyBtn.textContent = "Copiar"), 1200);
-        });
-    }
-  });
-
-  // ESC fecha
-  window.addEventListener("keydown", (ev) => {
-    const modal = document.getElementById("founderModal");
-    if (ev.key === "Escape" && modal?.classList.contains("is-open")) closeFounderModal();
-  });
-
-  function copyText(text) {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
-      }
-    } catch {}
-    // fallback
-    return new Promise((resolve, reject) => {
+    function track(ev, data = {}) {
       try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        ta.remove();
-        resolve();
-      } catch (e) {
-        reject(e);
+        if (window.lioraDebug) console.log("📍", ev, data);
+        if (typeof window.gtag === "function") window.gtag("event", ev, data);
+        if (typeof window.fbq === "function") window.fbq("trackCustom", ev, data);
+      } catch (e) {}
+    }
+
+    track("liora_lp_view", { path: location.pathname + location.hash });
+
+    document.querySelectorAll("[data-ev]").forEach((el) => {
+      el.addEventListener("click", () => {
+        track("liora_lp_click", { id: el.getAttribute("data-ev") });
+      });
+    });
+
+    document.getElementById("yr").textContent = new Date().getFullYear();
+
+    // =============================
+    // Founder (salva lead + abre modal sem reload)
+    // =============================
+    const COUPON = "FOUNDER30";
+    const CHECKOUT_URL = "https://pay.hotmart.com/I104401854N?off=oplx5hku";
+
+    const form = document.getElementById("leadForm");
+    const btnFounder = document.getElementById("btnFounder");
+
+    function openFounderModal() {
+      const modal = document.getElementById("founderModal");
+      if (!modal) return;
+
+      modal.classList.add("is-open");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+
+      // Atualiza cupom e checkout (garante consistência)
+      const couponEl = modal.querySelector("#couponCode");
+      if (couponEl) couponEl.textContent = COUPON;
+
+      const pay = document.getElementById("btnPayFounder");
+      if (pay) pay.href = CHECKOUT_URL;
+
+      setTimeout(() => {
+        modal.querySelector("#btnCopyCoupon")?.focus();
+      }, 20);
+
+      track("liora_founder_open", { coupon: COUPON });
+    }
+
+    function closeFounderModal() {
+      const modal = document.getElementById("founderModal");
+      if (!modal) return;
+
+      modal.classList.remove("is-open");
+      modal.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+
+      track("liora_founder_close", {});
+    }
+
+    function copyText(text) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text);
+        }
+      } catch {}
+      return new Promise((resolve, reject) => {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }
+
+    // Submit do form: impede reload, salva lead no Supabase via /api/founder e abre modal
+    form?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+
+      const fd = new FormData(form);
+
+      const payload = {
+        name: (fd.get("nome") || "").toString().trim(),
+        email: (fd.get("email") || "").toString().trim(),
+        niche: (fd.get("area") || "").toString().trim(),
+        banca: (fd.get("prova") || "").toString().trim(),
+        page_url: location.href,
+        user_agent: navigator.userAgent
+      };
+
+      if (!payload.email) {
+        alert("Informe seu e-mail para liberar o cupom Founder.");
+        return;
+      }
+
+      const oldText = btnFounder?.textContent;
+      if (btnFounder) {
+        btnFounder.disabled = true;
+        btnFounder.textContent = "Liberando cupom...";
+      }
+
+      try {
+        track("liora_lead_submit", { place: "landing" });
+
+        const res = await fetch("/api/founder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || "Falha ao salvar seu cadastro.");
+        }
+
+        const coupon = (data.coupon || COUPON).toString().trim();
+
+        // Atualiza cupom na UI antes de abrir
+        const modal = document.getElementById("founderModal");
+        modal?.querySelector("#couponCode")?.replaceChildren(document.createTextNode(coupon));
+
+        track("liora_founder_lead_ok", { coupon });
+
+        openFounderModal();
+      } catch (err) {
+        console.error("[Founder]", err);
+        alert("Não consegui liberar o cupom agora. Tente novamente em instantes.");
+        track("liora_founder_lead_fail", { msg: String(err?.message || err) });
+      } finally {
+        if (btnFounder) {
+          btnFounder.disabled = false;
+          btnFounder.textContent = oldText || "Quero cupom Founder";
+        }
       }
     });
-  }
 
-  // Se o form existir e você quiser tracking do submit real (quando houver submit)
-  form?.addEventListener("submit", () => track("liora_lead_submit", { place: "landing" }));
-</script>
+    // Fechar modal via backdrop e botões com data-modal="close"
+    document.addEventListener("click", (ev) => {
+      const modal = document.getElementById("founderModal");
+      if (!modal || !modal.classList.contains("is-open")) return;
+
+      const closeEl = ev.target.closest("[data-modal]");
+      if (closeEl?.getAttribute("data-modal") === "close") {
+        closeFounderModal();
+        return;
+      }
+
+      // Copiar cupom
+      const copyBtn = ev.target.closest("#btnCopyCoupon");
+      if (copyBtn) {
+        const codeEl = modal.querySelector("#couponCode");
+        const txt = (codeEl?.textContent || COUPON).trim();
+
+        copyText(txt)
+          .then(() => {
+            copyBtn.textContent = "Copiado";
+            track("liora_founder_copy", { coupon: txt });
+            setTimeout(() => (copyBtn.textContent = "Copiar"), 1200);
+          })
+          .catch(() => {
+            copyBtn.textContent = "Falhou";
+            setTimeout(() => (copyBtn.textContent = "Copiar"), 1200);
+          });
+      }
+    });
+
+    // ESC fecha
+    window.addEventListener("keydown", (ev) => {
+      const modal = document.getElementById("founderModal");
+      if (ev.key === "Escape" && modal?.classList.contains("is-open")) closeFounderModal();
+    });
+  </script>
 </body>
 </html>
