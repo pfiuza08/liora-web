@@ -335,32 +335,50 @@ function wireLogin(ctx) {
     const el = document.createElement("div");
     el.id = "liora-login";
     el.className = "liora-modal hidden";
-    el.innerHTML = `
-      <div class="liora-modal-backdrop" data-login-action="close"></div>
-
-      <div class="liora-modal-card" style="max-width:520px;">
-        <div class="liora-modal-head">
-          <div>
-            <div class="liora-modal-title">Entrar</div>
-            <div class="liora-modal-sub muted">Receba um link por e-mail para acessar.</div>
+   el.innerHTML = `
+        <div class="liora-modal-backdrop" data-login-action="close"></div>
+      
+        <div class="liora-modal-card" style="max-width:520px;">
+          <div class="liora-modal-head">
+            <div>
+              <div class="liora-modal-title">Entrar</div>
+              <div class="liora-modal-sub muted">Entre com Google ou receba um link por e-mail.</div>
+            </div>
+            <button class="btn-secondary" data-login-action="close">Fechar</button>
           </div>
-          <button class="btn-secondary" data-login-action="close">Fechar</button>
-        </div>
-
-        <div class="liora-modal-body">
-          <label class="label">E-mail</label>
-          <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
-
-          <div class="muted small" style="margin-top:10px;">
-            Dica: verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
+      
+          <div class="liora-modal-body">
+      
+            <div class="muted small" style="margin-bottom:10px;">
+              Dica: Google é mais rápido. O link por e-mail é útil se você preferir.
+            </div>
+      
+            <button class="btn-primary" style="width:100%;" data-login-action="google">
+              Entrar com Google
+            </button>
+      
+            <div class="muted small" style="margin:10px 0; text-align:center; opacity:.85;">
+              ou
+            </div>
+      
+            <label class="label">E-mail</label>
+            <input id="liora-login-email" class="input" placeholder="voce@exemplo.com" />
+      
+            <div class="muted small" style="margin-top:10px;">
+              Verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
+            </div>
+          </div>
+      
+          <div class="liora-modal-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn-secondary" style="flex:1; min-width:200px;" data-login-action="magic">
+              Enviar link de acesso
+            </button>
+            <button class="btn-secondary" style="flex:1; min-width:200px;" data-login-action="close">
+              Cancelar
+            </button>
           </div>
         </div>
-
-        <div class="liora-modal-actions">
-          <button class="btn-primary" data-login-action="magic">Enviar link de acesso</button>
-        </div>
-      </div>
-    `;
+      `;
     document.body.appendChild(el);
   }
 
@@ -459,41 +477,89 @@ function wireLogin(ctx) {
       const act = a.getAttribute("data-login-action");
       if (act === "close") return closeLogin();
 
+      if (act === "google") {
+        if (!ctx?.auth?.signInWithGoogle) {
+          ctx?.ui?.toast?.("Login Google não carregou. Recarregue a página.");
+          return;
+        }
+      
+        // trava simples para evitar duplo clique
+        window.__lioraGoogle = window.__lioraGoogle || { busy: false };
+      
+        if (window.__lioraGoogle.busy) return ctx?.ui?.toast?.("Abrindo Google…");
+      
+        window.__lioraGoogle.busy = true;
+        a.disabled = true;
+        ctx?.ui?.loading?.("Abrindo Google…");
+      
+        ctx.auth.signInWithGoogle("/app/").then(({ error }) => {
+          // Normal: o browser vai redirecionar, então isso pode nem executar.
+          // Se falhar antes do redirect, cai aqui.
+          ctx?.ui?.loading?.(false);
+          window.__lioraGoogle.busy = false;
+          a.disabled = false;
+      
+          if (error) {
+            console.warn("❌ Google login error:", error);
+            ctx?.ui?.toast?.("Falha ao abrir o Google. Verifique as URLs no Google Cloud e no Supabase.");
+            return;
+          }
+        }).catch((e) => {
+          ctx?.ui?.loading?.(false);
+          window.__lioraGoogle.busy = false;
+          a.disabled = false;
+          console.warn("❌ Google login exception:", e);
+          ctx?.ui?.toast?.("Falha inesperada ao abrir o Google.");
+        });
+      
+        return;
+      }
+      
       if (act === "magic") {
         const email = (document.getElementById("liora-login-email")?.value || "").trim();
         if (!email) return ctx?.ui?.toast?.("Digite seu e-mail.");
         if (!ctx?.auth?.sendMagicLink) return ctx?.ui?.toast?.("Auth não carregou. Recarregue a página.");
-
+      
         // trava global simples (evita duplo clique)
         window.__lioraMagic = window.__lioraMagic || { busy: false, lastAt: 0, cooldownMs: 60000, tries: 0 };
-
+      
         const now = Date.now();
         const left = window.__lioraMagic.lastAt ? (window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)) : 0;
         if (left > 0) return ctx?.ui?.toast?.(`Aguarde ${Math.ceil(left / 1000)}s para reenviar o link.`);
         if (window.__lioraMagic.busy) return ctx?.ui?.toast?.("Enviando link…");
-
+      
         window.__lioraMagic.busy = true;
         window.__lioraMagic.lastAt = now;
         window.__lioraMagic.tries++;
-
+      
         a.disabled = true;
         ctx?.ui?.loading?.("Enviando link…");
-
+      
         ctx.auth.sendMagicLink(email).then(({ error }) => {
           ctx?.ui?.loading?.(false);
-
+      
           if (error) {
             const msg = String(error?.message || "").toLowerCase();
             const status = String(error?.status || "");
             const isRate = msg.includes("rate") || status.includes("429");
-
+      
             window.__lioraMagic.cooldownMs = isRate ? 120000 : 60000;
             ctx?.ui?.toast?.(isRate ? "Limite de envios atingido. Aguarde 2 minutos e tente novamente." : "Falha ao enviar link. Tente novamente.");
-
+      
             window.__lioraMagic.busy = false;
             setTimeout(() => { a.disabled = false; }, 800);
             return;
           }
+
+    window.__lioraMagic.cooldownMs = 60000;
+    ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
+
+    window.__lioraMagic.busy = false;
+    setTimeout(() => { a.disabled = false; }, 800);
+  });
+
+  return;
+}
 
           window.__lioraMagic.cooldownMs = 60000;
           ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
