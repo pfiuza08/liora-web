@@ -1,6 +1,6 @@
 // /app/scripts/auth.js
 // =============================================================
-// 🔐 LIORA — AUTH (Supabase Magic Link) v1.4
+// 🔐 LIORA — AUTH (Supabase Magic Link + Google OAuth) v1.5
 // (profiles + premium + pending + throttle robusto + logs + refreshProfile)
 // Exporta: auth
 // =============================================================
@@ -9,7 +9,6 @@ export const auth = {
   session: null,
   user: null,
 
-  // throttle padrão local (evita martelar)
   THROTTLE_MS: 2 * 60 * 1000, // 2 min
 
   init(ctx) {
@@ -25,6 +24,9 @@ export const auth = {
       auth: { persistSession: true, autoRefreshToken: true }
     });
 
+    // expõe para o resto do app se quiser usar sb direto
+    ctx.supabase = this.sb;
+
     // sessão atual
     this.sb.auth.getSession().then(({ data }) => {
       this._handleSession(ctx, data?.session || null);
@@ -34,6 +36,23 @@ export const auth = {
     this.sb.auth.onAuthStateChange((_event, session) => {
       this._handleSession(ctx, session || null);
     });
+  },
+
+  /* -----------------------------
+     Google OAuth
+  ----------------------------- */
+  async signInWithGoogle(redirectPath = "/app/") {
+    const sb = this.sb;
+    if (!sb) return { data: null, error: { message: "Supabase não inicializado." } };
+
+    const redirectTo = (location.origin || "").replace(/\/$/, "") + redirectPath;
+
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo }
+    });
+
+    return { data, error };
   },
 
   /* -----------------------------
@@ -67,7 +86,6 @@ export const auth = {
 
   _throttleWindowMs(email) {
     const t = this._readThrottle(email);
-    // ✅ se houver forcedMs, usa. Se não, usa o padrão.
     const forced = Number(t?.forcedMs);
     if (!Number.isNaN(forced) && forced > 0) return forced;
     return this.THROTTLE_MS;
@@ -94,7 +112,6 @@ export const auth = {
     const msg = String(error?.message || "").toLowerCase();
     const code = String(error?.code || "").toLowerCase();
     const status = String(error?.status || "");
-    // supabase costuma usar 429; nem sempre vem "rate limit" no texto
     return (
       msg.includes("rate limit") ||
       msg.includes("too many") ||
@@ -115,7 +132,6 @@ export const auth = {
       const e = String(email || "").trim().toLowerCase();
       if (!sb || !u?.id || !e) return { consumed: false };
 
-      // 1) busca pendência
       const { data: pending, error: e1 } = await sb
         .from("premium_pending")
         .select("email, premium, plan, last_event, payload_id, updated_at")
@@ -129,7 +145,6 @@ export const auth = {
 
       if (!pending || pending.premium !== true) return { consumed: false };
 
-      // 2) aplica em profiles (FK: profiles.id = auth.users.id)
       const { error: e2 } = await sb
         .from("profiles")
         .upsert(
@@ -150,7 +165,6 @@ export const auth = {
         return { consumed: false, error: e2.message };
       }
 
-      // 3) remove pendência
       const { error: e3 } = await sb.from("premium_pending").delete().eq("email", e);
       if (e3) console.warn("⚠️ pending delete error:", e3);
 
@@ -179,7 +193,7 @@ export const auth = {
 
     const fallbackEmail = (this.user?.email || "").trim().toLowerCase();
 
-   // Se houver compra antes do login, pede para o backend consumir pending (server-side)
+    // Se houver compra antes do login, consome pendência via API (server-side)
     try {
       const accessToken = this.session?.access_token || "";
       if (accessToken) {
@@ -187,12 +201,11 @@ export const auth = {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}` }
         });
-    
+
         const out = await resp.json().catch(() => null);
-    
+
         if (resp.ok && out?.consumed) {
           console.log("✅ Premium pendente aplicado (API → profiles).");
-          // Rebusca profiles para refletir premium sem reload
           await this.refreshProfile(ctx);
         }
       }
@@ -228,7 +241,7 @@ export const auth = {
   },
 
   /* ---------------------------------------------------------
-     ✉️ Magic Link (throttle robusto + mensagens úteis)
+     ✉️ Magic Link
   --------------------------------------------------------- */
   async sendMagicLink(email) {
     const sb = this.sb;
@@ -237,7 +250,6 @@ export const auth = {
     if (!sb) return { data: null, error: { message: "Supabase não inicializado." } };
     if (!e || !e.includes("@")) return { data: null, error: { message: "Digite um e-mail válido." } };
 
-    // throttle local
     const left = this._msLeftThrottle(e);
     if (left > 0) {
       return {
@@ -246,7 +258,6 @@ export const auth = {
       };
     }
 
-    // registra tentativa local imediatamente (evita duplo clique)
     const prev = this._readThrottle(e);
     const stamp = {
       at: Date.now(),
@@ -260,7 +271,7 @@ export const auth = {
     const { data, error } = await sb.auth.signInWithOtp({
       email: e,
       options: {
-        // permitido em Auth → URL Configuration → Redirect URLs
+        // precisa estar permitido em Auth → URL Configuration → Redirect URLs
         emailRedirectTo: location.origin + "/app/"
       }
     });
@@ -270,11 +281,8 @@ export const auth = {
     if (error) {
       const isRate = this._isRateLimitError(error);
 
-      // ✅ ajusta throttle local conforme tipo de erro
       if (isRate) {
-        // 5 min local, para não fritar seu limite e nem o usuário
         this._writeThrottle(e, { at: Date.now(), tries: stamp.tries, forcedMs: 5 * 60 * 1000 });
-
         return {
           data,
           error: {
@@ -285,7 +293,6 @@ export const auth = {
         };
       }
 
-      // erro comum (smtp, config, etc): throttle curto só para evitar spam de clique
       this._writeThrottle(e, { at: Date.now(), tries: stamp.tries, forcedMs: 30 * 1000 });
 
       return {
@@ -297,7 +304,6 @@ export const auth = {
       };
     }
 
-    // sucesso: mantém throttle padrão (2 min) para UX mais estável
     this._writeThrottle(e, { at: Date.now(), tries: stamp.tries, forcedMs: 0 });
 
     return { data, error: null };
@@ -311,10 +317,9 @@ export const auth = {
     return !!this.user?.id;
   },
 
-  // ---------------------------------------------------------
-  // 🔄 Rebusca profiles (premium) e atualiza store
-  // Útil para testes: sem depender de reload
-  // ---------------------------------------------------------
+  /* ---------------------------------------------------------
+     🔄 Rebusca profiles (premium) e atualiza store
+  --------------------------------------------------------- */
   async refreshProfile(ctx) {
     try {
       if (!this.sb || !this.user?.id) return { ok: false, error: "not_logged" };
