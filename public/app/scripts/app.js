@@ -335,7 +335,7 @@ function wireLogin(ctx) {
     const el = document.createElement("div");
     el.id = "liora-login";
     el.className = "liora-modal hidden";
-   el.innerHTML = `
+    el.innerHTML = `
         <div class="liora-modal-backdrop" data-login-action="close"></div>
       
         <div class="liora-modal-card" style="max-width:520px;">
@@ -466,7 +466,7 @@ function wireLogin(ctx) {
     window.addEventListener("liora:login-required", () => openLogin());
     window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
 
-    // modal actions (1 listener só)
+    // modal actions (1 listener só) — ✅ corrigido
     document.addEventListener("click", (ev) => {
       const modal = document.getElementById("liora-login");
       if (!modal || modal.classList.contains("hidden")) return;
@@ -482,23 +482,22 @@ function wireLogin(ctx) {
           ctx?.ui?.toast?.("Login Google não carregou. Recarregue a página.");
           return;
         }
-      
+
         // trava simples para evitar duplo clique
         window.__lioraGoogle = window.__lioraGoogle || { busy: false };
-      
         if (window.__lioraGoogle.busy) return ctx?.ui?.toast?.("Abrindo Google…");
-      
+
         window.__lioraGoogle.busy = true;
         a.disabled = true;
         ctx?.ui?.loading?.("Abrindo Google…");
-      
+
         ctx.auth.signInWithGoogle("/app/").then(({ error }) => {
           // Normal: o browser vai redirecionar, então isso pode nem executar.
           // Se falhar antes do redirect, cai aqui.
           ctx?.ui?.loading?.(false);
           window.__lioraGoogle.busy = false;
           a.disabled = false;
-      
+
           if (error) {
             console.warn("❌ Google login error:", error);
             ctx?.ui?.toast?.("Falha ao abrir o Google. Verifique as URLs no Google Cloud e no Supabase.");
@@ -511,56 +510,54 @@ function wireLogin(ctx) {
           console.warn("❌ Google login exception:", e);
           ctx?.ui?.toast?.("Falha inesperada ao abrir o Google.");
         });
-      
+
         return;
       }
-      
+
       if (act === "magic") {
         const email = (document.getElementById("liora-login-email")?.value || "").trim();
         if (!email) return ctx?.ui?.toast?.("Digite seu e-mail.");
         if (!ctx?.auth?.sendMagicLink) return ctx?.ui?.toast?.("Auth não carregou. Recarregue a página.");
-      
+
         // trava global simples (evita duplo clique)
         window.__lioraMagic = window.__lioraMagic || { busy: false, lastAt: 0, cooldownMs: 60000, tries: 0 };
-      
+
         const now = Date.now();
-        const left = window.__lioraMagic.lastAt ? (window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt)) : 0;
+        const left = window.__lioraMagic.lastAt
+          ? (window.__lioraMagic.cooldownMs - (now - window.__lioraMagic.lastAt))
+          : 0;
+
         if (left > 0) return ctx?.ui?.toast?.(`Aguarde ${Math.ceil(left / 1000)}s para reenviar o link.`);
         if (window.__lioraMagic.busy) return ctx?.ui?.toast?.("Enviando link…");
-      
+
         window.__lioraMagic.busy = true;
         window.__lioraMagic.lastAt = now;
         window.__lioraMagic.tries++;
-      
+
         a.disabled = true;
         ctx?.ui?.loading?.("Enviando link…");
-      
+
         ctx.auth.sendMagicLink(email).then(({ error }) => {
           ctx?.ui?.loading?.(false);
-      
+
           if (error) {
             const msg = String(error?.message || "").toLowerCase();
             const status = String(error?.status || "");
             const isRate = msg.includes("rate") || status.includes("429");
-      
+
             window.__lioraMagic.cooldownMs = isRate ? 120000 : 60000;
-            ctx?.ui?.toast?.(isRate ? "Limite de envios atingido. Aguarde 2 minutos e tente novamente." : "Falha ao enviar link. Tente novamente.");
-      
+            ctx?.ui?.toast?.(
+              isRate
+                ? "Limite de envios atingido. Aguarde 2 minutos e tente novamente."
+                : "Falha ao enviar link. Tente novamente."
+            );
+
             window.__lioraMagic.busy = false;
             setTimeout(() => { a.disabled = false; }, 800);
             return;
           }
 
-    window.__lioraMagic.cooldownMs = 60000;
-    ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
-
-    window.__lioraMagic.busy = false;
-    setTimeout(() => { a.disabled = false; }, 800);
-  });
-
-  return;
-}
-
+          // ✅ sucesso (uma vez só)
           window.__lioraMagic.cooldownMs = 60000;
           ctx?.ui?.toast?.("Link enviado! Verifique seu e-mail (spam/promoções).");
 
@@ -712,7 +709,9 @@ function demoBadgeInit() {
     // gates do seu módulo espera store como argumento (recomendado)
     ctx.gates = gatesMod;
     // atualiza limiter para usar gates real
-    ctx.limits = createLimiter(store, { isPremium: () => !!gatesMod.isPremium?.(store) || !!gatesFallback.isPremium() });
+    ctx.limits = createLimiter(store, {
+      isPremium: () => !!gatesMod.isPremium?.(store) || !!gatesFallback.isPremium()
+    });
     console.log("🔒 gates.js ativo");
   } else {
     // fallback continua
