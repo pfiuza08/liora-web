@@ -475,6 +475,20 @@ function wireLogin(ctx) {
     window.addEventListener("liora:login-required", () => openLogin());
     window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
 
+     // ✅ 3) fecha o modal quando trocar de rota
+      window.addEventListener("liora:route-changed", () => {
+        try { closeLogin(); } catch {}
+      });
+     
+    // ✅ fecha automaticamente quando virar logged
+      window.addEventListener("liora:user-changed", () => {
+        try {
+          const u = getUserSafe();
+          const logged = !!u?.uid || !!u?.email || !!u?.name;
+          if (logged) closeLogin();
+        } catch {}
+      });
+     
     // modal actions (1 listener só) — ✅ corrigido
     document.addEventListener("click", (ev) => {
       const modal = document.getElementById("liora-login");
