@@ -488,8 +488,14 @@ function wireLogin(ctx) {
 
     window.addEventListener("liora:open-login", () => openLogin());
     window.addEventListener("liora:login-required", () => openLogin());
-    window.addEventListener("liora:user-changed", () => updateHeaderAuthUI());
-
+    window.addEventListener("liora:user-changed", () => {
+        updateHeaderAuthUI();
+      
+        // fecha o modal automaticamente quando o login completar
+        const u = getUserSafe();
+        const logged = !!u?.uid || !!u?.email || !!u?.name;
+        if (logged) closeLogin();
+      });
      // ✅ 3) fecha o modal quando trocar de rota
       window.addEventListener("liora:route-changed", () => {
         try { closeLogin(); } catch {}
