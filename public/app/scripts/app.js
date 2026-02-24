@@ -376,6 +376,13 @@ function wireLogin(ctx) {
             <div class="muted small" style="margin-top:10px;">
               Verifique spam e promoções. O link abre a Liora já logada neste dispositivo.
             </div>
+      
+            <!-- Versão mais discreta -->
+            <div class="muted small" style="margin-top:12px; line-height:1.35; opacity:.85;">
+              Ao continuar: <a href="/termos" target="_blank" rel="noopener noreferrer">Termos</a> ·
+              <a href="/privacidade" target="_blank" rel="noopener noreferrer">Privacidade</a>
+            </div>
+      
           </div>
       
           <div class="liora-modal-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
