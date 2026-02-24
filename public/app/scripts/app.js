@@ -335,7 +335,7 @@ function wireLogin(ctx) {
     const el = document.createElement("div");
     el.id = "liora-login";
     el.className = "liora-modal hidden";
-    el.innerHTML = `
+      el.innerHTML = `
         <div class="liora-modal-backdrop" data-login-action="close"></div>
       
         <div class="liora-modal-card" style="max-width:520px;">
@@ -366,8 +366,16 @@ function wireLogin(ctx) {
               <span>Entrar com Google</span>
             </button>
       
+            <div class="muted small" style="margin-top:10px; line-height:1.35; opacity:.90;">
+              Você será direcionado ao login seguro do Google e retornará para <b>getliora.ia.br</b>.
+            </div>
+      
             <div class="muted small" style="margin:10px 0; text-align:center; opacity:.85;">
               ou
+            </div>
+      
+            <div class="muted small" style="text-align:center; opacity:.75; margin-bottom:8px;">
+              Dica: confira o cadeado do navegador 🔒
             </div>
       
             <label class="label">E-mail</label>
