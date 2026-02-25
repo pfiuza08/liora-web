@@ -2780,3 +2780,15 @@ select.input option:checked {
   border-color: rgba(196,75,4,.55);
   box-shadow: 0 0 0 3px rgba(196,75,4,.18);
 }
+.cta-row{
+  margin-top: 14px;
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.btn-small{
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-weight: 800;
+}
