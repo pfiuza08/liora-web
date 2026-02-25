@@ -738,12 +738,56 @@ function demoBadgeInit() {
   // 🔐 Supabase Auth (Magic Link)
   // -----------------------------
   const authMod = await loadFeature("./auth.js", "auth");
-  if (authMod?.init) {
-    ctx.auth = authMod;
-    authMod.init(ctx);
-  } else {
-    console.warn("⚠️ auth.js não carregou (verifique ./auth.js em /app/scripts)");
-  }
+if (authMod?.init) {
+  ctx.auth = authMod;
+  authMod.init(ctx);
+
+  // ✅ GARANTIR que premium (profiles) esteja sempre atualizado
+  // - roda no boot (com pequeno delay para dar tempo do getSession/_handleSession)
+  // - roda quando a aba voltar para frente (focus/visibilitychange)
+  (function wireProfileAutoRefresh() {
+    if (window.__lioraProfileAutoRefreshWired) return;
+    window.__lioraProfileAutoRefreshWired = true;
+
+    let busy = false;
+
+    async function refreshNow(reason = "auto") {
+      try {
+        if (busy) return;
+        if (!ctx?.auth?.refreshProfile) return;
+
+        // só faz sentido se estiver logado
+        if (typeof ctx.auth.isLogged === "function" && !ctx.auth.isLogged()) return;
+
+        busy = true;
+        const out = await ctx.auth.refreshProfile(ctx);
+        if (window.lioraDebug) console.log("🔄 refreshProfile", { reason, out });
+      } catch (e) {
+        if (window.lioraDebug) console.warn("⚠️ refreshProfile falhou:", e);
+      } finally {
+        busy = false;
+      }
+    }
+
+    // 1) boot: roda uma vez logo após iniciar
+    setTimeout(() => refreshNow("boot"), 900);
+
+    // 2) quando a aba volta para frente
+    window.addEventListener("focus", () => refreshNow("focus"));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") refreshNow("visible");
+    });
+
+    // 3) quando o usuário “aparecer” no store, reforça mais uma vez (one-shot)
+    const onFirstUser = () => {
+      window.removeEventListener("liora:user-changed", onFirstUser);
+      setTimeout(() => refreshNow("first-user"), 300);
+    };
+    window.addEventListener("liora:user-changed", onFirstUser);
+  })();
+} else {
+  console.warn("⚠️ auth.js não carregou (verifique ./auth.js em /app/scripts)");
+}
 
   // -----------------------------
   // 🔒 Gates (módulo real) — preferir o seu gates v2
