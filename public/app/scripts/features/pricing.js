@@ -1,6 +1,6 @@
 // =============================================================
 // 💳 LIORA — PRICING (Hotmart Checkout)
-// Versão: v1.8 (Hotmart 2 ofertas: normal vs founder + em breve trimestral/vitalício)
+// Versão: v1.9 (Meta Pixel no app: ViewContent + InitiateCheckout)
 // -------------------------------------------------------------
 // ✔ Usa HTML existente (não sobrescreve)
 // ✔ Botões: data-action="pricingChoose" (free/monthly/quarterly/lifetime)
@@ -12,6 +12,7 @@
 // ✔ Trimestral/Vitalício: "Em breve" (não abre checkout)
 // ✔ Link normal (app): off=6mzlvtiy
 // ✔ Founder fica só na landing: off=oplx5hku
+// ✔ Meta Pixel: ViewContent ao abrir pricing + InitiateCheckout no clique
 // =============================================================
 
 export const pricing = {
@@ -30,14 +31,30 @@ export const pricing = {
   init(ctx) {
     this.ctx = ctx;
 
-    window.addEventListener("liora:open-pricing", () => this.render());
-    window.addEventListener("liora:open-plans", () => this.render()); // compat antigo
+    window.addEventListener("liora:open-pricing", () => {
+      this.render();
+      this.trackMetaStandard("ViewContent", {
+        content_name: "Planos Liora App",
+        content_category: "pricing",
+        content_type: "product_group"
+      });
+    });
+
+    window.addEventListener("liora:open-plans", () => {
+      this.render();
+      this.trackMetaStandard("ViewContent", {
+        content_name: "Planos Liora App",
+        content_category: "pricing",
+        content_type: "product_group"
+      });
+    }); // compat antigo
+
     window.addEventListener("liora:user-changed", () => this.render());
 
     this.bindOnce();
     this.render();
 
-    console.log("💳 pricing.js iniciado (v1.8 Hotmart normal + em breve)");
+    console.log("💳 pricing.js iniciado (v1.9 Hotmart normal + Meta Pixel)");
   },
 
   // -----------------------------
@@ -173,6 +190,16 @@ export const pricing = {
 
       // ✅ abre Hotmart (nova aba) - link normal do app (off=6mzlvtiy)
       const url = this._buildHotmartUrl(plan);
+
+      this.trackMetaStandard("InitiateCheckout", {
+        content_name: "Liora Mensal App",
+        content_category: "subscription",
+        content_type: "product",
+        value: 19.90,
+        currency: "BRL",
+        plan: String(plan || "monthly")
+      });
+
       this.toast("Abrindo checkout seguro…");
 
       try {
@@ -214,5 +241,15 @@ export const pricing = {
       this.ctx?.ui?.toast?.(msg);
     } catch {}
     console.log("🔔", msg);
+  },
+
+  trackMetaStandard(eventName, params = {}) {
+    try {
+      if (typeof window.fbq === "function") {
+        window.fbq("track", eventName, params);
+      }
+    } catch (e) {
+      console.warn("[Meta Pixel]", e);
+    }
   }
 };
