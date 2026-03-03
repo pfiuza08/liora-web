@@ -19,6 +19,32 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
+  <!-- Meta Pixel Code -->
+  <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;
+    n.push=n;
+    n.loaded=!0;
+    n.version='2.0';
+    n.queue=[];
+    t=b.createElement(e);
+    t.async=!0;
+    t.src=v;
+    s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+
+    fbq('init', '1216858680616772');
+    fbq('track', 'PageView');
+  </script>
+  <noscript>
+    <img height="1" width="1" style="display:none"
+         src="https://www.facebook.com/tr?id=1216858680616772&ev=PageView&noscript=1"/>
+  </noscript>
+  <!-- End Meta Pixel Code -->
+
   <style>
     :root{
       --bg:#0b0b0d; --card:#121216; --text:#f5f5f7; --muted:#a9a9b3;
@@ -210,9 +236,6 @@
     }
     code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
 
-    /* =============================
-       MODAL Founder (HTML fixo)
-    ============================= */
     .modal{
       position:fixed; inset:0;
       display:none;
@@ -286,31 +309,6 @@
       justify-content:flex-start;
     }
   </style>
-<!-- Meta Pixel Code -->
-<script>
-  !function(f,b,e,v,n,t,s)
-  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-  if(!f._fbq)f._fbq=n;
-  n.push=n;
-  n.loaded=!0;
-  n.version='2.0';
-  n.queue=[];
-  t=b.createElement(e);
-  t.async=!0;
-  t.src=v;
-  s=b.getElementsByTagName(e)[0];
-  s.parentNode.insertBefore(t,s)}(window, document,'script',
-  'https://connect.facebook.net/en_US/fbevents.js');
-
-  fbq('init', '1216858680616772');
-  fbq('track', 'PageView');
-</script>
-<noscript>
-  <img height="1" width="1" style="display:none"
-       src="https://www.facebook.com/tr?id=1216858680616772&ev=PageView&noscript=1"/>
-</noscript>
-<!-- End Meta Pixel Code -->
 </head>
 
 <body>
@@ -332,31 +330,41 @@
         te coloca para praticar com <strong>simulados</strong> e mostra sua evolução no <strong>dashboard</strong>.
       </p>
 
-    <div class="ctaRow" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:4px;">
-      <a href="/app#login" class="btn btnSecondary" style="min-width:220px; text-align:center;">
-        Entrar
-      </a>
-    
-      <a href="https://pay.hotmart.com/I104401854N" class="btn btnPrimary" style="min-width:220px; text-align:center;" target="_blank" rel="noopener noreferrer">
-        Assinar agora
-      </a>
-    </div>
-    
-    <div style="margin-top:10px; font-size:13px; opacity:.85; color: var(--muted);">
-      Já é assinante? Clique em <b>Entrar</b> e faça login com o e-mail usado na compra.
-    </div>
-    
-    <div class="ctaRow" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; opacity:.95;">
-      <a class="btn btnSmall" id="btnTestar" href="/app#home" data-ev="cta_testar">
-        Testar agora
-      </a>
-    
-      <a class="btn btnSmall" href="/app#pricing" data-ev="cta_planos">
-        Ver planos
-      </a>
-    
-      <span class="tiny">Sem cartão para testar. Em 90s você entende.</span>
-    </div>
+      <div class="ctaRow" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:4px;">
+        <a href="/app#login" class="btn btnSecondary" style="min-width:220px; text-align:center;">
+          Entrar
+        </a>
+
+        <a
+          href="https://pay.hotmart.com/I104401854N"
+          class="btn btnPrimary js-meta-checkout"
+          style="min-width:220px; text-align:center;"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-offer="monthly"
+          data-checkout-name="Liora Mensal"
+          data-checkout-url="https://pay.hotmart.com/I104401854N"
+        >
+          Assinar agora
+        </a>
+      </div>
+
+      <div style="margin-top:10px; font-size:13px; opacity:.85; color: var(--muted);">
+        Já é assinante? Clique em <b>Entrar</b> e faça login com o e-mail usado na compra.
+      </div>
+
+      <div class="ctaRow" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; opacity:.95;">
+        <a class="btn btnSmall" id="btnTestar" href="/app#home" data-ev="cta_testar">
+          Testar agora
+        </a>
+
+        <a class="btn btnSmall" href="/app#pricing" data-ev="cta_planos">
+          Ver planos
+        </a>
+
+        <span class="tiny">Sem cartão para testar. Em 90s você entende.</span>
+      </div>
+
       <div class="pillRow">
         <div class="pill">Plano em minutos</div>
         <div class="pill">Simulados por estilo</div>
@@ -487,7 +495,6 @@
     </footer>
   </div>
 
-  <!-- Modal Founder (único, fixo no HTML) -->
   <div class="modal" id="founderModal" aria-hidden="true">
     <div class="modalBack" data-modal="close"></div>
 
@@ -517,7 +524,17 @@
       </div>
 
       <div class="modalActions">
-        <a class="btn btnPrimary" id="btnPayFounder" href="https://pay.hotmart.com/I104401854N?off=oplx5hku" target="_blank" rel="noopener noreferrer">
+        <a
+          class="btn btnPrimary js-meta-checkout"
+          id="btnPayFounder"
+          href="https://pay.hotmart.com/I104401854N?off=oplx5hku"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-offer="founder"
+          data-coupon="FOUNDER30"
+          data-checkout-name="Liora Mensal Founder"
+          data-checkout-url="https://pay.hotmart.com/I104401854N?off=oplx5hku"
+        >
           Assinar com desconto Founder
         </a>
 
@@ -529,9 +546,6 @@
   </div>
 
   <script>
-    // =============================
-    // Tracking mínimo (opcional)
-    // =============================
     window.lioraDebug = window.lioraDebug ?? false;
 
     function track(ev, data = {}) {
@@ -539,6 +553,13 @@
         if (window.lioraDebug) console.log("📍", ev, data);
         if (typeof window.gtag === "function") window.gtag("event", ev, data);
         if (typeof window.fbq === "function") window.fbq("trackCustom", ev, data);
+      } catch (e) {}
+    }
+
+    function trackMetaStandard(eventName, params = {}) {
+      try {
+        if (window.lioraDebug) console.log("🟦 Meta", eventName, params);
+        if (typeof window.fbq === "function") window.fbq("track", eventName, params);
       } catch (e) {}
     }
 
@@ -552,9 +573,6 @@
 
     document.getElementById("yr").textContent = new Date().getFullYear();
 
-    // =============================
-    // Founder (salva lead + abre modal sem reload)
-    // =============================
     const COUPON = "FOUNDER30";
     const CHECKOUT_URL = "https://pay.hotmart.com/I104401854N?off=oplx5hku";
 
@@ -573,7 +591,11 @@
       if (couponEl) couponEl.textContent = COUPON;
 
       const pay = document.getElementById("btnPayFounder");
-      if (pay) pay.href = CHECKOUT_URL;
+      if (pay) {
+        pay.href = CHECKOUT_URL;
+        pay.setAttribute("data-checkout-url", CHECKOUT_URL);
+        pay.setAttribute("data-coupon", COUPON);
+      }
 
       setTimeout(() => {
         modal.querySelector("#btnCopyCoupon")?.focus();
@@ -616,7 +638,6 @@
       });
     }
 
-    // Submit do form: impede reload, salva lead no Supabase via /api/founder e abre modal
     form?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
 
@@ -664,6 +685,13 @@
 
         track("liora_founder_lead_ok", { coupon });
 
+        trackMetaStandard("Lead", {
+          content_name: "Founder Liora",
+          content_category: "lead",
+          status: "qualified",
+          coupon: coupon
+        });
+
         openFounderModal();
       } catch (err) {
         console.error("[Founder]", err);
@@ -677,7 +705,6 @@
       }
     });
 
-    // Fechar modal via backdrop e botões com data-modal="close"
     document.addEventListener("click", (ev) => {
       const modal = document.getElementById("founderModal");
       if (!modal || !modal.classList.contains("is-open")) return;
@@ -688,7 +715,6 @@
         return;
       }
 
-      // Copiar cupom
       const copyBtn = ev.target.closest("#btnCopyCoupon");
       if (copyBtn) {
         const codeEl = modal.querySelector("#couponCode");
@@ -707,10 +733,60 @@
       }
     });
 
-    // ESC fecha
     window.addEventListener("keydown", (ev) => {
       const modal = document.getElementById("founderModal");
       if (ev.key === "Escape" && modal?.classList.contains("is-open")) closeFounderModal();
+    });
+
+    (function () {
+      const pricing = document.getElementById("pricing");
+      if (!pricing || typeof IntersectionObserver === "undefined") return;
+
+      let sentPricingView = false;
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !sentPricingView) {
+            sentPricingView = true;
+
+            track("liora_pricing_view", { section: "pricing" });
+
+            trackMetaStandard("ViewContent", {
+              content_name: "Planos Liora",
+              content_category: "pricing",
+              content_type: "product_group"
+            });
+
+            observer.disconnect();
+          }
+        });
+      }, { threshold: 0.35 });
+
+      observer.observe(pricing);
+    })();
+
+    document.querySelectorAll(".js-meta-checkout").forEach((el) => {
+      el.addEventListener("click", () => {
+        const offer = (el.getAttribute("data-offer") || "monthly").trim();
+        const coupon = (el.getAttribute("data-coupon") || "").trim();
+        const checkoutName = (el.getAttribute("data-checkout-name") || "Liora Mensal").trim();
+        const url = (el.getAttribute("data-checkout-url") || el.getAttribute("href") || "").trim();
+
+        track("liora_checkout_click", {
+          offer,
+          coupon,
+          url
+        });
+
+        trackMetaStandard("InitiateCheckout", {
+          content_name: checkoutName,
+          content_category: "subscription",
+          content_type: "product",
+          value: 19.90,
+          currency: "BRL",
+          coupon: coupon || undefined
+        });
+      });
     });
   </script>
 </body>
