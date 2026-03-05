@@ -5,6 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Compra confirmada | Liora</title>
   <meta name="robots" content="noindex,nofollow" />
+
+  <!-- Meta Pixel Code (LioraWeb) -->
+  <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;
+    n.push=n;
+    n.loaded=!0;
+    n.version='2.0';
+    n.queue=[];
+    t=b.createElement(e);
+    t.async=!0;
+    t.src=v;
+    s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+
+    fbq('init', '1216858680616772');
+    fbq('track', 'PageView');
+  </script>
+  <noscript>
+    <img height="1" width="1" style="display:none"
+         src="https://www.facebook.com/tr?id=1216858680616772&ev=PageView&noscript=1"/>
+  </noscript>
+  <!-- End Meta Pixel Code -->
+
   <style>
     :root { color-scheme: dark; }
     body{
@@ -98,13 +125,14 @@
     }
     a{ color: rgba(147,197,253,.92); }
     a:hover{ opacity:.9; }
+    .cta-row { margin-top: 14px; }
+    .btn-small { min-width: 260px; }
   </style>
 </head>
 <body>
   <main class="card">
     <div class="top">
       <div class="badge" aria-hidden="true">
-        <!-- check -->
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M20 7L9 18l-5-5" stroke="rgba(34,197,94,.95)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -118,7 +146,8 @@
     </div>
 
     <div class="actions">
-      <a class="btn btn-primary" href="/app/#login" rel="noopener">
+      <!-- Ajustado: sem / antes do # -->
+      <a class="btn btn-primary" href="/app#thanks" rel="noopener">
         Acessar a Liora
         <span aria-hidden="true">→</span>
       </a>
@@ -133,24 +162,48 @@
         Se você entrou e ainda aparece como <b>Free</b>, aguarde 1 minuto e tente novamente.
         (A liberação Premium pode levar um instante para sincronizar.)
       </div>
-    
+
       <div style="opacity:.92;">
         No cartão de crédito, o lançamento pode aparecer como <b>LioraIA</b>.
       </div>
     </div>
 
-   <div class="links">
-    <span>Documentos:</span>
-    <a href="/termos" target="_blank" rel="noopener noreferrer">Termos</a>
-    <span style="opacity:.55;">·</span>
-    <a href="/privacidade" target="_blank" rel="noopener noreferrer">Privacidade</a>
-  </div>
-  
-  <div class="cta-row">
-    <a class="btn btn-secondary btn-small" href="/" rel="noopener">
-      Ainda não assinou? Veja os planos
-    </a>
-  </div>
+    <div class="links">
+      <span>Documentos:</span>
+      <a href="/termos" target="_blank" rel="noopener noreferrer">Termos</a>
+      <span style="opacity:.55;">·</span>
+      <a href="/privacidade" target="_blank" rel="noopener noreferrer">Privacidade</a>
+    </div>
+
+    <div class="cta-row">
+      <a class="btn btn-secondary btn-small" href="/#pricing" rel="noopener">
+        Ainda não assinou? Veja os planos
+      </a>
+    </div>
   </main>
+
+  <!-- StartTrial (para trial de 7 dias) -->
+  <script>
+    (function () {
+      // evita duplicar StartTrial em refresh / voltar
+      const KEY = "liora:starttrial:sentAt";
+      const now = Date.now();
+      const last = Number(localStorage.getItem(KEY) || "0");
+
+      // trava por 12h (ajuste se quiser)
+      if (last && (now - last) < 12 * 60 * 60 * 1000) return;
+
+      try {
+        if (typeof window.fbq === "function") {
+          fbq("track", "StartTrial", {
+            content_name: "Liora Premium (Trial 7 dias)",
+            value: 0.00,
+            currency: "BRL"
+          });
+        }
+        localStorage.setItem(KEY, String(now));
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>
