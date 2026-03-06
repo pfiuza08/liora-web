@@ -545,5 +545,52 @@
 
   <!-- APP (1 único script) -->
   <script type="module" src="/app/scripts/app.js?v=1"></script>
+
+  <!-- =========================================================
+🤖 Assistente da Liora — MVP
+Colar no final do <body>
+========================================================= -->
+<button id="lioraAssistBtn" class="liora-assist-btn" aria-label="Abrir assistente da Liora">
+  ✨ Ajuda
+</button>
+
+<div id="lioraAssistModal" class="liora-assist-modal" aria-hidden="true">
+  <div class="liora-assist-backdrop" data-close-assist="true"></div>
+
+  <section class="liora-assist-panel" role="dialog" aria-modal="true" aria-labelledby="lioraAssistTitle">
+    <header class="liora-assist-header">
+      <div>
+        <div class="liora-assist-kicker">Assistente da Liora</div>
+        <h3 id="lioraAssistTitle">Como posso te ajudar?</h3>
+      </div>
+      <button class="liora-assist-close" id="lioraAssistClose" aria-label="Fechar assistente">×</button>
+    </header>
+
+    <div class="liora-assist-body">
+      <div id="lioraAssistMessages" class="liora-assist-messages"></div>
+
+      <div id="lioraAssistQuickActions" class="liora-assist-quick-actions">
+        <button class="liora-chip" data-assist-prompt="Como começar">Como começar</button>
+        <button class="liora-chip" data-assist-prompt="Como usar PDF">Como usar PDF</button>
+        <button class="liora-chip" data-assist-prompt="Como funciona o simulado">Como funciona o simulado</button>
+        <button class="liora-chip" data-assist-prompt="Diferença entre Free e Premium">Diferença entre Free e Premium</button>
+        <button class="liora-chip" data-assist-prompt="Tenho pouco tempo hoje">Tenho pouco tempo hoje</button>
+      </div>
+    </div>
+
+    <footer class="liora-assist-footer">
+      <form id="lioraAssistForm" class="liora-assist-form">
+        <input
+          id="lioraAssistInput"
+          class="liora-assist-input"
+          type="text"
+          placeholder="Digite sua dúvida sobre a Liora..."
+          autocomplete="off"
+        />
+        <button type="submit" class="liora-assist-send">Enviar</button>
+      </form>
+    </footer>
+  </section>
+</div>
 </body>
 </html>
