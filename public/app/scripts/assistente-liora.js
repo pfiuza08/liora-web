@@ -1,12 +1,13 @@
 // assistente-liora.js
 // =========================================================
-// 🤖 Assistente da Liora — V2
-// Memória curta + matching melhor + integração por hash
+// 🤖 Assistente da Liora — V3
+// Memória curta + matching melhor + analytics local
 // =========================================================
 
 (function () {
   var MEMORY_LIMIT = 8;
   var autoOpenedByGate = false;
+  var ANALYTICS_KEY = "liora:assist:analytics:v1";
 
   var knowledge = [
     {
@@ -184,14 +185,65 @@
     } catch (err) {}
   }
 
-  function normalizeText(str) {
-    return String(str || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^\w\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+  function readAnalytics() {
+    try {
+      var raw = localStorage.getItem(ANALYTICS_KEY);
+      if (!raw) return createEmptyAnalytics();
+      var data = JSON.parse(raw);
+      return normalizeAnalytics(data);
+    } catch (e) {
+      return createEmptyAnalytics();
+    }
+  }
+
+  function createEmptyAnalytics() {
+    return {
+      opens: 0,
+      opensByReason: {},
+      gateOpens: {},
+      questions: {},
+      intents: {},
+      ctaClicks: {},
+      routes: {},
+      lastUpdatedAt: 0
+    };
+  }
+
+  function normalizeAnalytics(data) {
+    data = data && typeof data === "object" ? data : {};
+    return {
+      opens: Number(data.opens || 0),
+      opensByReason: data.opensByReason && typeof data.opensByReason === "object" ? data.opensByReason : {},
+      gateOpens: data.gateOpens && typeof data.gateOpens === "object" ? data.gateOpens : {},
+      questions: data.questions && typeof data.questions === "object" ? data.questions : {},
+      intents: data.intents && typeof data.intents === "object" ? data.intents : {},
+      ctaClicks: data.ctaClicks && typeof data.ctaClicks === "object" ? data.ctaClicks : {},
+      routes: data.routes && typeof data.routes === "object" ? data.routes : {},
+      lastUpdatedAt: Number(data.lastUpdatedAt || 0)
+    };
+  }
+
+  function writeAnalytics(data) {
+    try {
+      data.lastUpdatedAt = Date.now();
+      localStorage.setItem(ANALYTICS_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  function bumpCounter(bucketName, key) {
+    if (!key) return;
+    var data = readAnalytics();
+    if (!data[bucketName] || typeof data[bucketName] !== "object") data[bucketName] = {};
+    data[bucketName][key] = Number(data[bucketName][key] || 0) + 1;
+    writeAnalytics(data);
+  }
+
+  function bumpOpen(reason) {
+    var data = readAnalytics();
+    data.opens = Number(data.opens || 0) + 1;
+    reason = reason || "manual";
+    data.opensByReason[reason] = Number(data.opensByReason[reason] || 0) + 1;
+    writeAnalytics(data);
   }
 
   function remember(role, text, intentId) {
@@ -212,6 +264,22 @@
       if (state.memory[i].role === "user") return state.memory[i].text;
     }
     return "";
+  }
+
+  function normalizeText(str) {
+    return String(str || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function compactQuestion(text) {
+    var t = normalizeText(text);
+    if (!t) return "";
+    return t.length > 80 ? t.slice(0, 80) : t;
   }
 
   function scoreIntent(item, normalized) {
@@ -244,6 +312,28 @@
     return score;
   }
 
+  function inferNextStepFromContext(text) {
+    var t = normalizeText(text);
+
+    if (t.indexOf("pdf") >= 0 || t.indexOf("material") >= 0 || t.indexOf("apostila") >= 0) {
+      return [{ label: "Abrir PDF", action: "liora:open-pdf" }];
+    }
+
+    if (t.indexOf("simulado") >= 0 || t.indexOf("praticar") >= 0 || t.indexOf("revis") >= 0) {
+      return [{ label: "Abrir Simulados", action: "liora:open-simulados" }];
+    }
+
+    if (t.indexOf("tema") >= 0 || t.indexOf("assunto") >= 0 || t.indexOf("começar do zero") >= 0 || t.indexOf("comecar do zero") >= 0) {
+      return [{ label: "Abrir Tema", action: "liora:open-tema" }];
+    }
+
+    return [
+      { label: "Abrir Tema", action: "liora:open-tema" },
+      { label: "Abrir PDF", action: "liora:open-pdf" },
+      { label: "Abrir Simulados", action: "liora:open-simulados" }
+    ];
+  }
+
   function contextualIntent(normalized) {
     var last = normalizeText(getLastUserText());
 
@@ -270,28 +360,6 @@
     }
 
     return null;
-  }
-
-  function inferNextStepFromContext(text) {
-    var t = normalizeText(text);
-
-    if (t.indexOf("pdf") >= 0 || t.indexOf("material") >= 0 || t.indexOf("apostila") >= 0) {
-      return [{ label: "Abrir PDF", action: "liora:open-pdf" }];
-    }
-
-    if (t.indexOf("simulado") >= 0 || t.indexOf("praticar") >= 0 || t.indexOf("revis") >= 0) {
-      return [{ label: "Abrir Simulados", action: "liora:open-simulados" }];
-    }
-
-    if (t.indexOf("tema") >= 0 || t.indexOf("assunto") >= 0 || t.indexOf("começar do zero") >= 0 || t.indexOf("comecar do zero") >= 0) {
-      return [{ label: "Abrir Tema", action: "liora:open-tema" }];
-    }
-
-    return [
-      { label: "Abrir Tema", action: "liora:open-tema" },
-      { label: "Abrir PDF", action: "liora:open-pdf" },
-      { label: "Abrir Simulados", action: "liora:open-simulados" }
-    ];
   }
 
   function findIntent(text) {
@@ -335,6 +403,8 @@
     trackAssist("liora_assist_open", {
       reason: meta.reason || "manual"
     });
+
+    bumpOpen(meta.reason || "manual");
 
     if (els.messages && els.messages.dataset.booted !== "1") {
       bootAssistant();
@@ -384,11 +454,13 @@
 
     btn.addEventListener("click", function () {
       if (cta.prompt) {
+        bumpCounter("ctaClicks", "prompt:" + cta.label);
         handleUserPrompt(cta.prompt);
         return;
       }
 
       if (cta.action) {
+        bumpCounter("ctaClicks", cta.action + "|" + cta.label);
         dispatchLioraAction(cta.action, {
           source: "assistente",
           label: cta.label
@@ -441,6 +513,10 @@
 
     var route = routeMap[eventName];
 
+    if (route && route !== "login") {
+      bumpCounter("routes", route);
+    }
+
     if (route) {
       setTimeout(function () {
         location.hash = "#" + route;
@@ -466,6 +542,9 @@
       intent: intent.id
     });
 
+    bumpCounter("questions", compactQuestion(clean));
+    bumpCounter("intents", intent.id);
+
     addMessage(intent.response, "bot", intent.ctas || []);
     remember("bot", intent.response, intent.id);
   }
@@ -482,6 +561,39 @@
     );
 
     remember("bot", "Mensagem inicial", "boot");
+  }
+
+  function maybeOpenForGate(reason) {
+    if (autoOpenedByGate) return;
+    autoOpenedByGate = true;
+
+    bumpCounter("gateOpens", reason || "unknown");
+    openAssist({ reason: reason });
+
+    if (reason === "premium") {
+      setTimeout(function () {
+        addMessage(
+          "Você parece ter chegado a um limite do seu plano atual. Posso te mostrar os planos ou te ajudar a escolher outro caminho dentro da Liora.",
+          "bot",
+          [
+            { label: "Ver planos", action: "liora:open-pricing" },
+            { label: "Como começar", prompt: "Como começar" }
+          ]
+        );
+      }, 80);
+    }
+
+    if (reason === "login") {
+      setTimeout(function () {
+        addMessage(
+          "Para continuar, você precisa entrar na sua conta. Posso te levar para o login agora.",
+          "bot",
+          [
+            { label: "Abrir login", action: "liora:open-login" }
+          ]
+        );
+      }, 80);
+    }
   }
 
   function onModalClick(e) {
@@ -516,39 +628,8 @@
     var prompt = btn.getAttribute("data-assist-prompt");
     if (!prompt) return;
 
+    bumpCounter("ctaClicks", "quick:" + prompt);
     handleUserPrompt(prompt);
-  }
-
-  function maybeOpenForGate(reason) {
-    if (autoOpenedByGate) return;
-    autoOpenedByGate = true;
-
-    openAssist({ reason: reason });
-
-    if (reason === "premium") {
-      setTimeout(function () {
-        addMessage(
-          "Você parece ter chegado a um limite do seu plano atual. Posso te mostrar os planos ou te ajudar a escolher outro caminho dentro da Liora.",
-          "bot",
-          [
-            { label: "Ver planos", action: "liora:open-pricing" },
-            { label: "Como começar", prompt: "Como começar" }
-          ]
-        );
-      }, 80);
-    }
-
-    if (reason === "login") {
-      setTimeout(function () {
-        addMessage(
-          "Para continuar, você precisa entrar na sua conta. Posso te levar para o login agora.",
-          "bot",
-          [
-            { label: "Abrir login", action: "liora:open-login" }
-          ]
-        );
-      }, 80);
-    }
   }
 
   function bindEvents() {
@@ -587,10 +668,49 @@
     });
   }
 
+  function exposeDebugHelpers() {
+    window.lioraAssistAnalytics = {
+      read: function () {
+        return readAnalytics();
+      },
+      reset: function () {
+        localStorage.removeItem(ANALYTICS_KEY);
+        return readAnalytics();
+      },
+      topQuestions: function () {
+        return sortObjectDesc(readAnalytics().questions);
+      },
+      topIntents: function () {
+        return sortObjectDesc(readAnalytics().intents);
+      },
+      topCtas: function () {
+        return sortObjectDesc(readAnalytics().ctaClicks);
+      },
+      topRoutes: function () {
+        return sortObjectDesc(readAnalytics().routes);
+      }
+    };
+  }
+
+  function sortObjectDesc(obj) {
+    obj = obj && typeof obj === "object" ? obj : {};
+    var arr = [];
+    for (var k in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, k)) {
+        arr.push({ key: k, count: Number(obj[k] || 0) });
+      }
+    }
+    arr.sort(function (a, b) {
+      return b.count - a.count;
+    });
+    return arr;
+  }
+
   function ready() {
     els = getEls();
     if (!els.btn || !els.modal || !els.messages || !els.form || !els.input) return;
     bindEvents();
+    exposeDebugHelpers();
   }
 
   if (document.readyState === "loading") {
