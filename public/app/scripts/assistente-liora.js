@@ -1,30 +1,24 @@
 // assistente-liora.js
 // =========================================================
-// 🤖 Assistente da Liora — MVP
-// Navegação integrada ao router via location.hash
-// Compatível com ambiente sem optional chaining
+// 🤖 Assistente da Liora — V2
+// Memória curta + matching melhor + integração por hash
 // =========================================================
 
 (function () {
+  var MEMORY_LIMIT = 8;
+  var autoOpenedByGate = false;
+
   var knowledge = [
     {
       id: "como_comecar",
       keywords: [
-        "como começar",
-        "como comecar",
-        "por onde começo",
-        "por onde comeco",
-        "começar",
-        "comecar",
-        "estou perdido",
-        "estou perdida",
-        "perdido",
-        "perdida",
-        "início",
-        "inicio"
+        "como começar", "como comecar", "por onde começo", "por onde comeco",
+        "começar", "comecar", "estou perdido", "estou perdida",
+        "perdido", "perdida", "início", "inicio", "não sei por onde começar",
+        "nao sei por onde comecar"
       ],
       response:
-        "Se você já tem material, comece por PDF.\nSe quer estudar por assunto, comece por Tema.\nSe quer testar o que já sabe, use Simulados.",
+        "Se você já tem material, comece por PDF. Se quer estudar por assunto, comece por Tema. Se quer testar o que já sabe, use Simulados.",
       ctas: [
         { label: "Abrir PDF", action: "liora:open-pdf" },
         { label: "Abrir Tema", action: "liora:open-tema" },
@@ -34,14 +28,11 @@
     {
       id: "o_que_e_liora",
       keywords: [
-        "o que é a liora",
-        "o que e a liora",
-        "para que serve",
-        "como funciona a liora",
-        "o que a liora faz"
+        "o que é a liora", "o que e a liora", "para que serve",
+        "como funciona a liora", "o que a liora faz"
       ],
       response:
-        "A Liora é uma plataforma de estudo guiado por IA.\nEla te ajuda a estudar por tema, usar seus PDFs, praticar com simulados e acompanhar sua evolução no dashboard.",
+        "A Liora é uma plataforma de estudo guiado por IA. Ela te ajuda a estudar por tema, usar seus PDFs, praticar com simulados e acompanhar sua evolução no dashboard.",
       ctas: [
         { label: "Como começar", prompt: "Como começar" },
         { label: "Ver planos", action: "liora:open-pricing" }
@@ -50,17 +41,12 @@
     {
       id: "explicar_pdf",
       keywords: [
-        "pdf",
-        "como usar pdf",
-        "como funciona pdf",
-        "apostila",
-        "material",
-        "enviar pdf",
-        "tenho material",
-        "tenho apostila"
+        "pdf", "como usar pdf", "como funciona pdf", "apostila",
+        "material", "enviar pdf", "tenho material", "tenho apostila",
+        "estudar pdf", "usar pdf"
       ],
       response:
-        "A função PDF é ideal para quem já tem material de estudo.\nVocê envia o arquivo e usa a Liora para estudar de forma mais guiada a partir dele.",
+        "A função PDF é ideal para quem já tem material de estudo. Você envia o arquivo e usa a Liora para estudar de forma mais guiada a partir dele.",
       ctas: [
         { label: "Abrir PDF", action: "liora:open-pdf" }
       ]
@@ -68,18 +54,12 @@
     {
       id: "explicar_tema",
       keywords: [
-        "tema",
-        "como funciona tema",
-        "estudar por tema",
-        "estudar por assunto",
-        "assunto",
-        "quero começar do zero",
-        "quero comecar do zero",
-        "não tenho material",
-        "nao tenho material"
+        "tema", "como funciona tema", "estudar por tema",
+        "estudar por assunto", "assunto", "quero começar do zero",
+        "quero comecar do zero", "não tenho material", "nao tenho material"
       ],
       response:
-        "A função Tema é melhor quando você quer estudar um assunto específico.\nÉ uma boa opção para começar do zero, revisar um tópico ou focar em um ponto que precisa reforçar.",
+        "A função Tema é melhor quando você quer estudar um assunto específico. É uma boa opção para começar do zero, revisar um tópico ou focar em um ponto que precisa reforçar.",
       ctas: [
         { label: "Abrir Tema", action: "liora:open-tema" }
       ]
@@ -87,17 +67,12 @@
     {
       id: "explicar_simulados",
       keywords: [
-        "simulado",
-        "simulados",
-        "como funciona o simulado",
-        "praticar",
-        "treinar",
-        "testar",
-        "quero praticar",
-        "quero treinar"
+        "simulado", "simulados", "como funciona o simulado",
+        "praticar", "treinar", "testar", "quero praticar",
+        "quero treinar", "questões", "questoes"
       ],
       response:
-        "Simulados servem para praticar, revisar e identificar pontos fracos.\nEles funcionam melhor quando você já estudou algum conteúdo e quer testar seu desempenho.",
+        "Simulados servem para praticar, revisar e identificar pontos fracos. Eles funcionam melhor quando você já estudou algum conteúdo e quer testar seu desempenho.",
       ctas: [
         { label: "Abrir Simulados", action: "liora:open-simulados" }
       ]
@@ -105,15 +80,11 @@
     {
       id: "explicar_dashboard",
       keywords: [
-        "dashboard",
-        "progresso",
-        "desempenho",
-        "acompanhar evolução",
-        "acompanhar evolucao",
-        "meu desempenho"
+        "dashboard", "progresso", "desempenho",
+        "acompanhar evolução", "acompanhar evolucao", "meu desempenho"
       ],
       response:
-        "O Dashboard é a área em que você acompanha seu progresso na Liora.\nEle ajuda a visualizar sua evolução e seu ritmo de estudo.",
+        "O Dashboard é a área em que você acompanha seu progresso na Liora. Ele ajuda a visualizar sua evolução e seu ritmo de estudo.",
       ctas: [
         { label: "Abrir Dashboard", action: "liora:open-dashboard" }
       ]
@@ -121,22 +92,12 @@
     {
       id: "planos",
       keywords: [
-        "premium",
-        "free",
-        "plano",
-        "planos",
-        "diferença",
-        "diferenca",
-        "assinar",
-        "vale a pena",
-        "limite",
-        "limites",
-        "gratuito",
-        "grátis",
-        "gratis"
+        "premium", "free", "plano", "planos", "diferença", "diferenca",
+        "assinar", "vale a pena", "limite", "limites", "gratuito",
+        "grátis", "gratis", "plano gratuito"
       ],
       response:
-        "A principal diferença entre Free e Premium está nos limites de uso e no acesso mais contínuo aos recursos.\nO Free é ótimo para experimentar. O Premium faz mais sentido para uma rotina de estudo consistente.",
+        "A principal diferença entre Free e Premium está nos limites de uso e no acesso mais contínuo aos recursos. O Free é ótimo para experimentar. O Premium faz mais sentido para uma rotina de estudo consistente.",
       ctas: [
         { label: "Ver planos", action: "liora:open-pricing" }
       ]
@@ -144,15 +105,11 @@
     {
       id: "pouco_tempo",
       keywords: [
-        "pouco tempo",
-        "tenho pouco tempo",
-        "20 minutos",
-        "30 minutos",
-        "rápido",
-        "rapido"
+        "pouco tempo", "tenho pouco tempo", "20 minutos",
+        "30 minutos", "rápido", "rapido", "hoje tenho pouco tempo"
       ],
       response:
-        "Se você tem pouco tempo hoje, escolha um único objetivo.\nPode estudar um tema específico, revisar um PDF ou fazer um simulado curto.\nO importante é sair com uma sessão objetiva.",
+        "Se você tem pouco tempo hoje, escolha um único objetivo. Pode estudar um tema específico, revisar um PDF ou fazer um simulado curto. O importante é sair com uma sessão objetiva.",
       ctas: [
         { label: "Estudar por Tema", action: "liora:open-tema" },
         { label: "Revisar PDF", action: "liora:open-pdf" },
@@ -162,17 +119,25 @@
     {
       id: "revisao",
       keywords: [
-        "revisar",
-        "revisão",
-        "revisao",
-        "quero revisar"
+        "revisar", "revisão", "revisao", "quero revisar"
       ],
       response:
-        "Para revisão, o melhor costuma ser usar Simulados ou retomar um PDF que você já estudou.\nSe a revisão for de um ponto específico, você também pode usar Tema.",
+        "Para revisão, o melhor costuma ser usar Simulados ou retomar um PDF que você já estudou. Se a revisão for de um ponto específico, você também pode usar Tema.",
       ctas: [
         { label: "Abrir Simulados", action: "liora:open-simulados" },
         { label: "Abrir PDF", action: "liora:open-pdf" },
         { label: "Abrir Tema", action: "liora:open-tema" }
+      ]
+    },
+    {
+      id: "login",
+      keywords: [
+        "entrar", "login", "acessar", "não consigo entrar", "nao consigo entrar"
+      ],
+      response:
+        "Se você precisa acessar sua conta, posso te levar para o fluxo de login da Liora.",
+      ctas: [
+        { label: "Abrir login", action: "liora:open-login" }
       ]
     },
     {
@@ -190,6 +155,10 @@
   ];
 
   var els = null;
+  var state = {
+    memory: [],
+    openedOnce: false
+  };
 
   function getEls() {
     return {
@@ -201,12 +170,6 @@
       input: document.getElementById("lioraAssistInput"),
       quickActions: document.getElementById("lioraAssistQuickActions")
     };
-  }
-
-  function ready() {
-    els = getEls();
-    if (!els.btn || !els.modal || !els.messages || !els.form || !els.input) return;
-    bindEvents();
   }
 
   function trackAssist(eventName, data) {
@@ -226,35 +189,130 @@
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s]/g, " ")
+      .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function remember(role, text, intentId) {
+    state.memory.push({
+      role: role,
+      text: String(text || ""),
+      intentId: intentId || "",
+      ts: Date.now()
+    });
+
+    if (state.memory.length > MEMORY_LIMIT) {
+      state.memory = state.memory.slice(-MEMORY_LIMIT);
+    }
+  }
+
+  function getLastUserText() {
+    for (var i = state.memory.length - 1; i >= 0; i--) {
+      if (state.memory[i].role === "user") return state.memory[i].text;
+    }
+    return "";
+  }
+
+  function scoreIntent(item, normalized) {
+    if (!item.keywords || !item.keywords.length) return 0;
+
+    var score = 0;
+    var j, keyword, nk;
+
+    for (j = 0; j < item.keywords.length; j++) {
+      keyword = item.keywords[j];
+      nk = normalizeText(keyword);
+
+      if (!nk) continue;
+
+      if (normalized === nk) score += 100;
+      else if (normalized.indexOf(nk) >= 0) score += 20 + nk.length;
+      else {
+        var words = nk.split(" ");
+        var hits = 0;
+        var w;
+
+        for (w = 0; w < words.length; w++) {
+          if (words[w] && normalized.indexOf(words[w]) >= 0) hits++;
+        }
+
+        if (hits > 0) score += hits * 5;
+      }
+    }
+
+    return score;
+  }
+
+  function contextualIntent(normalized) {
+    var last = normalizeText(getLastUserText());
+
+    if (!normalized) return null;
+
+    if (normalized.indexOf("qual usar") >= 0 || normalized.indexOf("qual recurso") >= 0) {
+      return {
+        id: "contextual_escolha",
+        response: "Use Tema para estudar por assunto, PDF quando você já tiver material e Simulados para praticar e revisar.",
+        ctas: [
+          { label: "Abrir Tema", action: "liora:open-tema" },
+          { label: "Abrir PDF", action: "liora:open-pdf" },
+          { label: "Abrir Simulados", action: "liora:open-simulados" }
+        ]
+      };
+    }
+
+    if ((normalized.indexOf("entendi") >= 0 || normalized.indexOf("ok") >= 0 || normalized.indexOf("certo") >= 0) && last) {
+      return {
+        id: "contextual_followup",
+        response: "Perfeito. Quer que eu te leve direto para a próxima etapa?",
+        ctas: inferNextStepFromContext(last)
+      };
+    }
+
+    return null;
+  }
+
+  function inferNextStepFromContext(text) {
+    var t = normalizeText(text);
+
+    if (t.indexOf("pdf") >= 0 || t.indexOf("material") >= 0 || t.indexOf("apostila") >= 0) {
+      return [{ label: "Abrir PDF", action: "liora:open-pdf" }];
+    }
+
+    if (t.indexOf("simulado") >= 0 || t.indexOf("praticar") >= 0 || t.indexOf("revis") >= 0) {
+      return [{ label: "Abrir Simulados", action: "liora:open-simulados" }];
+    }
+
+    if (t.indexOf("tema") >= 0 || t.indexOf("assunto") >= 0 || t.indexOf("começar do zero") >= 0 || t.indexOf("comecar do zero") >= 0) {
+      return [{ label: "Abrir Tema", action: "liora:open-tema" }];
+    }
+
+    return [
+      { label: "Abrir Tema", action: "liora:open-tema" },
+      { label: "Abrir PDF", action: "liora:open-pdf" },
+      { label: "Abrir Simulados", action: "liora:open-simulados" }
+    ];
   }
 
   function findIntent(text) {
     var normalized = normalizeText(text);
-    var bestItem = null;
+    var contextual = contextualIntent(normalized);
+    if (contextual) return contextual;
+
+    var best = null;
     var bestScore = 0;
-    var i, j, item, keyword, score;
+    var i, item, score;
 
     for (i = 0; i < knowledge.length; i++) {
       item = knowledge[i];
-      if (!item.keywords || !item.keywords.length) continue;
-
-      score = 0;
-
-      for (j = 0; j < item.keywords.length; j++) {
-        keyword = normalizeText(item.keywords[j]);
-        if (normalized.indexOf(keyword) >= 0) {
-          score = Math.max(score, keyword.length);
-        }
-      }
-
+      score = scoreIntent(item, normalized);
       if (score > bestScore) {
+        best = item;
         bestScore = score;
-        bestItem = item;
       }
     }
 
-    if (bestItem) return bestItem;
+    if (best) return best;
 
     for (i = 0; i < knowledge.length; i++) {
       if (knowledge[i].id === "fallback") return knowledge[i];
@@ -263,14 +321,20 @@
     return knowledge[0];
   }
 
-  function openAssist() {
+  function openAssist(meta) {
+    meta = meta || {};
+
     if (!els) els = getEls();
     if (!els || !els.modal) return;
 
     els.modal.classList.add("is-open");
     els.modal.setAttribute("aria-hidden", "false");
 
-    trackAssist("liora_assist_open");
+    state.openedOnce = true;
+
+    trackAssist("liora_assist_open", {
+      reason: meta.reason || "manual"
+    });
 
     if (els.messages && els.messages.dataset.booted !== "1") {
       bootAssistant();
@@ -301,8 +365,7 @@
       var actions = document.createElement("div");
       actions.className = "liora-assist-ctas";
 
-      var i;
-      for (i = 0; i < ctas.length; i++) {
+      for (var i = 0; i < ctas.length; i++) {
         appendCTA(actions, ctas[i]);
       }
 
@@ -351,7 +414,8 @@
       "liora:open-pdf": "pdf",
       "liora:open-simulados": "simulados",
       "liora:open-dashboard": "dashboard",
-      "liora:open-pricing": "pricing"
+      "liora:open-pricing": "pricing",
+      "liora:open-login": "login"
     };
 
     var messageMap = {
@@ -360,15 +424,22 @@
       "liora:open-pdf": "Abrindo a área PDF para você.",
       "liora:open-simulados": "Abrindo a área de Simulados para você.",
       "liora:open-dashboard": "Abrindo o Dashboard para você.",
-      "liora:open-pricing": "Abrindo os planos da Liora para você."
+      "liora:open-pricing": "Abrindo os planos da Liora para você.",
+      "liora:open-login": "Abrindo o login da Liora para você."
     };
 
-    var route = routeMap[eventName];
+    addMessage(messageMap[eventName] || "Certo. Te levando para essa área agora.", "bot");
+    remember("bot", messageMap[eventName] || "Navegação", "nav");
 
-    addMessage(
-      messageMap[eventName] || "Certo. Te levando para essa área agora.",
-      "bot"
-    );
+    if (eventName === "liora:open-login") {
+      setTimeout(function () {
+        window.dispatchEvent(new Event("liora:open-login"));
+        closeAssist();
+      }, 150);
+      return;
+    }
+
+    var route = routeMap[eventName];
 
     if (route) {
       setTimeout(function () {
@@ -382,16 +453,21 @@
   }
 
   function handleUserPrompt(prompt) {
-    addMessage(prompt, "user");
+    var clean = String(prompt || "").trim();
+    if (!clean) return;
 
-    var intent = findIntent(prompt);
+    addMessage(clean, "user");
+    remember("user", clean, "");
+
+    var intent = findIntent(clean);
 
     trackAssist("liora_assist_question", {
-      prompt: prompt,
+      prompt: clean,
       intent: intent.id
     });
 
     addMessage(intent.response, "bot", intent.ctas || []);
+    remember("bot", intent.response, intent.id);
   }
 
   function bootAssistant() {
@@ -404,6 +480,8 @@
       "Posso te ajudar a entender como usar a Liora, escolher o melhor recurso para o seu momento e te levar direto para a próxima etapa.",
       "bot"
     );
+
+    remember("bot", "Mensagem inicial", "boot");
   }
 
   function onModalClick(e) {
@@ -441,10 +519,44 @@
     handleUserPrompt(prompt);
   }
 
+  function maybeOpenForGate(reason) {
+    if (autoOpenedByGate) return;
+    autoOpenedByGate = true;
+
+    openAssist({ reason: reason });
+
+    if (reason === "premium") {
+      setTimeout(function () {
+        addMessage(
+          "Você parece ter chegado a um limite do seu plano atual. Posso te mostrar os planos ou te ajudar a escolher outro caminho dentro da Liora.",
+          "bot",
+          [
+            { label: "Ver planos", action: "liora:open-pricing" },
+            { label: "Como começar", prompt: "Como começar" }
+          ]
+        );
+      }, 80);
+    }
+
+    if (reason === "login") {
+      setTimeout(function () {
+        addMessage(
+          "Para continuar, você precisa entrar na sua conta. Posso te levar para o login agora.",
+          "bot",
+          [
+            { label: "Abrir login", action: "liora:open-login" }
+          ]
+        );
+      }, 80);
+    }
+  }
+
   function bindEvents() {
     if (!els) return;
 
-    els.btn.addEventListener("click", openAssist);
+    els.btn.addEventListener("click", function () {
+      openAssist({ reason: "manual" });
+    });
 
     if (els.close) {
       els.close.addEventListener("click", closeAssist);
@@ -458,7 +570,27 @@
       els.quickActions.addEventListener("click", onQuickActionsClick);
     }
 
-    window.addEventListener("liora:open-assistente", openAssist);
+    window.addEventListener("liora:open-assistente", function () {
+      openAssist({ reason: "event" });
+    });
+
+    window.addEventListener("liora:premium-bloqueado", function () {
+      maybeOpenForGate("premium");
+    });
+
+    window.addEventListener("liora:login-required", function () {
+      maybeOpenForGate("login");
+    });
+
+    window.addEventListener("liora:route-changed", function () {
+      autoOpenedByGate = false;
+    });
+  }
+
+  function ready() {
+    els = getEls();
+    if (!els.btn || !els.modal || !els.messages || !els.form || !els.input) return;
+    bindEvents();
   }
 
   if (document.readyState === "loading") {
