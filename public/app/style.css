@@ -2792,3 +2792,231 @@ select.input option:checked {
   border-radius: 14px;
   font-weight: 800;
 }
+/* =========================================================
+🤖 Assistente da Liora — MVP
+Colar no final do CSS global
+========================================================= */
+
+.liora-assist-btn{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1200;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+}
+
+.liora-assist-modal{
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: none;
+}
+
+.liora-assist-modal.is-open{
+  display: block;
+}
+
+.liora-assist-backdrop{
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.48);
+  backdrop-filter: blur(4px);
+}
+
+.liora-assist-panel{
+  position: absolute;
+  right: 18px;
+  bottom: 78px;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(78vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 22px;
+  background: rgba(14,16,26,.98);
+  color: rgba(255,255,255,.94);
+  box-shadow: 0 22px 60px rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+html.light .liora-assist-panel{
+  background: rgba(255,255,255,.98);
+  color: #101828;
+  border: 1px solid rgba(16,24,40,.08);
+}
+
+.liora-assist-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+html.light .liora-assist-header{
+  border-bottom: 1px solid rgba(16,24,40,.08);
+}
+
+.liora-assist-kicker{
+  font-size: .78rem;
+  opacity: .78;
+  margin-bottom: 4px;
+}
+
+.liora-assist-header h3{
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.liora-assist-close{
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: .82;
+}
+
+.liora-assist-body{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 10px;
+  overflow: auto;
+}
+
+.liora-assist-messages{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.liora-msg{
+  max-width: 92%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  line-height: 1.45;
+  font-size: .95rem;
+  white-space: pre-line;
+}
+
+.liora-msg.user{
+  align-self: flex-end;
+  background: rgba(124,58,237,.24);
+}
+
+.liora-msg.bot{
+  align-self: flex-start;
+  background: rgba(255,255,255,.08);
+}
+
+html.light .liora-msg.bot{
+  background: rgba(16,24,40,.06);
+}
+
+.liora-assist-ctas{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.liora-assist-cta{
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255,255,255,.1);
+  color: inherit;
+}
+
+html.light .liora-assist-cta{
+  background: rgba(16,24,40,.08);
+}
+
+.liora-assist-quick-actions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.liora-chip{
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-size: .85rem;
+  cursor: pointer;
+  background: rgba(255,255,255,.08);
+  color: inherit;
+}
+
+html.light .liora-chip{
+  background: rgba(16,24,40,.08);
+}
+
+.liora-assist-footer{
+  padding: 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+html.light .liora-assist-footer{
+  border-top: 1px solid rgba(16,24,40,.08);
+}
+
+.liora-assist-form{
+  display: flex;
+  gap: 8px;
+}
+
+.liora-assist-input{
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: inherit;
+  border-radius: 14px;
+  padding: 12px 14px;
+  outline: none;
+}
+
+html.light .liora-assist-input{
+  border: 1px solid rgba(16,24,40,.12);
+  background: rgba(16,24,40,.04);
+}
+
+.liora-assist-send{
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+}
+
+@media (max-width: 640px){
+  .liora-assist-btn{
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .liora-assist-panel{
+    right: 12px;
+    left: 12px;
+    bottom: 72px;
+    width: auto;
+    max-height: 80vh;
+  }
+}
