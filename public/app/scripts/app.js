@@ -860,6 +860,24 @@ if (authMod?.init) {
   // -----------------------------
   wireLogin(ctx);
 
+  // ==============================
+   // 🟦 Meta Pixel Advanced Matching (email) após login
+   // ==============================
+   (function wireMetaAdvancedMatching() {
+     if (window.__lioraMetaAMWired) return;
+     window.__lioraMetaAMWired = true;
+   
+     window.addEventListener("liora:user-changed", () => {
+       try {
+         const u = JSON.parse(localStorage.getItem("liora:user") || "null");
+         const em = (u?.email || "").trim().toLowerCase();
+         if (em && typeof window.fbq === "function") {
+           window.fbq("set", "userData", { em });
+         }
+       } catch {}
+     });
+   })(); 
+
   // -----------------------------
   // Features
   // -----------------------------
