@@ -118,31 +118,39 @@
         </div>
       </section>
 
+     
       <!-- TEMA -->
       <section id="screen-tema" class="screen">
         <div class="screen-head">
           <button class="btn-link" data-nav="home">← Voltar</button>
           <h3>Plano por Tema</h3>
         </div>
-
+      
         <div class="panel">
           <label class="label">Tema</label>
-          <input id="inp-tema" class="input" placeholder="Ex.: IA Generativa, Direito Constitucional..." />
-
+          <div class="muted small" style="margin:4px 0 10px;">
+            Use esta área para estudar por assunto, item do edital ou tópico do conteúdo programático.
+          </div>
+          <input
+            id="inp-tema"
+            class="input"
+            placeholder="Ex.: Crase, Direito Constitucional, Raciocínio Lógico, item do edital..."
+          />
+      
           <label class="label">Nível</label>
           <select id="sel-nivel" class="input">
             <option value="iniciante">Iniciante</option>
             <option value="intermediario">Intermediário</option>
             <option value="avancado">Avançado</option>
           </select>
-
+      
           <div class="btn-row">
             <button id="btn-gerar-tema" class="btn-primary">Gerar plano</button>
             <button id="btn-limpar-plano" class="btn-secondary">Limpar plano</button>
           </div>
-
+      
           <div id="tema-status" class="muted small"></div>
-
+      
           <div id="tema-progress" class="progress-wrap hidden">
             <div class="progress-top">
               <span class="muted small">Progresso</span>
@@ -153,32 +161,34 @@
             </div>
           </div>
         </div>
-
+      
         <div id="tema-result" class="two-cols hidden">
           <aside class="aside">
             <div class="aside-title">Sessões</div>
             <div id="lista-sessoes" class="list"></div>
           </aside>
-
+      
           <section class="content">
             <div id="sessao-view" class="sessao"></div>
           </section>
         </div>
       </section>
-
-      <!-- PDF -->
+    
+     <!-- PDF -->
       <section id="screen-pdf" class="screen">
         <div class="screen-head">
           <button class="btn-link" data-nav="home">← Voltar</button>
           <h3>Plano por PDF</h3>
         </div>
-
+      
         <div class="panel">
           <label class="label">Arquivo PDF</label>
-            <div class="muted small" style="margin:4px 0 10px;">
-              Use esta área para apostilas, resumos e materiais de estudo. Para estudar pelo edital ou pelo conteúdo programático, use <b>Tema</b> e avance tópico por tópico.
-            </div>
-            <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
+          <div class="muted small" style="margin:4px 0 10px;">
+            Use esta área para apostilas, resumos e materiais de estudo.
+            Para estudar pelo edital ou pelo conteúdo programático, use <b>Tema</b> e avance tópico por tópico.
+          </div>
+          <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
+      
           <div class="grid-2">
             <div>
               <label class="label">Nível</label>
@@ -188,7 +198,7 @@
                 <option value="avancado">Avançado</option>
               </select>
             </div>
-
+      
             <div>
               <label class="label">Finalidade</label>
               <select id="sel-finalidade-pdf" class="input">
@@ -201,14 +211,14 @@
               </select>
             </div>
           </div>
-
+      
           <div class="btn-row">
             <button id="btn-gerar-pdf" class="btn-primary">Gerar plano</button>
             <button id="btn-limpar-pdf" class="btn-secondary">Limpar plano</button>
           </div>
-
+      
           <div id="pdf-status" class="muted small" style="margin-top:10px;"></div>
-
+      
           <div id="pdf-progress" class="progress-wrap hidden">
             <div class="progress-top">
               <span class="muted small">Progresso</span>
@@ -219,13 +229,13 @@
             </div>
           </div>
         </div>
-
+      
         <div id="pdf-result" class="two-cols hidden">
           <aside class="aside">
             <div class="aside-title">Sessões</div>
             <div id="pdf-lista-sessoes" class="list"></div>
           </aside>
-
+      
           <section class="content">
             <div id="pdf-viewer-wrap" class="pdf-viewer-wrap hidden">
               <div class="pdf-viewer-head">
@@ -234,15 +244,14 @@
                   <button id="btn-pdf-close" class="btn-secondary">Fechar PDF</button>
                 </div>
               </div>
-
+      
               <iframe id="pdf-iframe" class="pdf-iframe" src="" loading="lazy"></iframe>
             </div>
-
+      
             <div id="pdf-sessao-view" class="sessao"></div>
           </section>
         </div>
       </section>
-
       <!-- SIMULADOS -->
       <section id="screen-simulados" class="screen">
         <div class="screen-head">
