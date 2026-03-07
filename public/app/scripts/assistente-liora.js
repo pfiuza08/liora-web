@@ -1,7 +1,10 @@
 // assistente-liora.js
 // =========================================================
-// 🤖 Assistente da Liora — V3
+// 🤖 Assistente da Liora — V3 consolidada
 // Memória curta + matching melhor + analytics local
+// Regra de uso:
+// - PDF = apostilas, resumos, materiais prontos
+// - Tema = edital, conteúdo programático, tópicos, assuntos
 // =========================================================
 
 (function () {
@@ -19,7 +22,7 @@
         "nao sei por onde comecar"
       ],
       response:
-        "Se você já tem material, comece por PDF. Se quer estudar por assunto, comece por Tema. Se quer testar o que já sabe, use Simulados.",
+        "Se você já tem material de estudo pronto, como apostila ou resumo, comece por PDF. Se quer estudar por assunto ou seguir os tópicos de um edital ou conteúdo programático, comece por Tema. Se quer testar o que já sabe, use Simulados.",
       ctas: [
         { label: "Abrir PDF", action: "liora:open-pdf" },
         { label: "Abrir Tema", action: "liora:open-tema" },
@@ -47,9 +50,10 @@
         "estudar pdf", "usar pdf"
       ],
       response:
-        "A função PDF é ideal para quem já tem material de estudo. Você envia o arquivo e usa a Liora para estudar de forma mais guiada a partir dele.",
+        "A função PDF é ideal para quem já tem material de estudo pronto, como apostilas, resumos e materiais de aula. Se a sua ideia for estudar pelo edital ou pelo conteúdo programático, hoje o melhor caminho é usar Tema e trabalhar tópico por tópico.",
       ctas: [
-        { label: "Abrir PDF", action: "liora:open-pdf" }
+        { label: "Abrir PDF", action: "liora:open-pdf" },
+        { label: "Estudar por Tema", action: "liora:open-tema" }
       ]
     },
     {
@@ -60,7 +64,7 @@
         "quero comecar do zero", "não tenho material", "nao tenho material"
       ],
       response:
-        "A função Tema é melhor quando você quer estudar um assunto específico. É uma boa opção para começar do zero, revisar um tópico ou focar em um ponto que precisa reforçar.",
+        "A função Tema é melhor quando você quer estudar um assunto específico. Também é o melhor caminho para seguir os tópicos de um edital ou conteúdo programático, estudando um item por vez.",
       ctas: [
         { label: "Abrir Tema", action: "liora:open-tema" }
       ]
@@ -142,6 +146,89 @@
       ]
     },
     {
+      id: "edital_conteudo_programatico",
+      keywords: [
+        "edital",
+        "edital do concurso",
+        "upload do edital",
+        "subir edital",
+        "enviar edital",
+        "pdf do edital",
+        "posso mandar o edital",
+        "posso enviar o edital",
+        "quero mandar o edital",
+        "quero enviar o edital",
+        "conteúdo programático",
+        "conteudo programatico",
+        "programa do concurso",
+        "programático",
+        "programatico",
+        "posso mandar o conteúdo programático",
+        "posso mandar o conteudo programatico",
+        "posso enviar o conteúdo programático",
+        "posso enviar o conteudo programatico"
+      ],
+      response:
+        "Hoje, o melhor caminho para estudar pelo edital ou pelo conteúdo programático na Liora é usar Tema. O ideal é pegar os itens ou tópicos e estudar um por vez. A área PDF funciona melhor para apostilas, resumos e materiais de estudo prontos.",
+      ctas: [
+        { label: "Abrir Tema", action: "liora:open-tema" },
+        { label: "Como começar por tópicos", prompt: "Como começar por tópicos" }
+      ]
+    },
+    {
+      id: "como_estudar_por_topicos",
+      keywords: [
+        "como estudar por edital",
+        "estudar por edital",
+        "quero estudar por edital",
+        "tenho um edital",
+        "tenho o edital",
+        "estudar edital",
+        "como estudar pelo conteúdo programático",
+        "como estudar pelo conteudo programatico",
+        "como estudar por conteúdo programático",
+        "como estudar por conteudo programatico",
+        "quero estudar pelo conteúdo programático",
+        "quero estudar pelo conteudo programatico",
+        "tenho o conteúdo programático",
+        "tenho o conteudo programatico",
+        "como estudar por tópicos",
+        "como estudar por topicos",
+        "estudar por tópicos",
+        "estudar por topicos"
+      ],
+      response:
+        "Se você quer estudar pelo edital ou pelo conteúdo programático, o melhor caminho hoje é usar Tema. Pegue os tópicos e estude um por vez. A função PDF é mais indicada para materiais de estudo prontos, como apostilas e resumos.",
+      ctas: [
+        { label: "Abrir Tema", action: "liora:open-tema" }
+      ]
+    },
+    {
+      id: "como_comecar_por_topicos",
+      keywords: [
+        "como começar por edital",
+        "como comecar por edital",
+        "começar por edital",
+        "comecar por edital",
+        "item do edital",
+        "tópico do edital",
+        "topico do edital",
+        "conteúdo programático",
+        "conteudo programatico",
+        "item do conteúdo programático",
+        "item do conteudo programatico",
+        "tópico do conteúdo programático",
+        "topico do conteudo programatico",
+        "como começar por tópicos",
+        "como comecar por topicos"
+      ],
+      response:
+        "Para estudar pelo edital ou pelo conteúdo programático, escolha um tópico por vez e gere seu estudo em Tema. Em vez de enviar tudo de uma vez, selecione um item como Português, Direito Constitucional ou Raciocínio Lógico e comece por ele.",
+      ctas: [
+        { label: "Abrir Tema", action: "liora:open-tema" }
+      ]
+    },
+    {
       id: "fallback",
       keywords: [],
       response:
@@ -149,8 +236,8 @@
       ctas: [
         { label: "Como começar", prompt: "Como começar" },
         { label: "Como usar PDF", prompt: "Como usar PDF" },
-        { label: "Ver planos", action: "liora:open-pricing" },
-        { label: "Abrir Simulados", action: "liora:open-simulados" }
+        { label: "Como estudar por tópicos", prompt: "Como estudar por tópicos" },
+        { label: "Ver planos", action: "liora:open-pricing" }
       ]
     }
   ];
@@ -315,15 +402,34 @@
   function inferNextStepFromContext(text) {
     var t = normalizeText(text);
 
-    if (t.indexOf("pdf") >= 0 || t.indexOf("material") >= 0 || t.indexOf("apostila") >= 0) {
+    if (
+      t.indexOf("pdf") >= 0 ||
+      t.indexOf("material") >= 0 ||
+      t.indexOf("apostila") >= 0 ||
+      t.indexOf("resumo") >= 0
+    ) {
       return [{ label: "Abrir PDF", action: "liora:open-pdf" }];
     }
 
-    if (t.indexOf("simulado") >= 0 || t.indexOf("praticar") >= 0 || t.indexOf("revis") >= 0) {
+    if (
+      t.indexOf("simulado") >= 0 ||
+      t.indexOf("praticar") >= 0 ||
+      t.indexOf("revis") >= 0
+    ) {
       return [{ label: "Abrir Simulados", action: "liora:open-simulados" }];
     }
 
-    if (t.indexOf("tema") >= 0 || t.indexOf("assunto") >= 0 || t.indexOf("começar do zero") >= 0 || t.indexOf("comecar do zero") >= 0) {
+    if (
+      t.indexOf("tema") >= 0 ||
+      t.indexOf("assunto") >= 0 ||
+      t.indexOf("edital") >= 0 ||
+      t.indexOf("conteudo programatico") >= 0 ||
+      t.indexOf("conteúdo programático") >= 0 ||
+      t.indexOf("topico") >= 0 ||
+      t.indexOf("tópico") >= 0 ||
+      t.indexOf("começar do zero") >= 0 ||
+      t.indexOf("comecar do zero") >= 0
+    ) {
       return [{ label: "Abrir Tema", action: "liora:open-tema" }];
     }
 
@@ -339,10 +445,13 @@
 
     if (!normalized) return null;
 
-    if (normalized.indexOf("qual usar") >= 0 || normalized.indexOf("qual recurso") >= 0) {
+    if (
+      normalized.indexOf("qual usar") >= 0 ||
+      normalized.indexOf("qual recurso") >= 0
+    ) {
       return {
         id: "contextual_escolha",
-        response: "Use Tema para estudar por assunto, PDF quando você já tiver material e Simulados para praticar e revisar.",
+        response: "Use Tema para estudar por assunto, edital, conteúdo programático e tópicos específicos. Use PDF quando você já tiver material pronto, como apostilas e resumos. Use Simulados para praticar e revisar.",
         ctas: [
           { label: "Abrir Tema", action: "liora:open-tema" },
           { label: "Abrir PDF", action: "liora:open-pdf" },
@@ -351,7 +460,12 @@
       };
     }
 
-    if ((normalized.indexOf("entendi") >= 0 || normalized.indexOf("ok") >= 0 || normalized.indexOf("certo") >= 0) && last) {
+    if (
+      (normalized.indexOf("entendi") >= 0 ||
+        normalized.indexOf("ok") >= 0 ||
+        normalized.indexOf("certo") >= 0) &&
+      last
+    ) {
       return {
         id: "contextual_followup",
         response: "Perfeito. Quer que eu te leve direto para a próxima etapa?",
@@ -668,6 +782,20 @@
     });
   }
 
+  function sortObjectDesc(obj) {
+    obj = obj && typeof obj === "object" ? obj : {};
+    var arr = [];
+    for (var k in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, k)) {
+        arr.push({ key: k, count: Number(obj[k] || 0) });
+      }
+    }
+    arr.sort(function (a, b) {
+      return b.count - a.count;
+    });
+    return arr;
+  }
+
   function exposeDebugHelpers() {
     window.lioraAssistAnalytics = {
       read: function () {
@@ -690,20 +818,6 @@
         return sortObjectDesc(readAnalytics().routes);
       }
     };
-  }
-
-  function sortObjectDesc(obj) {
-    obj = obj && typeof obj === "object" ? obj : {};
-    var arr = [];
-    for (var k in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, k)) {
-        arr.push({ key: k, count: Number(obj[k] || 0) });
-      }
-    }
-    arr.sort(function (a, b) {
-      return b.count - a.count;
-    });
-    return arr;
   }
 
   function ready() {
