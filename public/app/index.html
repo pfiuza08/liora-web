@@ -19,7 +19,7 @@
   <!-- CSS do app (fix: path absoluto para /app) -->
   <link rel="stylesheet" href="/app/style.css?v=2" />
 
-<!-- Meta Pixel Code -->
+<!-- Meta Pixel Code (LioraWeb) + Advanced Matching (email do login) -->
 <script>
   !function(f,b,e,v,n,t,s)
   {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -36,7 +36,22 @@
   s.parentNode.insertBefore(t,s)}(window, document,'script',
   'https://connect.facebook.net/en_US/fbevents.js');
 
-  fbq('init', '1216858680616772');
+  const PIXEL_ID = '1216858680616772';
+
+  function getEmailForMatching(){
+    try {
+      const u = JSON.parse(localStorage.getItem('liora:user') || 'null');
+      const em = (u?.email || '').trim().toLowerCase();
+      return em || null;
+    } catch {
+      return null;
+    }
+  }
+
+  const em = getEmailForMatching();
+
+  // init com advanced matching quando houver e-mail
+  fbq('init', PIXEL_ID, em ? { em } : {});
   fbq('track', 'PageView');
 </script>
 <noscript>
@@ -44,7 +59,6 @@
        src="https://www.facebook.com/tr?id=1216858680616772&ev=PageView&noscript=1"/>
 </noscript>
 <!-- End Meta Pixel Code -->
-
 </head>
 
 <body>
