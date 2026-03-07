@@ -860,17 +860,28 @@ if (authMod?.init) {
   // -----------------------------
   wireLogin(ctx);
 
-   // ==============================
+ // ==============================
    // 🟦 Meta Pixel Advanced Matching (email) após login
-   // - dispara só quando o e-mail mudar (evita spam)
-   // - força pixel_id correto no 'set' (evita warning do Meta)
+   // - dispara só quando o e-mail mudar
+   // - espera o pixel estar carregado (evita warning/bagunça de fila)
    // ==============================
    (function wireMetaAdvancedMatching() {
      if (window.__lioraMetaAMWired) return;
      window.__lioraMetaAMWired = true;
    
-     const PIXEL_ID = "1216858680616772";
      window.__lioraMetaLastEm = window.__lioraMetaLastEm || "";
+   
+     function setUserDataWhenReady(em, tries = 0) {
+       try {
+         if (typeof window.fbq !== "function") return;
+         // fbq.loaded é setado pelo snippet do pixel quando o script terminou de carregar
+         if (!window.fbq.loaded) {
+           if (tries < 20) return setTimeout(() => setUserDataWhenReady(em, tries + 1), 150);
+           return;
+         }
+         window.fbq("set", "userData", { em });
+       } catch {}
+     }
    
      window.addEventListener("liora:user-changed", () => {
        try {
@@ -878,13 +889,10 @@ if (authMod?.init) {
          const em = (u?.email || "").trim().toLowerCase();
          if (!em) return;
    
-         // ✅ não repete se já setou este e-mail
          if (em === window.__lioraMetaLastEm) return;
          window.__lioraMetaLastEm = em;
    
-         if (typeof window.fbq === "function") {
-          fbq("set", "userData", { em });
-         }
+         setUserDataWhenReady(em);
        } catch {}
      });
    })();
