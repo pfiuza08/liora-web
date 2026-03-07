@@ -883,8 +883,7 @@ if (authMod?.init) {
          window.__lioraMetaLastEm = em;
    
          if (typeof window.fbq === "function") {
-           // ✅ força o pixel_id correto (sem aspas extras)
-           window.fbq("set", "userData", { em }, PIXEL_ID);
+          fbq("set", "userData", { em });
          }
        } catch {}
      });
