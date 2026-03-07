@@ -860,26 +860,32 @@ if (authMod?.init) {
   // -----------------------------
   wireLogin(ctx);
 
-     // ==============================
-   // 🟦 Meta Pixel Advanced Matching (email) após login
-   // ==============================
-     (function wireMetaAdvancedMatching() {
-     if (window.__lioraMetaAMWired) return;
-     window.__lioraMetaAMWired = true;
-   
-     window.addEventListener("liora:user-changed", () => {
-       try {
-         const u = JSON.parse(localStorage.getItem("liora:user") || "null");
-         const em = (u?.email || "").trim().toLowerCase();
-         if (!em) return;
-   
-         if (typeof window.fbq === "function") {
-           // ✅ sem pixel_id (evita erro de aspas extras)
-           window.fbq("set", "userData", { em });
-         }
-       } catch {}
-     });
-   })();
+// ==============================
+// 🟦 Meta Pixel Advanced Matching (email) após login
+// - dispara só quando o e-mail mudar (evita spam)
+// ==============================
+(function wireMetaAdvancedMatching() {
+  if (window.__lioraMetaAMWired) return;
+  window.__lioraMetaAMWired = true;
+
+  window.__lioraMetaLastEm = window.__lioraMetaLastEm || "";
+
+  window.addEventListener("liora:user-changed", () => {
+    try {
+      const u = JSON.parse(localStorage.getItem("liora:user") || "null");
+      const em = (u?.email || "").trim().toLowerCase();
+      if (!em) return;
+
+      // ✅ não repete se já setou este e-mail
+      if (em === window.__lioraMetaLastEm) return;
+      window.__lioraMetaLastEm = em;
+
+      if (typeof window.fbq === "function") {
+        window.fbq("set", "userData", { em });
+      }
+    } catch {}
+  });
+})();
 
   // -----------------------------
   // Features
