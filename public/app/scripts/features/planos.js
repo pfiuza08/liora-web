@@ -37,7 +37,7 @@ export const planos = {
       if (window.gatesUX?.explainAndRoute) {
         this._gatesUX = window.gatesUX;
       } else {
-        const mod = await import("../core/gates-ux.js"); // ajuste o path se necessário
+        const mod = await import("../core/gates-ux.js");
         this._gatesUX = mod?.gatesUX || null;
         if (this._gatesUX) {
           try {
@@ -62,7 +62,7 @@ export const planos = {
     }
 
     try {
-      const mod = await import("../core/gates-ux.js"); // ajuste o path se necessário
+      const mod = await import("../core/gates-ux.js");
       this._gatesUX = mod?.gatesUX || null;
       if (this._gatesUX) {
         try {
@@ -161,20 +161,13 @@ export const planos = {
       });
 
       const text = await res.text();
-      let data = null;
-
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        console.error("Resposta não-JSON:", text);
-        throw new Error("Servidor retornou resposta inválida (não JSON).");
-      }
+      const dataBruta = this._parseJsonResponse(text, "resposta de gerarPlano");
 
       if (!res.ok) {
-        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+        throw new Error(dataBruta?.message || dataBruta?.error || `HTTP ${res.status}`);
       }
 
-      if (!data?.sessoes?.length) {
+      if (!dataBruta?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
       }
 
@@ -185,7 +178,7 @@ export const planos = {
       // etapa 2: normaliza + salva
       this._progressSet(92, "Organizando sessões…");
 
-      data = this._normalizePlano(data, { tema, nivel });
+      const data = this._normalizePlano(dataBruta, { tema, nivel });
 
       store.set("planoTema", data);
 
@@ -803,14 +796,7 @@ export const planos = {
       });
 
       const text = await res.text();
-      let data = null;
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        console.error("Aprofundar não-JSON:", text);
-        throw new Error("Resposta inválida do servidor (não JSON).");
-      }
+      const data = this._parseJsonResponse(text, "resposta de aprofundar");
 
       if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
       if (!data?.topico || !data?.explicacaoLonga) {
@@ -966,6 +952,56 @@ export const planos = {
   // -----------------------------
   // Helpers
   // -----------------------------
+  _parseJsonResponse(text, label = "resposta") {
+    if (typeof text !== "string" || !text.trim()) {
+      throw new Error(`Servidor retornou ${label} vazia.`);
+    }
+
+    let raw = text.trim();
+
+    // remove cercas markdown do tipo ```json ... ```
+    raw = raw
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    // tenta parse direto primeiro
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      // segue para extração defensiva
+    }
+
+    // tenta extrair apenas o trecho entre o primeiro { e o último }
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+
+    if (start === -1 || end === -1 || end <= start) {
+      console.error(`❌ ${label} sem objeto JSON detectável:`, raw);
+      throw new Error(`Servidor retornou ${label} inválida.`);
+    }
+
+    const candidate = raw.slice(start, end + 1);
+
+    try {
+      return JSON.parse(candidate);
+    } catch (err) {
+      const posMatch = String(err?.message || "").match(/position (\d+)/i);
+      const pos = posMatch ? Number(posMatch[1]) : -1;
+      const around =
+        pos >= 0
+          ? candidate.slice(Math.max(0, pos - 250), pos + 250)
+          : candidate.slice(0, 500);
+
+      console.error(`❌ Falha ao interpretar JSON da ${label}:`, err);
+      console.error("📍 Trecho próximo do erro:", around);
+      console.error("🧾 Resposta bruta completa:", raw);
+
+      throw new Error(`Servidor retornou ${label} inválida.`);
+    }
+  },
+
   _normalizePlano(data, fallback) {
     const meta = data?.meta || {};
     const tema = meta?.tema || fallback?.tema || "Tema";
