@@ -164,8 +164,29 @@ export const planos = {
       const dataBruta = this._parseJsonResponse(text, "resposta de gerarPlano");
 
       if (!res.ok) {
-        throw new Error(dataBruta?.message || dataBruta?.error || `HTTP ${res.status}`);
-      }
+  console.error("❌ gerarPlano falhou:", {
+    statusHttpFront: res.status,
+    payload: dataBruta
+  });
+
+  const detalhe =
+    dataBruta?.raw ||
+    dataBruta?.detail ||
+    dataBruta?.error ||
+    "";
+
+  throw new Error(
+    [
+      dataBruta?.message || `HTTP ${res.status}`,
+      dataBruta?.status ? `(OpenAI: ${dataBruta.status})` : "",
+      dataBruta?.requestId ? `[requestId: ${dataBruta.requestId}]` : "",
+      dataBruta?.clientRequestId ? `[clientRequestId: ${dataBruta.clientRequestId}]` : "",
+      detalhe ? `→ ${String(detalhe).slice(0, 800)}` : ""
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
 
       if (!dataBruta?.sessoes?.length) {
         throw new Error("Resposta inválida: sem sessões.");
@@ -208,7 +229,7 @@ export const planos = {
     } catch (e) {
       if (stopSim) stopSim();
 
-      console.error(e);
+      console.error("❌ Erro final gerarTema:", e);
       ui.error(e?.message || "Falha ao gerar plano por tema.");
       if (status) status.textContent = "";
       this._progressHide();
