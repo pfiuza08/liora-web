@@ -62,14 +62,20 @@ Regras de qualidade:
   - 1 do tipo "curta"
 
 Regras do checkpoint:
-- Para "mcq":
+- Cada item de checkpoint deve sempre incluir os campos:
+  tipo, pergunta, opcoes, correta, explicacao e gabarito.
+- Para itens do tipo "mcq":
   - pergunta objetiva
-  - 4 opções
+  - opcoes com exatamente 4 alternativas
   - correta entre 0 e 3
   - explicacao curta
-- Para "curta":
+  - gabarito pode ser string vazia
+- Para itens do tipo "curta":
   - pergunta objetiva
   - gabarito direto com justificativa breve
+  - opcoes deve ser []
+  - correta deve ser 0
+  - explicacao pode ser string vazia
 
 Regras do conteúdo:
 - introducao: 4 a 6 frases, incluindo o que é, por que importa, onde aparece e como estudar
@@ -81,7 +87,7 @@ Regras do conteúdo:
 
     const user = `TEMA: ${tema}\nNÍVEL: ${nivelFinal}\nGere o plano completo.`;
 
-  const schema = {
+    const schema = {
       type: "object",
       additionalProperties: false,
       properties: {
@@ -147,7 +153,7 @@ Regras do conteúdo:
                     explicacao: { type: "string" },
                     gabarito: { type: "string" }
                   },
-                  required: ["tipo", "pergunta"]
+                  required: ["tipo", "pergunta", "opcoes", "correta", "explicacao", "gabarito"]
                 }
               },
               conteudo: {
@@ -191,7 +197,7 @@ Regras do conteúdo:
       },
       required: ["meta", "sessoes"]
     };
-    
+
     const openaiPayload = {
       model: "gpt-4.1-mini",
       input: [
