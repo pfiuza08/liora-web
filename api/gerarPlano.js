@@ -81,121 +81,117 @@ Regras do conteúdo:
 
     const user = `TEMA: ${tema}\nNÍVEL: ${nivelFinal}\nGere o plano completo.`;
 
-    const schema = {
-      name: "liora_plano_tema",
-      strict: true,
-      schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          meta: {
+  const schema = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        meta: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            tema: { type: "string" },
+            nivel: {
+              type: "string",
+              enum: ["iniciante", "intermediario", "avancado"]
+            }
+          },
+          required: ["tema", "nivel"]
+        },
+        sessoes: {
+          type: "array",
+          minItems: 6,
+          maxItems: 10,
+          items: {
             type: "object",
             additionalProperties: false,
             properties: {
-              tema: { type: "string" },
-              nivel: {
-                type: "string",
-                enum: ["iniciante", "intermediario", "avancado"]
-              }
-            },
-            required: ["tema", "nivel"]
-          },
-          sessoes: {
-            type: "array",
-            minItems: 6,
-            maxItems: 10,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                id: { type: "string" },
-                titulo: { type: "string" },
-                objetivo: { type: "string" },
-                tempoEstimadoMin: { type: "integer" },
-                checklist: {
-                  type: "array",
-                  items: { type: "string" }
-                },
-                errosComuns: {
-                  type: "array",
-                  items: { type: "string" }
-                },
-                flashcards: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                      frente: { type: "string" },
-                      verso: { type: "string" }
-                    },
-                    required: ["frente", "verso"]
-                  }
-                },
-                checkpoint: {
-                  type: "array",
-                  minItems: 3,
-                  maxItems: 3,
-                  items: {
-                    type: "object",
-                    additionalProperties: false,
-                    properties: {
-                      tipo: { type: "string" },
-                      pergunta: { type: "string" },
-                      opcoes: {
-                        type: "array",
-                        items: { type: "string" }
-                      },
-                      correta: { type: "integer" },
-                      explicacao: { type: "string" },
-                      gabarito: { type: "string" }
-                    },
-                    required: ["tipo", "pergunta"]
-                  }
-                },
-                conteudo: {
+              id: { type: "string" },
+              titulo: { type: "string" },
+              objetivo: { type: "string" },
+              tempoEstimadoMin: { type: "integer" },
+              checklist: {
+                type: "array",
+                items: { type: "string" }
+              },
+              errosComuns: {
+                type: "array",
+                items: { type: "string" }
+              },
+              flashcards: {
+                type: "array",
+                items: {
                   type: "object",
                   additionalProperties: false,
                   properties: {
-                    introducao: { type: "string" },
-                    conceitos: {
-                      type: "array",
-                      items: { type: "string" }
-                    },
-                    exemplos: {
-                      type: "array",
-                      items: { type: "string" }
-                    },
-                    aplicacoes: {
-                      type: "array",
-                      items: { type: "string" }
-                    },
-                    resumoRapido: {
-                      type: "array",
-                      items: { type: "string" }
-                    }
+                    frente: { type: "string" },
+                    verso: { type: "string" }
                   },
-                  required: ["introducao", "conceitos", "exemplos", "aplicacoes", "resumoRapido"]
+                  required: ["frente", "verso"]
                 }
               },
-              required: [
-                "id",
-                "titulo",
-                "objetivo",
-                "tempoEstimadoMin",
-                "checklist",
-                "errosComuns",
-                "flashcards",
-                "checkpoint",
-                "conteudo"
-              ]
-            }
+              checkpoint: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    tipo: { type: "string" },
+                    pergunta: { type: "string" },
+                    opcoes: {
+                      type: "array",
+                      items: { type: "string" }
+                    },
+                    correta: { type: "integer" },
+                    explicacao: { type: "string" },
+                    gabarito: { type: "string" }
+                  },
+                  required: ["tipo", "pergunta"]
+                }
+              },
+              conteudo: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  introducao: { type: "string" },
+                  conceitos: {
+                    type: "array",
+                    items: { type: "string" }
+                  },
+                  exemplos: {
+                    type: "array",
+                    items: { type: "string" }
+                  },
+                  aplicacoes: {
+                    type: "array",
+                    items: { type: "string" }
+                  },
+                  resumoRapido: {
+                    type: "array",
+                    items: { type: "string" }
+                  }
+                },
+                required: ["introducao", "conceitos", "exemplos", "aplicacoes", "resumoRapido"]
+              }
+            },
+            required: [
+              "id",
+              "titulo",
+              "objetivo",
+              "tempoEstimadoMin",
+              "checklist",
+              "errosComuns",
+              "flashcards",
+              "checkpoint",
+              "conteudo"
+            ]
           }
-        },
-        required: ["meta", "sessoes"]
-      }
+        }
+      },
+      required: ["meta", "sessoes"]
     };
-
+    
     const openaiPayload = {
       model: "gpt-4.1-mini",
       input: [
@@ -206,7 +202,9 @@ Regras do conteúdo:
       text: {
         format: {
           type: "json_schema",
-          json_schema: schema
+          name: "liora_plano_tema",
+          schema,
+          strict: true
         }
       }
     };
