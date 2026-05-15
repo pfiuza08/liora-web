@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Liora — Estudo guiado por IA</title>
-  <meta name="description" content="Transforme um tema em plano, pratique com simulados e acompanhe evolução no dashboard. Liora: estudo guiado por IA." />
+  <meta name="description" content="Teste grátis a Liora, sem cartão. Transforme um tema em plano, pratique com simulados e acompanhe evolução no dashboard." />
   <meta name="theme-color" content="#0b0b0d" />
 
   <link rel="icon" href="/favicon.ico" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="Liora — Estudo guiado por IA" />
-  <meta property="og:description" content="Plano + Simulados + Dashboard. Estude com direção e consistência." />
+  <meta property="og:description" content="Teste grátis, sem cartão. Plano + Simulados + Dashboard para estudar com direção." />
   <meta property="og:type" content="website" />
 
   <!-- Fonte -->
@@ -145,6 +145,42 @@
     .btnSmall{
       padding:10px 12px;
       font-size:13px;
+    }
+    .btnHero{
+      min-width:240px;
+      min-height:48px;
+      font-size:15px;
+    }
+    .freeNotice{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      max-width:760px;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid rgba(196,75,4,.35);
+      background: rgba(196,75,4,.13);
+      color: rgba(255,255,255,.92);
+      font-size:14px;
+      line-height:1.45;
+      margin-top:2px;
+    }
+    .freeNotice strong{color:#fff}
+    .freeBadge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:34px;
+      height:24px;
+      padding:0 8px;
+      border-radius:999px;
+      background: linear-gradient(135deg, #c44b04, #ff6a1a);
+      color:#0b0b0d;
+      font-size:11px;
+      font-weight:950;
+      letter-spacing:.04em;
+      flex:0 0 auto;
+      margin-top:1px;
     }
 
     .tiny{font-size:12px; color:var(--muted)}
@@ -330,22 +366,32 @@
         te coloca para praticar com <strong>simulados</strong> e mostra sua evolução no <strong>dashboard</strong>.
       </p>
 
-      <div class="ctaRow" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:4px;">
-        <a href="/app#login" class="btn btnSecondary" style="min-width:220px; text-align:center;">
+      <div class="freeNotice" role="note" aria-label="Teste grátis da Liora">
+        <span class="freeBadge">FREE</span>
+        <div>
+          <strong>Teste grátis, sem cartão.</strong> Você pode experimentar o ciclo da Liora — gerar um plano, praticar com simulado e acompanhar o desempenho — com limites diários.
+        </div>
+      </div>
+
+      <div class="ctaRow" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+        <a class="btn btnPrimary btnHero" id="btnTestar" href="/app#home" data-ev="cta_testar_gratis">
+          Teste grátis
+        </a>
+
+        <a href="/app#login" class="btn btnSecondary btnHero" data-ev="cta_entrar">
           Entrar
         </a>
 
         <a
           href="https://pay.hotmart.com/I104401854N"
-          class="btn btnPrimary js-meta-checkout"
-          style="min-width:220px; text-align:center;"
+          class="btn btnSecondary btnHero js-meta-checkout"
           target="_blank"
           rel="noopener noreferrer"
           data-offer="monthly"
           data-checkout-name="Liora Mensal"
           data-checkout-url="https://pay.hotmart.com/I104401854N"
         >
-          Assinar agora
+          Assinar Premium
         </a>
       </div>
 
@@ -354,15 +400,11 @@
       </div>
 
       <div class="ctaRow" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; opacity:.95;">
-        <a class="btn btnSmall" id="btnTestar" href="/app#home" data-ev="cta_testar">
-          Testar agora
-        </a>
-
         <a class="btn btnSmall" href="/app#pricing" data-ev="cta_planos">
           Ver planos
         </a>
 
-        <span class="tiny">Free sem cartão (limitado). Premium: 7 dias grátis no cartão • cancele antes.</span>
+        <span class="tiny">Plano Free: sem cartão e com limites diários. Premium: mais volume e recursos.</span>
       </div>
 
       <div class="pillRow">
@@ -431,14 +473,14 @@
         <div class="price">
           <div class="tag">Free</div>
           <div class="big">R$ 0</div>
-          <p class="sub">Para testar o ciclo completo e sentir o fluxo da Liora.</p>
+          <p class="sub"><strong>Teste grátis, sem cartão.</strong> Para experimentar o ciclo completo da Liora antes de assinar.</p>
           <ul class="list">
             <li class="li"><span class="check"></span><div>Plano por tema (limitado)</div></li>
             <li class="li"><span class="check"></span><div>Simulados (limite diário)</div></li>
             <li class="li"><span class="check"></span><div>Dashboard básico</div></li>
           </ul>
           <div class="ctaRow" style="margin-top:12px;">
-            <a class="btn" href="/app#home" data-ev="pricing_testar">Testar agora</a>
+            <a class="btn btnPrimary" href="/app#home" data-ev="pricing_testar_gratis">Teste grátis</a>
           </div>
         </div>
 
@@ -470,10 +512,10 @@
             Sim. O ciclo é universal: plano por tema + prática + revisão por métricas.
           </div>
         </details>
-        <details>
-          <summary>Preciso de cartão para testar?</summary>
+        <details open>
+          <summary>O teste grátis precisa de cartão?</summary>
           <div class="sub" style="margin-top:8px;">
-            Não. O gratuito é para você experimentar o fluxo completo antes de assinar.
+            Não. O teste grátis é pelo plano Free, com limites diários, para você experimentar o fluxo completo antes de assinar.
           </div>
         </details>
         <details>
