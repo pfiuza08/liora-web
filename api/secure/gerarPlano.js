@@ -3,7 +3,7 @@ const {
   requireAuth,
   consumeDailyUsage,
   sendUsageLimit
-} = require("../_lib/requireAuth");
+} = require("../../lib/requireAuth");
 
 module.exports = async function secureGerarPlano(req, res) {
   const context = await requireAuth(req, res);
