@@ -1,9 +1,9 @@
 {
   "rewrites": [
-    { "source": "/api/gerarPlano", "destination": "/api/secure/gerarPlano" },
-    { "source": "/api/gerarPlanoPdf", "destination": "/api/secure/gerarPlanoPdf" },
-    { "source": "/api/gerarSimulado", "destination": "/api/secure/gerarSimulado" },
-    { "source": "/api/aprofundar", "destination": "/api/secure/aprofundar" },
+    { "source": "/api/gerarPlano", "destination": "/api/secure?feature=tema" },
+    { "source": "/api/gerarPlanoPdf", "destination": "/api/secure?feature=pdf" },
+    { "source": "/api/gerarSimulado", "destination": "/api/secure?feature=simulado" },
+    { "source": "/api/aprofundar", "destination": "/api/secure?feature=aprofundar" },
     { "source": "/app", "destination": "/app/index.html" },
     { "source": "/app/(.*)", "destination": "/app/index.html" },
     { "source": "/", "destination": "/index.html" }
