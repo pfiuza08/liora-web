@@ -1,15 +1,22 @@
 // =============================================================
 // 🔒 LIORA — Gates (regras de acesso)
-// Versão: v2.0
+// Versão: v3.0 — login obrigatório + Free reduzido
 // =============================================================
 
 export const gates = {
-  // -----------------------------
-  // USER
-  // -----------------------------
+  limits: {
+    free_tema_per_day: 1,
+    free_simulados_per_day: 1,
+    free_simulado_max_questions: 5
+  },
+
+  _store(store) {
+    return store || window.lioraStore || null;
+  },
+
   getUser(store) {
     try {
-      const u = store?.get?.("user");
+      const u = this._store(store)?.get?.("user");
       return u && typeof u === "object" ? u : null;
     } catch {
       return null;
@@ -18,7 +25,6 @@ export const gates = {
 
   isLogged(store) {
     const u = this.getUser(store);
-    // considera logado se tiver name OU uid/email (se você usar isso depois)
     return !!(u && (u.name || u.uid || u.email));
   },
 
@@ -27,90 +33,133 @@ export const gates = {
     return !!u?.premium;
   },
 
-  // -----------------------------
-  // STATS (para limite free)
-  // -----------------------------
-  _todayISO(d = new Date()) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+  _todayISO() {
+    return new Date().toISOString().slice(0, 10);
   },
 
-  _statsGet() {
-    const key = "liora_stats:v1";
+  _usageGet(store) {
+    const s = this._store(store);
+    const today = this._todayISO();
+
     try {
-      const raw = localStorage.getItem(key);
-      const data = raw ? JSON.parse(raw) : {};
-      return Array.isArray(data.attempts) ? data.attempts : [];
+      const raw = s?.get?.("usage:v1");
+      if (!raw || typeof raw !== "object" || raw.day !== today) {
+        return { day: today, tema: 0, pdf: 0, sim: 0, simulados: 0 };
+      }
+
+      return {
+        day: today,
+        tema: Number(raw.tema || 0),
+        pdf: Number(raw.pdf || 0),
+        sim: Number(raw.sim || raw.simulados || 0),
+        simulados: Number(raw.simulados || raw.sim || 0)
+      };
     } catch {
-      return [];
+      return { day: today, tema: 0, pdf: 0, sim: 0, simulados: 0 };
     }
   },
 
-  getSimuladosHojeCount() {
-    const today = this._todayISO();
-    const attempts = this._statsGet();
-    return attempts.filter((a) => a?.date === today).length;
+  _loginGate(store) {
+    if (this.isLogged(store)) return null;
+    return {
+      ok: false,
+      reason: "login",
+      msg: "Entre para usar as funcionalidades da Liora, inclusive no plano Free."
+    };
   },
 
-  // -----------------------------
-  // LIMITES (free)
-  // -----------------------------
-  // ajuste aqui sem medo
-  limits: {
-    free_simulados_per_day: 3
+  canGenerateTemaPlan(store) {
+    const login = this._loginGate(store);
+    if (login) return login;
+    if (this.isPremium(store)) return { ok: true, premium: true };
+
+    const used = this._usageGet(store).tema;
+    const limit = this.limits.free_tema_per_day;
+
+    if (used >= limit) return { ok: false, reason: "limit", used, limit };
+    return { ok: true, used, limit };
   },
 
-  // -----------------------------
-  // FEATURES / TELAS
-  // -----------------------------
-  // Dashboard MVP: você decidiu "Trava 2" como premium?
-  // Pelo seu modal, Trava 2,3,4 são premium features do dashboard.
-  // Então: entrar para ver dashboard (Trava 2 = login). E partes premium (Trava 2/3/4 no seu texto) exigem premium.
-  // Sugestão prática:
-  // - Dashboard básico: login
-  // - Insights/Detalhes/Histórico completo: premium
+  canGeneratePdfPlan(store) {
+    const login = this._loginGate(store);
+    if (login) return login;
+    if (this.isPremium(store)) return { ok: true, premium: true };
+
+    return {
+      ok: false,
+      reason: "premium",
+      msg: "A geração de planos por PDF é um recurso Premium."
+    };
+  },
+
+  canStartSimulado(store) {
+    const login = this._loginGate(store);
+    if (login) return login;
+    if (this.isPremium(store)) return { ok: true, premium: true };
+
+    const used = this._usageGet(store).sim;
+    const limit = this.limits.free_simulados_per_day;
+
+    if (used >= limit) return { ok: false, reason: "limit", used, limit };
+    return {
+      ok: true,
+      used,
+      limit,
+      maxQuestions: this.limits.free_simulado_max_questions
+    };
+  },
+
+  canRunSimulados(store) {
+    return this.canStartSimulado(store);
+  },
+
+  canAprofundar(store) {
+    const login = this._loginGate(store);
+    if (login) return login;
+    if (this.isPremium(store)) return { ok: true, premium: true };
+
+    return {
+      ok: false,
+      reason: "premium",
+      msg: "A função Aprofundar é um recurso Premium."
+    };
+  },
+
+  canUseAprofundar(store) {
+    return this.canAprofundar(store);
+  },
+
+  canGeneratePlan(store, options = {}) {
+    const source = String(options?.source || "tema").toLowerCase();
+
+    if (source === "pdf") return this.canGeneratePdfPlan(store);
+    if (source === "simulados" || source === "simulado") return this.canStartSimulado(store);
+    if (source === "aprofundar") return this.canAprofundar(store);
+    return this.canGenerateTemaPlan(store);
+  },
+
   canOpenDashboard(store) {
-    return this.isLogged(store); // login obrigatório
+    const login = this._loginGate(store);
+    return login || { ok: true };
   },
 
   canUseDashboardPremiumBlocks(store) {
     return this.isPremium(store);
   },
 
-  // Simulados: por enquanto liberado, mas com limite no free
-  canStartSimulado(store) {
-    // se você quiser exigir login para salvar histórico, faça:
-    // if (!this.isLogged(store)) return { ok:false, reason:"login" };
-
-    // limite free
-    if (this.isPremium(store)) return { ok: true };
-
-    const used = this.getSimuladosHojeCount();
-    const limit = this.limits.free_simulados_per_day;
-
-    if (used >= limit) {
-      return { ok: false, reason: "limit", used, limit };
-    }
-
-    return { ok: true, used, limit };
-  },
-
-  // Tutor (quando existir)
   canUseTutor(store) {
     return this.isPremium(store);
   },
 
-  // Tema avançado (você disse que NÃO é premium)
   canUseAdvancedTheme(store) {
-    return true;
+    return this.isLogged(store);
+  },
+
+  getSimuladoMaxQuestions(store) {
+    return this.isPremium(store) ? 30 : this.limits.free_simulado_max_questions;
   }
 };
-// -------------------------------------------------------------
-// 🌐 Expor gates global (para módulos sem import)
-// -------------------------------------------------------------
+
 try {
   window.lioraGates = gates;
 } catch {}
-
