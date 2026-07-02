@@ -1,6 +1,9 @@
-// router.js — v4.1 (compat: sem optional chaining)
+// router.js — v5.0 (login obrigatório para uso das funcionalidades)
+import { hasAuthenticatedSession, requestLogin } from "./api-auth-fetch.js";
+
 export const router = {
   screens: ["home", "tema", "pdf", "simulados", "dashboard", "pricing"],
+  protectedScreens: new Set(["tema", "pdf", "simulados", "dashboard"]),
 
   init: function () {
     var self = this;
@@ -37,6 +40,10 @@ export const router = {
   getInitialRoute: function () {
     var h = String(location.hash || "").replace("#", "").trim().toLowerCase();
     return this.normalize(h || "home");
+  },
+
+  requiresLogin: function (route) {
+    return this.protectedScreens.has(String(route || "").trim().toLowerCase());
   },
 
   setActiveScreen: function (route) {
@@ -88,12 +95,19 @@ export const router = {
 
     var r = this.normalize(route);
 
+    if (this.requiresLogin(r) && !hasAuthenticatedSession()) {
+      requestLogin(r);
+      r = "home";
+    }
+
     this.setActiveScreen(r);
     this.setActiveNav(r);
 
+    var next = "#" + r;
     if (pushHash) {
-      var next = "#" + r;
       if (location.hash !== next) history.pushState(null, "", next);
+    } else if (location.hash !== next) {
+      history.replaceState(null, "", next);
     }
 
     this.emitOpenEvent(r);
