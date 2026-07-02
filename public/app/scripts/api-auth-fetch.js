@@ -95,6 +95,24 @@ function installAuthenticatedFetch() {
   };
 }
 
+function getCurrentUser() {
+  try {
+    return window.lioraStore?.get?.("user") || null;
+  } catch {
+    return null;
+  }
+}
+
+function applyPlanUiLimits() {
+  const premium = !!getCurrentUser()?.premium;
+  const qtd = document.getElementById("sim-qtd");
+
+  if (qtd) {
+    qtd.max = premium ? "30" : "5";
+    if (!premium && Number(qtd.value || 0) > 5) qtd.value = "5";
+  }
+}
+
 function renderFreeLimitsNotice() {
   const pricingPanel = document.querySelector("#screen-pricing .panel");
   if (!pricingPanel || document.getElementById("liora-free-limits-notice")) return;
@@ -112,12 +130,20 @@ function renderFreeLimitsNotice() {
   else pricingPanel.prepend(notice);
 }
 
+function syncPlanUi() {
+  renderFreeLimitsNotice();
+  applyPlanUiLimits();
+}
+
 installAuthenticatedFetch();
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", renderFreeLimitsNotice, { once: true });
+  document.addEventListener("DOMContentLoaded", syncPlanUi, { once: true });
 } else {
-  renderFreeLimitsNotice();
+  syncPlanUi();
 }
 
-window.addEventListener("liora:user-changed", resumePendingRoute);
+window.addEventListener("liora:user-changed", () => {
+  resumePendingRoute();
+  applyPlanUiLimits();
+});
