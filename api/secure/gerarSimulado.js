@@ -1,5 +1,5 @@
 import originalHandler from "../gerarSimulado.js";
-import authHelpers from "../_lib/requireAuth.js";
+import authHelpers from "../../lib/requireAuth.js";
 
 const {
   requireAuth,
@@ -15,9 +15,14 @@ export default async function secureGerarSimulado(req, res) {
   if (!usage.ok) return sendUsageLimit(res, usage, "simulado");
 
   if (!context.premium) {
-    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : { ...(req.body || {}) };
-    const maxQuestions = 5;
+    let body = {};
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : { ...(req.body || {}) };
+    } catch {
+      body = {};
+    }
 
+    const maxQuestions = 5;
     if (body.qtd != null) body.qtd = Math.min(maxQuestions, Math.max(1, Number(body.qtd || 1)));
     if (body.qtdDiscursivas != null) {
       body.qtdDiscursivas = Math.min(maxQuestions, Math.max(1, Number(body.qtdDiscursivas || 1)));
