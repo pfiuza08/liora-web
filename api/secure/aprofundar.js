@@ -1,5 +1,5 @@
 const originalHandler = require("../aprofundar");
-const { requireAuth, requirePremium } = require("../_lib/requireAuth");
+const { requireAuth, requirePremium } = require("../../lib/requireAuth");
 
 module.exports = async function secureAprofundar(req, res) {
   const context = await requireAuth(req, res);
