@@ -22,9 +22,11 @@ export const pdf = {
 
   const btn = document.getElementById("btn-gerar-pdf");
   const limpar = document.getElementById("btn-limpar-pdf");
+  const baixar = document.getElementById("btn-download-plano-pdf");
 
   btn?.addEventListener("click", () => this.gerarPorPdfUltraFiel());
   limpar?.addEventListener("click", () => this.limparPlano());
+  baixar?.addEventListener("click", () => this.baixarPlano());
 
   // fechar viewer
   document
@@ -56,6 +58,24 @@ export const pdf = {
 
   console.log("pdf.js iniciado (Ultra Fiel + viewer + progresso + aprofundar)");
 },
+
+  async baixarPlano() {
+    if (!this._plano?.sessoes?.length) {
+      this.ctx?.ui?.error?.("Gere um plano antes de baixar o PDF.");
+      return;
+    }
+
+    try {
+      this.ctx?.ui?.loading?.(true, "Preparando seu plano em PDF…");
+      const { exportStudyPlanPdf } = await import("../plan-pdf-export.js");
+      await exportStudyPlanPdf(this._plano, { origem: "material" });
+    } catch (e) {
+      console.error("Falha ao baixar plano em PDF:", e);
+      this.ctx?.ui?.error?.(e?.message || "Não foi possível gerar o PDF.");
+    } finally {
+      this.ctx?.ui?.loading?.(false);
+    }
+  },
 
 
   // =========================================================
