@@ -20,9 +20,11 @@ export const planos = {
 
     const btn = document.getElementById("btn-gerar-tema");
     const limpar = document.getElementById("btn-limpar-plano");
+    const baixar = document.getElementById("btn-download-plano-tema");
 
     btn?.addEventListener("click", () => this.gerarTema());
     limpar?.addEventListener("click", () => this.limparPlano());
+    baixar?.addEventListener("click", () => this.baixarPlano());
 
     // se existir plano salvo, renderiza
     const saved = this.ctx.store.get("planoTema");
@@ -51,6 +53,24 @@ export const planos = {
     }
 
     console.log("planos.js iniciado (Tema + gatesUX + aprofundar gate)");
+  },
+
+  async baixarPlano() {
+    if (!this._plano?.sessoes?.length) {
+      this.ctx?.ui?.error?.("Gere um plano antes de baixar o PDF.");
+      return;
+    }
+
+    try {
+      this.ctx?.ui?.loading?.(true, "Preparando seu plano em PDF…");
+      const { exportStudyPlanPdf } = await import("../plan-pdf-export.js");
+      await exportStudyPlanPdf(this._plano, { origem: "tema" });
+    } catch (e) {
+      console.error("Falha ao baixar plano em PDF:", e);
+      this.ctx?.ui?.error?.(e?.message || "Não foi possível gerar o PDF.");
+    } finally {
+      this.ctx?.ui?.loading?.(false);
+    }
   },
 
   // garante gatesUX (se init não tiver carregado por algum motivo)
