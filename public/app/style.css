@@ -1,3 +1,638 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Liora — Estudo Inteligente</title>
+  <meta name="description" content="Liora — Planos de estudo e sessões com IA." />
+  <link rel="icon" href="/favicon.ico" />
+
+  <!-- Fonte -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Supabase (Auth via Magic Link) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Geração local dos planos em PDF (nenhum conteúdo é enviado a terceiros) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+
+  <!-- CSS do app (fix: path absoluto para /app) -->
+  <link rel="stylesheet" href="/app/style.css?v=2" />
+
+<!-- Meta Pixel Code (LioraWeb) + Advanced Matching (email do login) -->
+<script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;
+  n.push=n;
+  n.loaded=!0;
+  n.version='2.0';
+  n.queue=[];
+  t=b.createElement(e);
+  t.async=!0;
+  t.src=v;
+  s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+
+  const PIXEL_ID = '1216858680616772';
+
+  function getEmailForMatching(){
+    try {
+      const u = JSON.parse(localStorage.getItem('liora:user') || 'null');
+      const em = (u?.email || '').trim().toLowerCase();
+      return em || null;
+    } catch {
+      return null;
+    }
+  }
+
+  const em = getEmailForMatching();
+
+  // init com advanced matching quando houver e-mail
+  fbq('init', PIXEL_ID, em ? { em } : {});
+  fbq('track', 'PageView');
+</script>
+<noscript>
+  <img height="1" width="1" style="display:none"
+       src="https://www.facebook.com/tr?id=1216858680616772&ev=PageView&noscript=1"/>
+</noscript>
+<!-- End Meta Pixel Code -->
+</head>
+
+<body>
+  <div id="app">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo">Li</div>
+        <div class="brand-text">
+          <h1>Liora</h1>
+          <p>Estudo guiado por IA</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-theme" class="btn-icon" title="Alternar tema" aria-label="Alternar tema">🌗</button>
+
+        <button id="btn-login" class="btn-secondary">Entrar</button>
+        <button id="btn-logout" class="btn-secondary hidden">Sair</button>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- HOME -->
+      <section id="screen-home" class="screen active">
+        <div class="hero">
+          <h2>Como deseja estudar hoje?</h2>
+
+          <div class="grid-2">
+            <button class="card-btn" data-nav="tema">
+              <div class="card-title">Tema</div>
+              <div class="card-desc">Estude por assunto, item do edital ou tópico do conteúdo programático</div>
+              <span class="pill pill-base">Base</span>
+            </button>
+
+            <button class="card-btn" data-nav="pdf">
+              <div class="card-title">PDF</div>
+              <div class="card-desc">Estude com base em apostilas, resumos e materiais prontos</div>
+              <span class="pill pill-upload">Upload</span>
+            </button>
+
+            <button class="card-btn" data-nav="simulados">
+              <div class="card-title">Simulados</div>
+              <div class="card-desc">Questões por estilo e dificuldade</div>
+              <span class="pill pill-ia">IA</span>
+            </button>
+
+            <button class="card-btn" data-nav="dashboard">
+              <div class="card-title">Meu desempenho</div>
+              <div class="card-desc">Acompanhe sua evolução</div>
+              <span class="pill pill-mvp">MVP</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+     
+      <!-- TEMA -->
+      <section id="screen-tema" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Plano por Tema</h3>
+        </div>
+      
+        <div class="panel">
+          <label class="label">Tema</label>
+          <div class="muted small" style="margin:4px 0 10px;">
+            Use esta área para estudar por assunto, item do edital ou tópico do conteúdo programático.
+          </div>
+          <input
+            id="inp-tema"
+            class="input"
+            placeholder="Ex.: Crase, Direito Constitucional, Raciocínio Lógico, item do edital..."
+          />
+      
+          <label class="label">Nível</label>
+          <select id="sel-nivel" class="input">
+            <option value="iniciante">Iniciante</option>
+            <option value="intermediario">Intermediário</option>
+            <option value="avancado">Avançado</option>
+          </select>
+      
+          <div class="btn-row">
+            <button id="btn-gerar-tema" class="btn-primary">Gerar plano</button>
+            <button id="btn-limpar-plano" class="btn-secondary">Limpar plano</button>
+          </div>
+      
+          <div id="tema-status" class="muted small"></div>
+      
+          <div id="tema-progress" class="progress-wrap hidden">
+            <div class="progress-top">
+              <span class="muted small">Progresso</span>
+              <span id="tema-progress-pct" class="muted small">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="tema-progress-fill" class="progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      
+        <div id="tema-result" class="two-cols hidden">
+          <aside class="aside">
+            <div class="plan-download-head">
+              <div class="aside-title">Sessões</div>
+              <button id="btn-download-plano-tema" class="btn-secondary btn-download-plan" type="button">
+                Baixar plano em PDF
+              </button>
+            </div>
+            <div id="lista-sessoes" class="list"></div>
+          </aside>
+      
+          <section class="content">
+            <div id="sessao-view" class="sessao"></div>
+          </section>
+        </div>
+      </section>
+    
+     <!-- PDF -->
+      <section id="screen-pdf" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Plano por PDF</h3>
+        </div>
+      
+        <div class="panel">
+          <label class="label">Arquivo PDF</label>
+          <div class="muted small" style="margin:4px 0 10px;">
+            Use esta área para apostilas, resumos e materiais de estudo.
+            Para estudar pelo edital ou pelo conteúdo programático, use <b>Tema</b> e avance tópico por tópico.
+          </div>
+          <input id="inp-pdf" type="file" accept="application/pdf" class="input" />
+      
+          <div class="grid-2">
+            <div>
+              <label class="label">Nível</label>
+              <select id="sel-nivel-pdf" class="input">
+                <option value="iniciante">Iniciante</option>
+                <option value="intermediario">Intermediário</option>
+                <option value="avancado">Avançado</option>
+              </select>
+            </div>
+      
+            <div>
+              <label class="label">Finalidade</label>
+              <select id="sel-finalidade-pdf" class="input">
+                <option value="estudo">Estudo geral</option>
+                <option value="prova">Prova / Concurso</option>
+                <option value="trabalho">Trabalho / Projeto</option>
+                <option value="procedimento">Procedimento / Manual</option>
+                <option value="certificacao">Certificação</option>
+                <option value="leitura">Leitura (livro)</option>
+              </select>
+            </div>
+          </div>
+      
+          <div class="btn-row">
+            <button id="btn-gerar-pdf" class="btn-primary">Gerar plano</button>
+            <button id="btn-limpar-pdf" class="btn-secondary">Limpar plano</button>
+          </div>
+      
+          <div id="pdf-status" class="muted small" style="margin-top:10px;"></div>
+      
+          <div id="pdf-progress" class="progress-wrap hidden">
+            <div class="progress-top">
+              <span class="muted small">Progresso</span>
+              <span id="pdf-progress-pct" class="muted small">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="pdf-progress-fill" class="progress-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      
+        <div id="pdf-result" class="two-cols hidden">
+          <aside class="aside">
+            <div class="plan-download-head">
+              <div class="aside-title">Sessões</div>
+              <button id="btn-download-plano-pdf" class="btn-secondary btn-download-plan" type="button">
+                Baixar plano em PDF
+              </button>
+            </div>
+            <div id="pdf-lista-sessoes" class="list"></div>
+          </aside>
+      
+          <section class="content">
+            <div id="pdf-viewer-wrap" class="pdf-viewer-wrap hidden">
+              <div class="pdf-viewer-head">
+                <div class="pdf-viewer-title">PDF</div>
+                <div class="pdf-viewer-actions">
+                  <button id="btn-pdf-close" class="btn-secondary">Fechar PDF</button>
+                </div>
+              </div>
+      
+              <iframe id="pdf-iframe" class="pdf-iframe" src="" loading="lazy"></iframe>
+            </div>
+      
+            <div id="pdf-sessao-view" class="sessao"></div>
+          </section>
+        </div>
+      </section>
+      <!-- SIMULADOS -->
+      <section id="screen-simulados" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Simulados</h3>
+          <span class="badge" id="sim-mode">Pronto</span>
+        </div>
+
+        <div class="panel">
+          <div id="sim-body"></div>
+        </div>
+
+       <section id="screen-thanks" class="screen">
+        <div class="card">
+          <h2>Ativar acesso Premium</h2>
+          <p class="muted">
+            Se você acabou de comprar, use o <b>mesmo e-mail da compra</b> para entrar.
+            Depois clique em <b>Atualizar acesso</b>.
+          </p>
+      
+          <div class="row">
+            <input id="thanks-email" type="email" placeholder="seuemail@exemplo.com" />
+            <button class="btn-secondary" id="thanks-sendlink">Enviar link</button>
+          </div>
+      
+          <div class="row">
+            <button class="btn-primary" id="thanks-refresh">Atualizar acesso</button>
+            <button class="btn-secondary" data-nav="home">Ir para Home</button>
+          </div>
+      
+          <div id="thanks-status" class="muted small" style="margin-top:10px;"></div>
+        </div>
+      </section>
+        
+        <!-- MODAL CONFIG -->
+        <div class="modal" id="sim-config" aria-hidden="true">
+          <div class="modal-backdrop" data-action="closeConfig"></div>
+
+          <div class="modal-card">
+            <div class="modal-head">
+              <div class="modal-title">Configurar simulado</div>
+              <button class="btn-secondary" data-action="closeConfig" aria-label="Fechar">Fechar</button>
+            </div>
+
+            <div class="modal-body">
+              <div class="grid-2">
+                <label class="field">
+                   <span class="label">Organizadora / Exame</span>
+                  <select id="sim-banca" class="input">
+                    <optgroup label="Geral">
+                      <option value="Geral">Geral (estilo misto)</option>
+                    </optgroup>
+                      <optgroup label="Concursos (Organizadoras)">
+                      <option value="FGV">FGV</option>
+                      <option value="CESPE/CEBRASPE">CEBRASPE (CESPE)</option>
+                      <option value="FCC">FCC</option>
+                      <option value="VUNESP">VUNESP</option>
+                      <option value="IBFC">IBFC</option>
+                      <option value="AOCP">AOCP</option>
+                    </optgroup>
+                  
+                    <optgroup label="Mercado financeiro (Certificações)">
+                      <option value="ANBIMA_CPA10">CPA-10 (ANBIMA)</option>
+                      <option value="ANBIMA_CPA20">CPA-20 (ANBIMA)</option>
+                    </optgroup>
+                  
+                    <optgroup label="TI (Certificações)">
+                      <option value="AWS_CLF_C02">AWS Cloud Practitioner</option>
+                      <option value="AZ_900">Microsoft AZ-900 (Azure Fundamentals)</option>
+                      <option value="ITIL4_F">ITIL 4 Foundation</option>
+                    </optgroup>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span class="label">Quantidade</span>
+                  <input id="sim-qtd" class="input" type="number" min="3" max="30" value="5" />
+                </label>
+
+                <label class="field">
+                  <span class="label">Dificuldade</span>
+                  <select id="sim-dificuldade" class="input">
+                    <option value="misturado">Misturado</option>
+                    <option value="facil">Fácil</option>
+                    <option value="medio">Médio</option>
+                    <option value="dificil">Difícil</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span class="label">Tempo (min)</span>
+                  <input id="sim-tempo" class="input" type="number" min="5" max="180" value="20" />
+                </label>
+              </div>
+
+              <label class="field">
+                <span class="label">Tipo de simulado</span>
+                <select id="sim-kind" class="input">
+                  <option value="obj">Objetivas (MCQ + C/E)</option>
+                  <option value="disc">Discursivas</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span class="label">Tema</span>
+                <input id="sim-tema" class="input" type="text" placeholder="Ex.: Língua Portuguesa, LGPD, SQL, Redes..." required />
+              </label>
+
+              <label class="field">
+                <span class="label">Timer</span>
+                <select id="sim-timer-mode" class="input">
+                  <option value="on">Ligado</option>
+                  <option value="off">Desligado</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="modal-foot">
+              <button class="btn-secondary" data-action="closeConfig">Cancelar</button>
+              <button class="btn-primary" data-action="saveConfig">Salvar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section id="screen-dashboard" class="screen">
+        <div class="screen-head">
+          <button class="btn-link" data-nav="home">← Voltar</button>
+          <h3>Meu desempenho</h3>
+        </div>
+
+        <!-- RESUMO (FREE) -->
+        <div class="panel">
+          <div class="dash-grid" id="dash-kpis"></div>
+        </div>
+
+        <!-- INSIGHTS -->
+        <div class="panel">
+          <div class="panel-head">
+            <h4>Insights</h4>
+            <div class="muted">Análises e recomendações</div>
+          </div>
+
+          <div class="dash-grid dash-grid-2" id="dash-insights"></div>
+        </div>
+
+        <!-- DETALHES -->
+        <div class="panel">
+          <div class="panel-head">
+            <h4>Detalhes</h4>
+            <div class="muted">Onde você mais ganha pontos</div>
+          </div>
+
+          <div class="dash-grid dash-grid-2" id="dash-tables"></div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div class="panel hidden" id="dash-empty">
+          <div class="muted">
+            Ainda não há dados suficientes.<br />
+            Faça seu primeiro simulado para começar a medir seu progresso.
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn-primary" data-action="startSimulado">Fazer simulado agora</button>
+          </div>
+        </div>
+      </section>
+
+     <!-- PRICING (Planos) -->
+    <section id="screen-pricing" class="screen">
+      <div class="screen-head">
+        <div>
+          <h2 class="screen-title">Planos</h2>
+          <p class="screen-subtitle">Escolha o plano ideal para você.</p>
+        </div>
+    
+        <div class="screen-head-actions">
+          <button class="btn-secondary" data-nav="home">Voltar</button>
+        </div>
+      </div>
+    
+      <div class="panel">
+        <div class="card-title">Planos Premium</div>
+        <div class="muted">O plano gratuito continua disponível. Premium libera insights e detalhes avançados.</div>
+    
+        <div class="pricing-grid" style="margin-top:12px;">
+          <!-- Mensal (ATIVO) -->
+          <div class="pricing-card">
+            <div class="pricing-top">
+              <div class="pricing-title">Mensal</div>
+              <div class="pricing-price">R$ 19,90</div>
+              <div class="pricing-sub">por mês</div>
+            </div>
+    
+            <div class="pricing-list">
+              <div class="pricing-item">Insights avançados no dashboard</div>
+              <div class="pricing-item">Detalhes por banca (rank e métricas)</div>
+              <div class="pricing-item">Histórico recente com tempo</div>
+            </div>
+    
+            <div class="pricing-actions">
+             <button
+              class="btn-primary js-meta-checkout-app"
+              data-action="pricingChoose"
+              data-plan="monthly"
+              data-offer="monthly"
+              data-checkout-name="Liora Mensal App"
+            >
+              Assinar mensal
+            </button>
+              <button class="btn-secondary" data-action="pricingLearnMore">Ver benefícios</button>
+            </div>
+          </div>
+    
+          <!-- Trimestral (EM BREVE) -->
+          <div class="pricing-card pricing-featured is-comingsoon" aria-disabled="true">
+            <div class="pricing-badge">Em breve</div>
+    
+            <div class="pricing-top">
+              <div class="pricing-title">Trimestral</div>
+              <div class="pricing-price">R$ 49,90</div>
+              <div class="pricing-sub">a cada 3 meses</div>
+            </div>
+    
+            <div class="pricing-list">
+              <div class="pricing-item">Melhor custo-benefício</div>
+              <div class="pricing-item">Acesso Premium completo</div>
+              <div class="pricing-item">Prioridade nas novidades</div>
+            </div>
+    
+            <div class="pricing-actions">
+              <button class="btn-primary" type="button" disabled title="Em breve">Assinar trimestral</button>
+              <button class="btn-secondary" type="button" disabled title="Em breve">Ver benefícios</button>
+            </div>
+          </div>
+    
+          <!-- Vitalício (EM BREVE) -->
+          <div class="pricing-card is-comingsoon" aria-disabled="true">
+            <div class="pricing-badge">Em breve</div>
+    
+            <div class="pricing-top">
+              <div class="pricing-title">Vitalício</div>
+              <div class="pricing-price">R$ 149,00</div>
+              <div class="pricing-sub">pagamento único</div>
+            </div>
+    
+            <div class="pricing-list">
+              <div class="pricing-item">Premium para sempre</div>
+              <div class="pricing-item">Sem renovação</div>
+              <div class="pricing-item">Ideal para maratonas de estudo</div>
+            </div>
+    
+            <div class="pricing-actions">
+              <button class="btn-primary" type="button" disabled title="Em breve">Quero vitalício</button>
+              <button class="btn-secondary" type="button" disabled title="Em breve">Ver benefícios</button>
+            </div>
+          </div>
+        </div>
+    
+        <!-- Continuar no Free (CENTRALIZADO) -->
+        <div class="actions-row pricing-free-row" style="margin-top:12px;">
+          <button class="btn-secondary" data-action="pricingChoose" data-plan="free">Continuar no Free</button>
+        </div>
+      </div>
+    
+      <!-- DEMO TOOLS (aparece só com ?demo=1) -->
+      <div class="panel hidden" id="demo-tools" style="margin-top:12px;">
+        <div class="card-title">Ferramentas de demo</div>
+        <div class="muted">
+          Use isto para reiniciar a demo e testar o fluxo do zero.
+        </div>
+    
+        <div class="actions-row" style="margin-top:12px;">
+          <button class="btn-secondary" id="btn-reset-demo">Reset demo</button>
+        </div>
+    
+        <div class="muted small" style="margin-top:10px;">
+          Isso apaga apenas dados locais da Liora (<code>liora:*</code> e <code>liora_stats:v1</code>).
+        </div>
+      </div>
+    
+      <div class="panel" style="margin-top:12px;">
+        <div class="muted small">
+          Um produto da
+          <a href="https://www.intellih.com.br/" target="_blank" rel="noopener noreferrer"
+             style="color:inherit; text-decoration:underline; text-underline-offset:3px;">
+            Intellih Tecnologia
+          </a>.
+        </div>
+      </div>
+    </section>
+
+    </main>
+
+    <!-- LOADING -->
+    <div id="ui-loading" class="overlay hidden" aria-hidden="true">
+      <div class="overlay-card">
+        <div class="spinner"></div>
+        <div id="ui-loading-text" class="overlay-text">Processando…</div>
+      </div>
+    </div>
+
+    <!-- ERROR -->
+    <div id="ui-error" class="overlay hidden" aria-hidden="true">
+      <div class="overlay-card">
+        <div class="overlay-title">Algo deu ruim</div>
+        <div id="ui-error-text" class="overlay-text">Erro</div>
+        <div class="overlay-actions">
+          <button id="ui-error-close" class="btn-primary">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- APP (1 único script) -->
+  <script type="module" src="/app/scripts/app.js?v=1"></script>
+
+  <!-- =========================================================
+🤖 Assistente da Liora — MVP
+Colar no final do <body>
+========================================================= -->
+<button id="lioraAssistBtn" class="liora-assist-btn" aria-label="Abrir assistente da Liora">
+  ✨ Ajuda
+</button>
+
+<div id="lioraAssistModal" class="liora-assist-modal" aria-hidden="true">
+  <div class="liora-assist-backdrop" data-close-assist="true"></div>
+
+  <section class="liora-assist-panel" role="dialog" aria-modal="true" aria-labelledby="lioraAssistTitle">
+    <header class="liora-assist-header">
+      <div>
+        <div class="liora-assist-kicker">Assistente da Liora</div>
+        <h3 id="lioraAssistTitle">Como posso te ajudar?</h3>
+      </div>
+      <button class="liora-assist-close" id="lioraAssistClose" aria-label="Fechar assistente">×</button>
+    </header>
+
+    <div class="liora-assist-body">
+      <div id="lioraAssistMessages" class="liora-assist-messages"></div>
+
+     <div id="lioraAssistQuickActions" class="liora-assist-quick-actions">
+        <button class="liora-chip" data-assist-prompt="Como começar">Como começar</button>
+        <button class="liora-chip" data-assist-prompt="Como estudar por tópicos">Como estudar por tópicos</button>
+        <button class="liora-chip" data-assist-prompt="Como usar PDF">Como usar PDF</button>
+        <button class="liora-chip" data-assist-prompt="Como funciona o simulado">Como funciona o simulado</button>
+        <button class="liora-chip" data-assist-prompt="Diferença entre Free e Premium">Diferença entre Free e Premium</button>
+        <button class="liora-chip" data-assist-prompt="Tenho pouco tempo hoje">Tenho pouco tempo hoje</button>
+      </div>
+    </div>
+
+    <footer class="liora-assist-footer">
+      <form id="lioraAssistForm" class="liora-assist-form">
+        <input
+          id="lioraAssistInput"
+          class="liora-assist-input"
+          type="text"
+          placeholder="Digite sua dúvida sobre a Liora..."
+          autocomplete="off"
+        />
+        <button type="submit" class="liora-assist-send">Enviar</button>
+      </form>
+    </footer>
+  </section>
+</div>
+</body>
+</html>
 :root {
   --bg: #0b0b0d;
   --card: #121216;
@@ -1475,6 +2110,22 @@ html.light .checkpoint-box .cq-input {
   --sim-surface: rgba(255,255,255,.03);
   --sim-surface-2: rgba(255,255,255,.05);
   --sim-accent: var(--brand, #c44b04);
+}
+
+.plan-download-head {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.plan-download-head .aside-title {
+  margin-bottom: 0;
+}
+
+.btn-download-plan {
+  width: 100%;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 /* ---------- Card base (só dentro de simulados) ---------- */
