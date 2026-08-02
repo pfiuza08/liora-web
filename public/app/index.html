@@ -16,6 +16,9 @@
   <!-- Supabase (Auth via Magic Link) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- Geração local dos planos em PDF (nenhum conteúdo é enviado a terceiros) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+
   <!-- CSS do app (fix: path absoluto para /app) -->
   <link rel="stylesheet" href="/app/style.css?v=2" />
 
@@ -164,7 +167,12 @@
       
         <div id="tema-result" class="two-cols hidden">
           <aside class="aside">
-            <div class="aside-title">Sessões</div>
+            <div class="plan-download-head">
+              <div class="aside-title">Sessões</div>
+              <button id="btn-download-plano-tema" class="btn-secondary btn-download-plan" type="button">
+                Baixar plano em PDF
+              </button>
+            </div>
             <div id="lista-sessoes" class="list"></div>
           </aside>
       
@@ -232,7 +240,12 @@
       
         <div id="pdf-result" class="two-cols hidden">
           <aside class="aside">
-            <div class="aside-title">Sessões</div>
+            <div class="plan-download-head">
+              <div class="aside-title">Sessões</div>
+              <button id="btn-download-plano-pdf" class="btn-secondary btn-download-plan" type="button">
+                Baixar plano em PDF
+              </button>
+            </div>
             <div id="pdf-lista-sessoes" class="list"></div>
           </aside>
       
