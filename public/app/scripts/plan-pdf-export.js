@@ -53,7 +53,10 @@ export async function exportStudyPlanPdf(plano, options = {}) {
 function writeSession(writer, sessao, index, total) {
   const conteudo = sessao?.conteudo || {};
   const tempo = Number.isFinite(sessao?.tempoEstimadoMin) ? `${sessao.tempoEstimadoMin} minutos` : "Tempo livre";
-  writer.kicker(`SESSÃO ${index + 1} DE ${total} · ${tempo}`);
+
+  // Página 1: compreensão. Mantém os blocos relacionados juntos e evita
+  // que revisão e exercícios comecem espremidos no fim da página.
+  writer.kicker(`SESSAO ${index + 1} DE ${total} - ${tempo}`);
   writer.heading(clean(sessao?.titulo || `Sessão ${index + 1}`), 20);
   if (sessao?.objetivo) writer.callout(`Objetivo: ${clean(sessao.objetivo)}`);
   if (conteudo?.introducao) {
@@ -63,32 +66,32 @@ function writeSession(writer, sessao, index, total) {
   const fontes = Array.isArray(sessao?.fontes)
     ? sessao.fontes.map((fonte) => `Página ${fonte?.page || "-"}: ${clean(fonte?.trecho)}`)
     : [];
-  writer.listSection("Referências no material", fontes);
-  writer.listSection("O que estudar", conteudo?.conceitos);
-  writer.listSection("Exemplos", conteudo?.exemplos);
-  writer.listSection("Aplicações práticas", conteudo?.aplicacoes);
-  writer.listSection("Resumo rápido", conteudo?.resumoRapido);
-  writer.checkSection("Checklist da sessão", sessao?.checklist);
-  writer.listSection("Erros comuns", sessao?.errosComuns);
+  writer.listSection("Referências no material", fontes, { maxItems: 3 });
+  writer.listSection("O que estudar", conteudo?.conceitos, { maxItems: 5 });
+  writer.listSection("Exemplos", conteudo?.exemplos, { maxItems: 3 });
+  writer.listSection("Aplicações práticas", conteudo?.aplicacoes, { maxItems: 4 });
+
+  // Página 2: revisão e prática. A quebra deliberada elimina páginas com
+  // alternativas soltas e dá uma hierarquia previsível a todas as sessões.
+  writer.newPage();
+  writer.kicker(`SESSAO ${index + 1} - REVISAO E PRATICA`);
+  writer.heading(clean(sessao?.titulo || `Sessão ${index + 1}`), 18);
+  writer.checkSection("Checklist da sessão", sessao?.checklist, { maxItems: 4 });
 
   const flashcards = Array.isArray(sessao?.flashcards) ? sessao.flashcards : [];
   if (flashcards.length) {
     writer.heading("Flashcards para revisão", 14);
-    flashcards.forEach((card, cardIndex) => writer.paragraph(`${cardIndex + 1}. ${clean(card?.frente)} — ${clean(card?.verso)}`, { size: 9.5, gap: 2 }));
+    flashcards.slice(0, 4).forEach((card, cardIndex) => {
+      writer.flashcard(card, cardIndex);
+    });
   }
 
   const checkpoint = Array.isArray(sessao?.checkpoint) ? sessao.checkpoint : [];
   if (checkpoint.length) {
     writer.heading("Verificação rápida", 14);
-    checkpoint.forEach((questao, questionIndex) => {
-      writer.paragraph(`${questionIndex + 1}. ${clean(questao?.pergunta)}`, { size: 9.5, gap: 2 });
-      if (Array.isArray(questao?.opcoes) && questao.opcoes.length) {
-        questao.opcoes.forEach((opcao, optionIndex) => writer.bullet(`${String.fromCharCode(65 + optionIndex)}) ${clean(opcao)}`, { indent: 6 }));
-      } else {
-        writer.answerLines(2);
-      }
-    });
+    checkpoint.slice(0, 3).forEach((questao, questionIndex) => writer.question(questao, questionIndex));
   }
+
 }
 
 function drawCover(doc, meta) {
@@ -96,7 +99,7 @@ function drawCover(doc, meta) {
   doc.setFillColor(...BRAND.orange); doc.rect(0, 0, 10, 297, "F");
   doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(29); doc.text("Liora", 24, 35);
   doc.setTextColor(225, 225, 225); doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text("ESTUDO GUIADO POR IA", 24, 44);
-  doc.setTextColor(...BRAND.orange); doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text("PLANO DE ESTUDOS", 24, 82);
+  doc.setTextColor(...BRAND.orange); doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text("PLANO ESSENCIAL DE ESTUDOS", 24, 82);
   doc.setTextColor(255, 255, 255); doc.setFontSize(25);
   const titleLines = doc.splitTextToSize(meta.tema, 160);
   doc.text(titleLines, 24, 98, { lineHeightFactor: 1.15 });
@@ -145,8 +148,44 @@ function createWriter(doc) {
     checkbox(value) { ensure(7); doc.setDrawColor(...BRAND.muted); doc.rect(marginX, y - 4, 3.4, 3.4); text(value, { size: 9.5, indent: 6, width: maxWidth - 6, gap: 2.5 }); },
     callout(value) { const lines = doc.splitTextToSize(clean(value), maxWidth - 12); const height = Math.max(16, lines.length * 4.5 + 9); ensure(height + 5); doc.setFillColor(...BRAND.soft); doc.setDrawColor(...BRAND.line); doc.roundedRect(marginX, y - 5, maxWidth, height, 2, 2, "FD"); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(...BRAND.ink); doc.text(lines, marginX + 6, y + 2, { lineHeightFactor: 1.3 }); y += height + 5; },
     stat(label, value) { ensure(8); doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(...BRAND.ink); doc.text(`${label}:`, marginX, y); doc.setFont("helvetica", "normal"); doc.text(clean(value), marginX + 37, y); y += 7; },
-    listSection(title, items) { const list = normalizeList(items); if (!list.length) return; this.heading(title, 14); list.forEach((item) => this.bullet(item)); },
-    checkSection(title, items) { const list = normalizeList(items); if (!list.length) return; this.heading(title, 14); list.forEach((item) => this.checkbox(item)); },
+    listSection(title, items, options = {}) { const list = normalizeList(items).slice(0, options.maxItems || 99); if (!list.length) return; this.heading(title, 14); list.forEach((item) => this.bullet(item)); },
+    checkSection(title, items, options = {}) { const list = normalizeList(items).slice(0, options.maxItems || 99); if (!list.length) return; this.heading(title, 14); list.forEach((item) => this.checkbox(item)); },
+    flashcard(card, index) {
+      const frente = clean(card?.frente);
+      const verso = clean(card?.verso);
+      const value = `${index + 1}. ${frente}\nResposta: ${verso}`;
+      const lines = doc.splitTextToSize(value, maxWidth - 12);
+      const height = Math.max(15, lines.length * 3.7 + 7);
+      ensure(height + 3);
+      doc.setFillColor(250, 248, 246);
+      doc.setDrawColor(...BRAND.line);
+      doc.roundedRect(marginX, y - 4, maxWidth, height, 2, 2, "FD");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.8);
+      doc.setTextColor(...BRAND.ink);
+      doc.text(lines, marginX + 6, y + 1, { lineHeightFactor: 1.25 });
+      y += height + 3;
+    },
+    question(question, index) {
+      const prompt = `${index + 1}. ${clean(question?.pergunta)}`;
+      text(prompt, { size: 9.2, bold: true, lineHeight: 1.22, gap: 2 });
+      const options = Array.isArray(question?.opcoes) ? question.opcoes.slice(0, 4) : [];
+      if (options.length) {
+        options.forEach((option, optionIndex) => {
+          text(`${String.fromCharCode(65 + optionIndex)}) ${clean(option)}`, {
+            size: 8.6,
+            indent: 5,
+            width: maxWidth - 5,
+            lineHeight: 1.18,
+            gap: 1
+          });
+        });
+        y += 2;
+      } else {
+        this.answerLines(2);
+      }
+    },
+    newPage() { doc.addPage(); y = 22; },
     answerLines(count = 2) { ensure(count * 8); doc.setDrawColor(...BRAND.line); for (let i = 0; i < count; i += 1) doc.line(marginX, y + i * 7, marginX + maxWidth, y + i * 7); y += count * 7 + 2; }
   };
 }
