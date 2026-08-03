@@ -63,7 +63,7 @@ export const planos = {
 
     try {
       this.ctx?.ui?.loading?.(true, "Preparando seu plano em PDF…");
-      const { exportStudyPlanPdf } = await import("../plan-pdf-export.js");
+      const { exportStudyPlanPdf } = await import("../plan-pdf-export.js?v=2");
       await exportStudyPlanPdf(this._plano, { origem: "tema" });
     } catch (e) {
       console.error("Falha ao baixar plano em PDF:", e);
